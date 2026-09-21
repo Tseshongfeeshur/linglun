@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../library/presentation/library_page.dart';
+import '../../library/presentation/annual_summary_page.dart';
 import '../../player/presentation/audio_settings_page.dart';
+import '../../player/presentation/lyrics_page.dart';
 import '../../player/presentation/now_playing_bar.dart';
 
 class AppShell extends StatefulWidget {
@@ -34,6 +36,8 @@ class _AppShellState extends State<AppShell> {
   Widget _buildPage() {
     return switch (_selectedIndex) {
       4 => const AudioSettingsPage(),
+      6 => const LyricsPage(),
+      7 => const AnnualSummaryPage(),
       _ => const LibraryPage(),
     };
   }
@@ -88,6 +92,19 @@ class _NavigationRail extends StatelessWidget {
             label: '播放列表',
             selected: selectedIndex == 3,
             onTap: () => onSelected(3),
+          ),
+          const Spacer(),
+          _NavItem(
+            icon: Icons.lyrics_outlined,
+            label: '歌词',
+            selected: selectedIndex == 6,
+            onTap: () => onSelected(6),
+          ),
+          _NavItem(
+            icon: Icons.auto_awesome,
+            label: '年度总结',
+            selected: selectedIndex == 7,
+            onTap: () => onSelected(7),
           ),
           const Spacer(),
           _NavItem(
