@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../library/presentation/library_page.dart';
+import '../../player/presentation/audio_settings_page.dart';
 import '../../player/presentation/now_playing_bar.dart';
 
 class AppShell extends StatefulWidget {
@@ -23,11 +24,18 @@ class _AppShellState extends State<AppShell> {
             onSelected: (index) => setState(() => _selectedIndex = index),
           ),
           const VerticalDivider(width: 1),
-          const Expanded(child: LibraryPage()),
+          Expanded(child: _buildPage()),
         ],
       ),
       bottomNavigationBar: const NowPlayingBar(),
     );
+  }
+
+  Widget _buildPage() {
+    return switch (_selectedIndex) {
+      4 => const AudioSettingsPage(),
+      _ => const LibraryPage(),
+    };
   }
 }
 

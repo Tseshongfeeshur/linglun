@@ -7,6 +7,11 @@ class Track {
     required this.album,
     required this.duration,
     this.path,
+    this.lyrics,
+    this.lyricsFormat,
+    this.replayGainDb,
+    this.playCount = 0,
+    this.lastPlayedAt,
     this.coverColor = 0xFF263238,
   });
 
@@ -16,6 +21,11 @@ class Track {
   final String album;
   final Duration duration;
   final String? path;
+  final String? lyrics;
+  final String? lyricsFormat;
+  final double? replayGainDb;
+  final int playCount;
+  final DateTime? lastPlayedAt;
   final int coverColor;
 }
 

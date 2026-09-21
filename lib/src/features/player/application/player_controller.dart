@@ -1,6 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart' hide Track;
 
+import 'dart:async';
+import 'dart:math' as math;
+
+import '../../../core/database/app_database.dart';
 import '../domain/track.dart';
 
 final playerControllerProvider =
@@ -13,12 +17,14 @@ class PlayerState {
     required this.currentIndex,
     required this.isPlaying,
     required this.position,
+    required this.normalizationEnabled,
   });
 
   final List<Track> queue;
   final int currentIndex;
   final bool isPlaying;
   final Duration position;
+  final bool normalizationEnabled;
 
   Track get currentTrack => queue[currentIndex];
 
@@ -27,18 +33,21 @@ class PlayerState {
     int? currentIndex,
     bool? isPlaying,
     Duration? position,
+    bool? normalizationEnabled,
   }) {
     return PlayerState(
       queue: queue ?? this.queue,
       currentIndex: currentIndex ?? this.currentIndex,
       isPlaying: isPlaying ?? this.isPlaying,
       position: position ?? this.position,
+      normalizationEnabled: normalizationEnabled ?? this.normalizationEnabled,
     );
   }
 }
 
 class PlayerController extends Notifier<PlayerState> {
   Player? _player;
+  bool _normalizationEnabled = true;
 
   @override
   PlayerState build() {
@@ -48,6 +57,7 @@ class PlayerController extends Notifier<PlayerState> {
       currentIndex: 0,
       isPlaying: false,
       position: Duration.zero,
+      normalizationEnabled: true,
     );
   }
 
@@ -77,8 +87,18 @@ class PlayerController extends Notifier<PlayerState> {
     );
 
     if (track.path != null) {
-      await _ensurePlayer().open(Media(Uri.file(track.path!).toString()));
+      final player = _ensurePlayer();
+      await player.open(Media(Uri.file(track.path!).toString()));
+      await _applyReplayGain(track);
+      unawaited(_recordPlayback(track));
     }
+  }
+
+  void setNormalizationEnabled(bool enabled) {
+    _normalizationEnabled = enabled;
+    state = state.copyWith(normalizationEnabled: enabled);
+    final track = state.currentTrack;
+    unawaited(_applyReplayGain(track));
   }
 
   /// 用曲库扫描结果替换播放队列，同时保留当前播放项（如果仍存在）。
@@ -122,5 +142,21 @@ class PlayerController extends Notifier<PlayerState> {
       assert(error.isNotEmpty);
     });
     return player;
+  }
+
+  Future<void> _applyReplayGain(Track track) async {
+    final gain = _normalizationEnabled ? (track.replayGainDb ?? 0) : 0;
+    // ReplayGain 是 dB 增益；转换为 mpv 的百分比音量并限制上限，避免异常标签造成过载。
+    final volume = (100 * math.pow(10, gain / 20)).clamp(0, 100).toDouble();
+    await _ensurePlayer().setVolume(volume);
+  }
+
+  Future<void> _recordPlayback(Track track) async {
+    try {
+      final database = await sharedLinglunDatabase();
+      await database.recordPlayback(track.id, DateTime.now());
+    } on Object {
+      // 统计失败不能影响播放。
+    }
   }
 }

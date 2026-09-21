@@ -60,7 +60,7 @@ class LibraryController extends Notifier<LibraryState> {
 
   Future<void> _initialize() async {
     try {
-      final database = await openLinglunDatabase();
+      final database = await sharedLinglunDatabase();
       _database = database;
       _repository = LibraryRepository(database);
       final library = await _repository!.load();

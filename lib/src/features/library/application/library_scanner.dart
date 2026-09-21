@@ -1,6 +1,15 @@
 import 'dart:io';
 
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
+// ignore: implementation_imports
+import 'package:audio_metadata_reader/src/metadata/base.dart'
+    show
+        ApeMetadata,
+        Mp3Metadata,
+        Mp4Metadata,
+        ParserTag,
+        RiffMetadata,
+        VorbisMetadata;
 
 import '../../player/domain/track.dart';
 
@@ -37,7 +46,7 @@ class LibraryScanner {
 
     final tracks = <Track>[];
     for (final file in files) {
-      final track = _readTrack(file);
+      final track = await _readTrack(file);
       if (track != null) tracks.add(track);
     }
 
@@ -47,10 +56,12 @@ class LibraryScanner {
     return tracks;
   }
 
-  Track? _readTrack(File file) {
+  Future<Track?> _readTrack(File file) async {
     try {
       final metadata = readMetadata(file, getImage: false);
+      final detailed = readAllMetadata(file, getImage: false);
       final fallbackTitle = _fileNameWithoutExtension(file.path);
+      final sidecarLyrics = await _readSidecarLyrics(file);
       return Track(
         id: file.path,
         path: file.path,
@@ -58,12 +69,53 @@ class LibraryScanner {
         artist: _clean(metadata.artist) ?? '未知艺术家',
         album: _clean(metadata.album) ?? '未知专辑',
         duration: metadata.duration ?? Duration.zero,
+        lyrics: sidecarLyrics?.content ?? metadata.lyrics,
+        lyricsFormat: sidecarLyrics?.extension ?? 'lrc',
+        replayGainDb: _replayGainDb(detailed),
         coverColor: _colorForPath(file.path),
       );
     } on Object {
       // 损坏或暂不支持的文件不应中断整个曲库扫描。
       return null;
     }
+  }
+
+  Future<({String content, String extension})?> _readSidecarLyrics(
+    File audioFile,
+  ) async {
+    final basePath = audioFile.path.substring(
+      0,
+      audioFile.path.lastIndexOf('.'),
+    );
+    for (final extension in const ['.lrc', '.elrc', '.ass', '.srt', '.vtt']) {
+      final file = File('$basePath$extension');
+      if (await file.exists()) {
+        return (content: await file.readAsString(), extension: extension);
+      }
+    }
+    return null;
+  }
+
+  double? _replayGainDb(ParserTag metadata) {
+    String? value;
+    switch (metadata) {
+      case VorbisMetadata m:
+        value =
+            m.replayGainTrackGain.firstOrNull ??
+            m.replayGainAlbumGain.firstOrNull;
+      case Mp3Metadata m:
+        value =
+            m.customMetadata['REPLAYGAIN_TRACK_GAIN'] ??
+            m.customMetadata['REPLAYGAIN_ALBUM_GAIN'];
+      case Mp4Metadata():
+        value = null;
+      case RiffMetadata():
+        value = null;
+      case ApeMetadata():
+        value = null;
+    }
+    if (value == null) return null;
+    return double.tryParse(value.replaceAll(RegExp(r'[^0-9+\-.]'), ''));
   }
 
   String _extension(String path) =>
