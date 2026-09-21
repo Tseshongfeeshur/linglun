@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit/media_kit.dart' hide Track;
 
 import '../domain/track.dart';
 
@@ -37,8 +38,11 @@ class PlayerState {
 }
 
 class PlayerController extends Notifier<PlayerState> {
+  Player? _player;
+
   @override
   PlayerState build() {
+    ref.onDispose(() => _player?.dispose());
     return PlayerState(
       queue: demoTracks,
       currentIndex: 0,
@@ -48,10 +52,21 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   void togglePlay() {
-    state = state.copyWith(isPlaying: !state.isPlaying);
+    final track = state.currentTrack;
+    if (track.path == null) {
+      state = state.copyWith(isPlaying: !state.isPlaying);
+      return;
+    }
+
+    final player = _ensurePlayer();
+    if (state.isPlaying) {
+      player.pause();
+    } else {
+      player.play();
+    }
   }
 
-  void playTrack(Track track) {
+  Future<void> playTrack(Track track) async {
     final index = state.queue.indexWhere((item) => item.id == track.id);
     if (index == -1) return;
 
@@ -59,6 +74,21 @@ class PlayerController extends Notifier<PlayerState> {
       currentIndex: index,
       isPlaying: true,
       position: Duration.zero,
+    );
+
+    if (track.path != null) {
+      await _ensurePlayer().open(Media(Uri.file(track.path!).toString()));
+    }
+  }
+
+  /// 用曲库扫描结果替换播放队列，同时保留当前播放项（如果仍存在）。
+  void replaceQueue(List<Track> tracks) {
+    if (tracks.isEmpty) return;
+    final currentId = state.currentTrack.id;
+    final nextIndex = tracks.indexWhere((track) => track.id == currentId);
+    state = state.copyWith(
+      queue: tracks,
+      currentIndex: nextIndex == -1 ? 0 : nextIndex,
     );
   }
 
@@ -68,10 +98,29 @@ class PlayerController extends Notifier<PlayerState> {
 
   void skipNext() {
     final nextIndex = (state.currentIndex + 1) % state.queue.length;
-    state = state.copyWith(
-      currentIndex: nextIndex,
-      position: Duration.zero,
-      isPlaying: true,
-    );
+    playTrack(state.queue[nextIndex]);
+  }
+
+  Player _ensurePlayer() {
+    return _player ??= _createPlayer();
+  }
+
+  Player _createPlayer() {
+    final player = Player();
+    player.stream.playing.listen((playing) {
+      state = state.copyWith(isPlaying: playing);
+    });
+    player.stream.position.listen((position) {
+      state = state.copyWith(position: position);
+    });
+    player.stream.completed.listen((completed) {
+      if (completed) skipNext();
+    });
+    player.stream.error.listen((error) {
+      state = state.copyWith(isPlaying: false);
+      // 先停止当前状态，后续接入统一错误提示和日志服务。
+      assert(error.isNotEmpty);
+    });
+    return player;
   }
 }

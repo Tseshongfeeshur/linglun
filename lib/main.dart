@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit/media_kit.dart';
 
 import 'src/app/linglun_app.dart';
 
@@ -7,5 +8,8 @@ import 'src/app/linglun_app.dart';
 export 'src/app/linglun_app.dart';
 
 void main() {
+  // 在创建播放器前初始化 libmpv 的平台实现。
+  WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
   runApp(const ProviderScope(child: LinglunApp()));
 }

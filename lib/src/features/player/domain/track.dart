@@ -6,6 +6,7 @@ class Track {
     required this.artist,
     required this.album,
     required this.duration,
+    this.path,
     this.coverColor = 0xFF263238,
   });
 
@@ -14,6 +15,7 @@ class Track {
   final String artist;
   final String album;
   final Duration duration;
+  final String? path;
   final int coverColor;
 }
 

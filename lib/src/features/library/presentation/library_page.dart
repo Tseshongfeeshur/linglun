@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../application/library_controller.dart';
 import '../../player/application/player_controller.dart';
 import '../../player/domain/track.dart';
 
@@ -16,8 +17,9 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final playerState = ref.watch(playerControllerProvider);
-    final tracks = playerState.queue.where((track) {
+    final libraryState = ref.watch(libraryControllerProvider);
+    final sourceTracks = libraryState.tracks;
+    final tracks = sourceTracks.where((track) {
       final query = _query.trim().toLowerCase();
       if (query.isEmpty) return true;
       return '${track.title} ${track.artist} ${track.album}'
@@ -27,7 +29,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 
     return CustomScrollView(
       slivers: [
-        SliverToBoxAdapter(child: _buildHeader(context)),
+        SliverToBoxAdapter(child: _buildHeader(context, libraryState)),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
           sliver: SliverToBoxAdapter(
@@ -36,7 +38,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
                 Text('所有歌曲', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(width: 10),
                 Text(
-                  '${playerState.queue.length} 首',
+                  '${sourceTracks.length} 首',
                   style: Theme.of(context).textTheme.bodyMedium
                       ?.copyWith(color: Colors.white54),
                 ),
@@ -56,7 +58,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, LibraryState libraryState) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 26, 28, 22),
       child: Row(
@@ -88,9 +90,27 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           ),
           const SizedBox(width: 10),
           IconButton(
-            onPressed: () {},
+            onPressed: libraryState.isScanning
+                ? null
+                : () => ref.read(libraryControllerProvider.notifier).scan(),
             tooltip: '刷新曲库',
-            icon: const Icon(Icons.refresh),
+            icon: libraryState.isScanning
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+          ),
+          const SizedBox(width: 4),
+          FilledButton.icon(
+            onPressed: libraryState.isScanning
+                ? null
+                : () => ref
+                      .read(libraryControllerProvider.notifier)
+                      .pickDirectoryAndScan(),
+            icon: const Icon(Icons.folder_open, size: 18),
+            label: const Text('添加目录'),
           ),
         ],
       ),
