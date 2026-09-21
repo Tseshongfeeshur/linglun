@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 /// 曲库中最小的可播放单元。
 class Track {
   const Track({
@@ -7,6 +9,7 @@ class Track {
     required this.album,
     required this.duration,
     this.path,
+    this.coverBytes,
     this.lyrics,
     this.lyricsFormat,
     this.replayGainDb,
@@ -21,6 +24,7 @@ class Track {
   final String album;
   final Duration duration;
   final String? path;
+  final Uint8List? coverBytes;
   final String? lyrics;
   final String? lyricsFormat;
   final double? replayGainDb;

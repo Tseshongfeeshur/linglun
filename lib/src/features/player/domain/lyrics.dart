@@ -12,11 +12,13 @@ class LyricLine {
     required this.start,
     required this.text,
     this.words = const [],
+    this.translation,
   });
 
   final Duration start;
   final String text;
   final List<LyricWord> words;
+  final String? translation;
 
   bool get isWordSynchronized => words.isNotEmpty;
 }
@@ -65,7 +67,7 @@ LyricsDocument parseLyrics(String source) {
   }
 
   lines.sort((a, b) => a.start.compareTo(b.start));
-  return LyricsDocument(lines: lines, offset: offset);
+  return LyricsDocument(lines: _mergeTranslations(lines), offset: offset);
 }
 
 /// 根据文件扩展名解析常见歌词格式；未知格式仍尝试按 LRC 处理。
@@ -99,7 +101,7 @@ LyricsDocument _parseSubtitleBlocks(
     final text = rows.sublist(timingIndex + 1).join('\n').trim();
     if (text.isNotEmpty) lines.add(LyricLine(start: start, text: text));
   }
-  return LyricsDocument(lines: lines);
+  return LyricsDocument(lines: _mergeTranslations(lines));
 }
 
 Duration? _srtTimestamp(String value) {
@@ -139,7 +141,31 @@ LyricsDocument _parseAss(String source) {
         .replaceAll(RegExp(r'\{[^}]*\}'), '');
     lines.add(LyricLine(start: start, text: text.replaceAll(r'\N', '\n')));
   }
-  return LyricsDocument(lines: lines);
+  return LyricsDocument(lines: _mergeTranslations(lines));
+}
+
+/// 常见双语歌词会使用相同时间戳连续存放原文和译文，这里将其合并为一行。
+List<LyricLine> _mergeTranslations(List<LyricLine> lines) {
+  final merged = <LyricLine>[];
+  for (final line in lines) {
+    if (merged.isNotEmpty &&
+        merged.last.start == line.start &&
+        merged.last.translation == null &&
+        line.text != merged.last.text) {
+      final previous = merged.removeLast();
+      merged.add(
+        LyricLine(
+          start: previous.start,
+          text: previous.text,
+          words: previous.words,
+          translation: line.text,
+        ),
+      );
+    } else {
+      merged.add(line);
+    }
+  }
+  return merged;
 }
 
 Duration? _assTimestamp(String value) {

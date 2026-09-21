@@ -10,6 +10,7 @@ part 'app_database.g.dart';
 class LibraryTracks extends Table {
   TextColumn get id => text()();
   TextColumn get filePath => text()();
+  BlobColumn get coverBytes => blob().nullable()();
   TextColumn get title => text()();
   TextColumn get artist => text()();
   TextColumn get album => text()();
@@ -45,7 +46,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -60,6 +61,9 @@ class AppDatabase extends _$AppDatabase {
       if (from < 3) {
         await m.addColumn(libraryTracks, libraryTracks.lyricsFormat);
         await m.createTable(playbackEvents);
+      }
+      if (from < 4) {
+        await m.addColumn(libraryTracks, libraryTracks.coverBytes);
       }
     },
   );

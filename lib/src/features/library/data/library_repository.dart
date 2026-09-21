@@ -40,6 +40,7 @@ class LibraryRepository {
         return LibraryTracksCompanion.insert(
           id: track.id,
           filePath: track.path!,
+          coverBytes: Value(track.coverBytes),
           title: track.title,
           artist: track.artist,
           album: track.album,
@@ -61,6 +62,7 @@ class LibraryRepository {
     return Track(
       id: row.id,
       path: row.filePath,
+      coverBytes: row.coverBytes,
       title: row.title,
       artist: row.artist,
       album: row.album,

@@ -29,6 +29,17 @@ class $LibraryTracksTable extends LibraryTracks
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _coverBytesMeta = const VerificationMeta(
+    'coverBytes',
+  );
+  @override
+  late final GeneratedColumn<Uint8List> coverBytes = GeneratedColumn<Uint8List>(
+    'cover_bytes',
+    aliasedName,
+    true,
+    type: DriftSqlType.blob,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _titleMeta = const VerificationMeta('title');
   @override
   late final GeneratedColumn<String> title = GeneratedColumn<String>(
@@ -147,6 +158,7 @@ class $LibraryTracksTable extends LibraryTracks
   List<GeneratedColumn> get $columns => [
     id,
     filePath,
+    coverBytes,
     title,
     artist,
     album,
@@ -183,6 +195,12 @@ class $LibraryTracksTable extends LibraryTracks
       );
     } else if (isInserting) {
       context.missing(_filePathMeta);
+    }
+    if (data.containsKey('cover_bytes')) {
+      context.handle(
+        _coverBytesMeta,
+        coverBytes.isAcceptableOrUnknown(data['cover_bytes']!, _coverBytesMeta),
+      );
     }
     if (data.containsKey('title')) {
       context.handle(
@@ -288,6 +306,10 @@ class $LibraryTracksTable extends LibraryTracks
         DriftSqlType.string,
         data['${effectivePrefix}file_path'],
       )!,
+      coverBytes: attachedDatabase.typeMapping.read(
+        DriftSqlType.blob,
+        data['${effectivePrefix}cover_bytes'],
+      ),
       title: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}title'],
@@ -344,6 +366,7 @@ class $LibraryTracksTable extends LibraryTracks
 class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
   final String id;
   final String filePath;
+  final Uint8List? coverBytes;
   final String title;
   final String artist;
   final String album;
@@ -358,6 +381,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
   const LibraryTrack({
     required this.id,
     required this.filePath,
+    this.coverBytes,
     required this.title,
     required this.artist,
     required this.album,
@@ -375,6 +399,9 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['file_path'] = Variable<String>(filePath);
+    if (!nullToAbsent || coverBytes != null) {
+      map['cover_bytes'] = Variable<Uint8List>(coverBytes);
+    }
     map['title'] = Variable<String>(title);
     map['artist'] = Variable<String>(artist);
     map['album'] = Variable<String>(album);
@@ -401,6 +428,9 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     return LibraryTracksCompanion(
       id: Value(id),
       filePath: Value(filePath),
+      coverBytes: coverBytes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(coverBytes),
       title: Value(title),
       artist: Value(artist),
       album: Value(album),
@@ -431,6 +461,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     return LibraryTrack(
       id: serializer.fromJson<String>(json['id']),
       filePath: serializer.fromJson<String>(json['filePath']),
+      coverBytes: serializer.fromJson<Uint8List?>(json['coverBytes']),
       title: serializer.fromJson<String>(json['title']),
       artist: serializer.fromJson<String>(json['artist']),
       album: serializer.fromJson<String>(json['album']),
@@ -450,6 +481,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'filePath': serializer.toJson<String>(filePath),
+      'coverBytes': serializer.toJson<Uint8List?>(coverBytes),
       'title': serializer.toJson<String>(title),
       'artist': serializer.toJson<String>(artist),
       'album': serializer.toJson<String>(album),
@@ -467,6 +499,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
   LibraryTrack copyWith({
     String? id,
     String? filePath,
+    Value<Uint8List?> coverBytes = const Value.absent(),
     String? title,
     String? artist,
     String? album,
@@ -481,6 +514,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
   }) => LibraryTrack(
     id: id ?? this.id,
     filePath: filePath ?? this.filePath,
+    coverBytes: coverBytes.present ? coverBytes.value : this.coverBytes,
     title: title ?? this.title,
     artist: artist ?? this.artist,
     album: album ?? this.album,
@@ -497,6 +531,9 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     return LibraryTrack(
       id: data.id.present ? data.id.value : this.id,
       filePath: data.filePath.present ? data.filePath.value : this.filePath,
+      coverBytes: data.coverBytes.present
+          ? data.coverBytes.value
+          : this.coverBytes,
       title: data.title.present ? data.title.value : this.title,
       artist: data.artist.present ? data.artist.value : this.artist,
       album: data.album.present ? data.album.value : this.album,
@@ -526,6 +563,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     return (StringBuffer('LibraryTrack(')
           ..write('id: $id, ')
           ..write('filePath: $filePath, ')
+          ..write('coverBytes: $coverBytes, ')
           ..write('title: $title, ')
           ..write('artist: $artist, ')
           ..write('album: $album, ')
@@ -545,6 +583,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
   int get hashCode => Object.hash(
     id,
     filePath,
+    $driftBlobEquality.hash(coverBytes),
     title,
     artist,
     album,
@@ -563,6 +602,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       (other is LibraryTrack &&
           other.id == this.id &&
           other.filePath == this.filePath &&
+          $driftBlobEquality.equals(other.coverBytes, this.coverBytes) &&
           other.title == this.title &&
           other.artist == this.artist &&
           other.album == this.album &&
@@ -579,6 +619,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
 class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
   final Value<String> id;
   final Value<String> filePath;
+  final Value<Uint8List?> coverBytes;
   final Value<String> title;
   final Value<String> artist;
   final Value<String> album;
@@ -594,6 +635,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
   const LibraryTracksCompanion({
     this.id = const Value.absent(),
     this.filePath = const Value.absent(),
+    this.coverBytes = const Value.absent(),
     this.title = const Value.absent(),
     this.artist = const Value.absent(),
     this.album = const Value.absent(),
@@ -610,6 +652,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
   LibraryTracksCompanion.insert({
     required String id,
     required String filePath,
+    this.coverBytes = const Value.absent(),
     required String title,
     required String artist,
     required String album,
@@ -633,6 +676,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
   static Insertable<LibraryTrack> custom({
     Expression<String>? id,
     Expression<String>? filePath,
+    Expression<Uint8List>? coverBytes,
     Expression<String>? title,
     Expression<String>? artist,
     Expression<String>? album,
@@ -649,6 +693,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (filePath != null) 'file_path': filePath,
+      if (coverBytes != null) 'cover_bytes': coverBytes,
       if (title != null) 'title': title,
       if (artist != null) 'artist': artist,
       if (album != null) 'album': album,
@@ -667,6 +712,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
   LibraryTracksCompanion copyWith({
     Value<String>? id,
     Value<String>? filePath,
+    Value<Uint8List?>? coverBytes,
     Value<String>? title,
     Value<String>? artist,
     Value<String>? album,
@@ -683,6 +729,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     return LibraryTracksCompanion(
       id: id ?? this.id,
       filePath: filePath ?? this.filePath,
+      coverBytes: coverBytes ?? this.coverBytes,
       title: title ?? this.title,
       artist: artist ?? this.artist,
       album: album ?? this.album,
@@ -706,6 +753,9 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     }
     if (filePath.present) {
       map['file_path'] = Variable<String>(filePath.value);
+    }
+    if (coverBytes.present) {
+      map['cover_bytes'] = Variable<Uint8List>(coverBytes.value);
     }
     if (title.present) {
       map['title'] = Variable<String>(title.value);
@@ -751,6 +801,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     return (StringBuffer('LibraryTracksCompanion(')
           ..write('id: $id, ')
           ..write('filePath: $filePath, ')
+          ..write('coverBytes: $coverBytes, ')
           ..write('title: $title, ')
           ..write('artist: $artist, ')
           ..write('album: $album, ')
@@ -1265,6 +1316,7 @@ typedef $$LibraryTracksTableCreateCompanionBuilder =
     LibraryTracksCompanion Function({
       required String id,
       required String filePath,
+      Value<Uint8List?> coverBytes,
       required String title,
       required String artist,
       required String album,
@@ -1282,6 +1334,7 @@ typedef $$LibraryTracksTableUpdateCompanionBuilder =
     LibraryTracksCompanion Function({
       Value<String> id,
       Value<String> filePath,
+      Value<Uint8List?> coverBytes,
       Value<String> title,
       Value<String> artist,
       Value<String> album,
@@ -1312,6 +1365,11 @@ class $$LibraryTracksTableFilterComposer
 
   ColumnFilters<String> get filePath => $composableBuilder(
     column: $table.filePath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<Uint8List> get coverBytes => $composableBuilder(
+    column: $table.coverBytes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1390,6 +1448,11 @@ class $$LibraryTracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<Uint8List> get coverBytes => $composableBuilder(
+    column: $table.coverBytes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get title => $composableBuilder(
     column: $table.title,
     builder: (column) => ColumnOrderings(column),
@@ -1460,6 +1523,11 @@ class $$LibraryTracksTableAnnotationComposer
 
   GeneratedColumn<String> get filePath =>
       $composableBuilder(column: $table.filePath, builder: (column) => column);
+
+  GeneratedColumn<Uint8List> get coverBytes => $composableBuilder(
+    column: $table.coverBytes,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
@@ -1538,6 +1606,7 @@ class $$LibraryTracksTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> filePath = const Value.absent(),
+                Value<Uint8List?> coverBytes = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<String> artist = const Value.absent(),
                 Value<String> album = const Value.absent(),
@@ -1553,6 +1622,7 @@ class $$LibraryTracksTableTableManager
               }) => LibraryTracksCompanion(
                 id: id,
                 filePath: filePath,
+                coverBytes: coverBytes,
                 title: title,
                 artist: artist,
                 album: album,
@@ -1570,6 +1640,7 @@ class $$LibraryTracksTableTableManager
               ({
                 required String id,
                 required String filePath,
+                Value<Uint8List?> coverBytes = const Value.absent(),
                 required String title,
                 required String artist,
                 required String album,
@@ -1585,6 +1656,7 @@ class $$LibraryTracksTableTableManager
               }) => LibraryTracksCompanion.insert(
                 id: id,
                 filePath: filePath,
+                coverBytes: coverBytes,
                 title: title,
                 artist: artist,
                 album: album,

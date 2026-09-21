@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../library/presentation/library_page.dart';
 import '../../library/presentation/annual_summary_page.dart';
 import '../../player/presentation/audio_settings_page.dart';
+import '../../player/presentation/floating_player.dart';
 import '../../player/presentation/lyrics_page.dart';
-import '../../player/presentation/now_playing_bar.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -19,17 +19,21 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
+      body: Stack(
         children: [
-          _NavigationRail(
-            selectedIndex: _selectedIndex,
-            onSelected: (index) => setState(() => _selectedIndex = index),
+          Row(
+            children: [
+              _NavigationRail(
+                selectedIndex: _selectedIndex,
+                onSelected: (index) => setState(() => _selectedIndex = index),
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(child: _buildPage()),
+            ],
           ),
-          const VerticalDivider(width: 1),
-          Expanded(child: _buildPage()),
+          const Positioned.fill(child: FloatingPlayer()),
         ],
       ),
-      bottomNavigationBar: const NowPlayingBar(),
     );
   }
 

@@ -58,13 +58,16 @@ class LibraryScanner {
 
   Future<Track?> _readTrack(File file) async {
     try {
-      final metadata = readMetadata(file, getImage: false);
-      final detailed = readAllMetadata(file, getImage: false);
+      final metadata = readMetadata(file, getImage: true);
+      final detailed = readAllMetadata(file, getImage: true);
       final fallbackTitle = _fileNameWithoutExtension(file.path);
       final sidecarLyrics = await _readSidecarLyrics(file);
       return Track(
         id: file.path,
         path: file.path,
+        coverBytes: metadata.pictures.isEmpty
+            ? null
+            : metadata.pictures.first.bytes,
         title: _clean(metadata.title) ?? fallbackTitle,
         artist: _clean(metadata.artist) ?? '未知艺术家',
         album: _clean(metadata.album) ?? '未知专辑',

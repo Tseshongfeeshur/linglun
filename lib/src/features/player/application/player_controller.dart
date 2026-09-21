@@ -121,6 +121,12 @@ class PlayerController extends Notifier<PlayerState> {
     playTrack(state.queue[nextIndex]);
   }
 
+  void previous() {
+    final previousIndex =
+        (state.currentIndex - 1 + state.queue.length) % state.queue.length;
+    playTrack(state.queue[previousIndex]);
+  }
+
   Player _ensurePlayer() {
     return _player ??= _createPlayer();
   }
