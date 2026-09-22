@@ -369,6 +369,7 @@ LyricsDocument _parseLrc(String source) {
     final wordResult = _parseLrcWords(
       speakerInfo.text,
       speaker: speakerInfo.speaker,
+      initialStart: timestamps.firstOrNull,
     );
     final cleanText = wordResult.text;
 
@@ -1041,44 +1042,61 @@ Duration _resolveTtmlTime(
 ({String text, List<LyricWord> words, Duration? firstStart}) _parseLrcWords(
   String text, {
   String? speaker,
+  Duration? initialStart,
 }) {
-  final matches = RegExp(r'<\s*(\d{1,3}(?::\d{1,3}){1,2}(?:[.,]\d{1,3})?)\s*>')
-      .allMatches(text)
-      .toList();
+  // Enhanced LRC 同时存在尖括号和方括号两种写法：
+  // <00:01.00>word 以及 [00:01.00]word [00:01.30]next。后者的最后一个
+  // 时间戳可能表示上一片段的结束时间，因此不能简单地把每个标签都当作起点。
+  final matches = RegExp(
+    r'(?:<|\[)\s*(\d{1,3}(?::\d{1,3}){1,2}(?:[.,]\d{1,3})?)\s*(?:>|\])',
+  ).allMatches(text).toList();
+  if (matches.isEmpty) {
+    return (text: _plainText(text), words: const [], firstStart: initialStart);
+  }
+
   final words = <LyricWord>[];
   final textBuffer = StringBuffer();
-  Duration? firstStart;
   var cursor = 0;
+  Duration? activeStart;
+  Duration? firstStart = initialStart;
 
-  for (var index = 0; index < matches.length; index++) {
-    final match = matches[index];
-    if (match.start > cursor) {
-      textBuffer.write(_plainText(text.substring(cursor, match.start)));
-    }
-    final segmentEnd = index + 1 < matches.length
-        ? matches[index + 1].start
-        : text.length;
+  void appendSegment(String rawText, Duration? start, Duration? end) {
+    // 逐字歌词常把单词间空格放在前一个片段末尾，不能逐片段 trim，
+    // 否则会把英文歌词拼成无空格的连续字符串。
+    final clean = _stripLyricMarkup(rawText).replaceAll(RegExp(r'[ \t]+'), ' ');
+    if (clean.trim().isEmpty) return;
+    textBuffer.write(clean);
+    if (start == null) return;
+    firstStart ??= start;
+    words.add(LyricWord(start: start, end: end, text: clean, speaker: speaker));
+  }
+
+  for (final match in matches) {
     final timing = _parseLrcTimestamp(match.group(1)!);
-    if (timing == null) {
-      textBuffer.write(
-        _stripLyricMarkup(text.substring(match.start, match.end)),
+    if (timing == null) continue;
+    final segmentText = text.substring(cursor, match.start);
+    appendSegment(segmentText, activeStart ?? initialStart, timing);
+    activeStart = timing;
+    cursor = match.end;
+  }
+  appendSegment(text.substring(cursor), activeStart, null);
+
+  // 当文本以时间标签结束时，该标签是上一片段的结束边界，而不是新词起点。
+  if (words.isNotEmpty && cursor == text.length && activeStart != null) {
+    final last = words.last;
+    if (activeStart > last.start && last.end == null) {
+      words[words.length - 1] = LyricWord(
+        start: last.start,
+        end: activeStart,
+        text: last.text,
+        speaker: last.speaker,
       );
-      cursor = match.end;
-      continue;
     }
-    final wordText = _stripLyricMarkup(text.substring(match.end, segmentEnd));
-    if (wordText.isNotEmpty) {
-      firstStart ??= timing;
-      words.add(LyricWord(start: timing, text: wordText, speaker: speaker));
-      textBuffer.write(wordText);
-    }
-    cursor = segmentEnd;
   }
 
   if (words.isEmpty) {
-    return (text: _plainText(text), words: const [], firstStart: null);
+    return (text: _plainText(text), words: const [], firstStart: firstStart);
   }
-  if (cursor < text.length) textBuffer.write(text.substring(cursor));
 
   final withEnds = [
     for (var index = 0; index < words.length; index++)
@@ -1103,9 +1121,9 @@ Duration _resolveTtmlTime(
   if (bracket != null && _parseLrcTimestamp(bracket.group(1)!) == null) {
     return (text: bracket.group(2)!, speaker: bracket.group(1));
   }
-  final colon = text.startsWith('<')
-      ? null
-      : RegExp(r'^([^:：]{1,16})[:：]\s*(.+)$').firstMatch(text);
+  // 说话者名称不能跨过歌词时间标签，否则 `[00:06.860]` 中的冒号会被
+  // 误认为“说话者:歌词”的分隔符。
+  final colon = RegExp(r'^([^\[\]<>:：]{1,16})[:：]\s*(.+)$').firstMatch(text);
   if (colon != null) {
     return (text: colon.group(2)!, speaker: colon.group(1)!.trim());
   }

@@ -17,6 +17,32 @@ void main() {
     expect(document.timing, LyricsTiming.word);
   });
 
+  test('解析方括号 Enhanced LRC 的逐字时间、行尾结束时间和翻译', () {
+    final document = parseLyrics('''
+[00:06.160]Salt [00:06.860]air[00:07.912]
+[00:06.160]咸涩的空气[00:09.000]
+[00:09.005]And [00:09.325]the [00:09.525]rust [00:09.837]on [00:10.317]your [00:10.693]door[00:11.493]
+[00:09.005]你门上的斑斑锈迹[00:11.760]
+''');
+
+    expect(document.syntax, LyricsSyntax.lrc);
+    expect(document.timing, LyricsTiming.word);
+    expect(document.lines, hasLength(2));
+    expect(document.lines.first.text, 'Salt air');
+    expect(document.lines.first.translation, '咸涩的空气');
+    expect(document.lines.first.words, hasLength(2));
+    expect(
+      document.lines.first.words.first.start,
+      const Duration(milliseconds: 6160),
+    );
+    expect(
+      document.lines.first.words.last.end,
+      const Duration(milliseconds: 7912),
+    );
+    expect(document.lines.last.text, 'And the rust on your door');
+    expect(document.lines.last.translation, '你门上的斑斑锈迹');
+  });
+
   test('解析只包含逐字时间标签的 Enhanced LRC', () {
     final document = parseLyrics('<00:01.00>你<00:01.30>好');
 
