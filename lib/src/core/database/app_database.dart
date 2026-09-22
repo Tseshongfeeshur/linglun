@@ -18,7 +18,10 @@ class LibraryTracks extends Table {
   IntColumn get coverColor => integer()();
   TextColumn get lyrics => text().nullable()();
   TextColumn get lyricsFormat => text().nullable()();
+  TextColumn get lyricsSourcesJson => text().nullable()();
+  TextColumn get metadataJson => text().nullable()();
   RealColumn get replayGainDb => real().nullable()();
+  TextColumn get replayGainMode => text().nullable()();
   IntColumn get playCount => integer().withDefault(const Constant(0))();
   DateTimeColumn get lastPlayedAt => dateTime().nullable()();
   DateTimeColumn get updatedAt => dateTime()();
@@ -41,12 +44,24 @@ class PlaybackEvents extends Table {
   DateTimeColumn get playedAt => dateTime()();
 }
 
-@DriftDatabase(tables: [LibraryTracks, LibraryDirectories, PlaybackEvents])
+/// 保存版本化的应用设置，避免音频处理参数只存在于当前进程内。
+class AppSettings extends Table {
+  TextColumn get key => text()();
+  TextColumn get valueJson => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {key};
+}
+
+@DriftDatabase(
+  tables: [LibraryTracks, LibraryDirectories, PlaybackEvents, AppSettings],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -65,6 +80,18 @@ class AppDatabase extends _$AppDatabase {
       if (from < 4) {
         await m.addColumn(libraryTracks, libraryTracks.coverBytes);
       }
+      if (from < 5) {
+        await m.addColumn(libraryTracks, libraryTracks.metadataJson);
+      }
+      if (from < 6) {
+        await m.createTable(appSettings);
+      }
+      if (from < 7) {
+        await m.addColumn(libraryTracks, libraryTracks.replayGainMode);
+      }
+      if (from < 8) {
+        await m.addColumn(libraryTracks, libraryTracks.lyricsSourcesJson);
+      }
     },
   );
 
@@ -72,6 +99,23 @@ class AppDatabase extends _$AppDatabase {
 
   Future<List<LibraryDirectory>> loadDirectories() =>
       select(libraryDirectories).get();
+
+  Future<String?> loadSetting(String key) async {
+    final row = await (select(
+      appSettings,
+    )..where((setting) => setting.key.equals(key))).getSingleOrNull();
+    return row?.valueJson;
+  }
+
+  Future<void> saveSetting(String key, String valueJson) async {
+    await into(appSettings).insertOnConflictUpdate(
+      AppSettingsCompanion.insert(
+        key: key,
+        valueJson: valueJson,
+        updatedAt: DateTime.now(),
+      ),
+    );
+  }
 
   Future<void> replaceLibrary({
     required List<LibraryTracksCompanion> tracks,

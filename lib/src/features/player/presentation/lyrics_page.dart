@@ -26,11 +26,9 @@ class _LyricsPageState extends ConsumerState<LyricsPage> {
   Widget build(BuildContext context) {
     final player = ref.watch(playerControllerProvider);
     final track = player.currentTrack;
-    final source = track.lyrics;
-    final document = source == null || source.trim().isEmpty
-        ? const LyricsDocument(lines: [])
-        : parseLyricsFile(source, extension: track.lyricsFormat);
+    final document = track.lyricsDocument;
     final currentLine = _lineAt(document, player.position);
+    final lyricPosition = player.position - document.offset;
 
     if (_trackId != track.id) {
       _trackId = track.id;
@@ -45,27 +43,47 @@ class _LyricsPageState extends ConsumerState<LyricsPage> {
       });
     }
 
+    final Widget lyricsContent;
+    if (document.lines.isEmpty && document.plainLines.isEmpty) {
+      lyricsContent = const _EmptyLyrics();
+    } else if (document.hasTimestamps) {
+      lyricsContent = ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(48, 24, 48, 80),
+        itemCount: document.lines.length,
+        itemBuilder: (context, index) {
+          final line = document.lines[index];
+          final active = index == currentLine;
+          return _LyricLineTile(
+            line: line,
+            active: active,
+            position: lyricPosition,
+          );
+        },
+      );
+    } else {
+      lyricsContent = ListView.builder(
+        padding: const EdgeInsets.fromLTRB(48, 24, 48, 80),
+        itemCount: document.plainLines.length,
+        itemBuilder: (context, index) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Text(
+            document.plainLines[index],
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 20,
+              height: 1.5,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Column(
       children: [
         _Header(trackTitle: track.title, artist: track.artist),
-        Expanded(
-          child: document.lines.isEmpty
-              ? const _EmptyLyrics()
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(48, 24, 48, 80),
-                  itemCount: document.lines.length,
-                  itemBuilder: (context, index) {
-                    final line = document.lines[index];
-                    final active = index == currentLine;
-                    return _LyricLineTile(
-                      line: line,
-                      active: active,
-                      position: player.position,
-                    );
-                  },
-                ),
-        ),
+        Expanded(child: lyricsContent),
       ],
     );
   }
@@ -148,9 +166,38 @@ class _LyricLineTile extends StatelessWidget {
         style: style,
         child: Align(
           alignment: Alignment.center,
-          child: line.isWordSynchronized
-              ? _WordSynchronizedText(line: line, position: position)
-              : Text(line.text, textAlign: TextAlign.center),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              line.isWordSynchronized
+                  ? _WordSynchronizedText(line: line, position: position)
+                  : Text(line.text, textAlign: TextAlign.center),
+              if (line.translation != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  line.translation!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+              for (final variant in line.variants) ...[
+                const SizedBox(height: 4),
+                Text(
+                  variant.text,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

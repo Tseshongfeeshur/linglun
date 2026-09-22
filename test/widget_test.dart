@@ -9,7 +9,7 @@ void main() {
 
     expect(find.text('伶伦'), findsOneWidget);
     expect(find.text('曲库'), findsNWidgets(2));
-    expect(find.text('雾中回声'), findsNWidgets(2));
+    expect(find.text('雾中回声'), findsOneWidget);
     expect(find.byType(FloatingPlayer), findsOneWidget);
   });
 }

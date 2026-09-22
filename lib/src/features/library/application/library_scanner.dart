@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 // ignore: implementation_imports
@@ -8,10 +9,13 @@ import 'package:audio_metadata_reader/src/metadata/base.dart'
         Mp3Metadata,
         Mp4Metadata,
         ParserTag,
+        PictureType,
         RiffMetadata,
         VorbisMetadata;
 
 import '../../player/domain/track.dart';
+import '../../player/domain/lyrics_source.dart';
+import '../../player/domain/lyrics.dart';
 
 const supportedAudioExtensions = {
   '.mp3',
@@ -58,24 +62,32 @@ class LibraryScanner {
 
   Future<Track?> _readTrack(File file) async {
     try {
-      final metadata = readMetadata(file, getImage: true);
       final detailed = readAllMetadata(file, getImage: true);
+      final metadata = _summaryMetadata(file, detailed);
       final fallbackTitle = _fileNameWithoutExtension(file.path);
       final sidecarLyrics = await _readSidecarLyrics(file);
+      final sources = <LyricsSource>[
+        ...sidecarLyrics,
+        ..._embeddedLyrics(detailed, metadata.lyrics),
+      ];
+      final selectedLyrics = selectLyricsSource(sources);
+      final replayGain = _replayGainInfo(detailed);
       return Track(
         id: file.path,
         path: file.path,
-        coverBytes: metadata.pictures.isEmpty
-            ? null
-            : metadata.pictures.first.bytes,
+        coverBytes: _coverBytes(detailed),
         title: _clean(metadata.title) ?? fallbackTitle,
         artist: _clean(metadata.artist) ?? '未知艺术家',
         album: _clean(metadata.album) ?? '未知专辑',
         duration: metadata.duration ?? Duration.zero,
-        lyrics: sidecarLyrics?.content ?? metadata.lyrics,
-        lyricsFormat: sidecarLyrics?.extension ?? 'lrc',
-        replayGainDb: _replayGainDb(detailed),
+        lyrics: selectedLyrics?.content,
+        // 内嵌歌词没有外挂文件扩展名，交给解析器根据内容自动识别语法。
+        lyricsFormat: selectedLyrics?.extension,
+        lyricsSources: sources,
+        replayGainDb: replayGain.db,
+        replayGainMode: replayGain.mode,
         coverColor: _colorForPath(file.path),
+        metadata: _metadataMap(file, detailed, metadata),
       );
     } on Object {
       // 损坏或暂不支持的文件不应中断整个曲库扫描。
@@ -83,42 +95,438 @@ class LibraryScanner {
     }
   }
 
-  Future<({String content, String extension})?> _readSidecarLyrics(
-    File audioFile,
-  ) async {
+  AudioMetadata _summaryMetadata(File file, ParserTag detailed) {
+    final metadata = switch (detailed) {
+      VorbisMetadata m => AudioMetadata(
+        file: file,
+        album: m.album.firstOrNull,
+        artist: m.artist.firstOrNull,
+        duration: m.duration,
+        lyrics: m.lyric,
+        sampleRate: m.sampleRate,
+        title: m.title.firstOrNull,
+        bitrate: m.bitrate,
+        trackNumber: m.trackNumber.firstOrNull,
+        trackTotal: m.trackTotal,
+        discNumber: m.discNumber,
+        totalDisc: m.discTotal,
+        year: m.date.firstOrNull,
+      ),
+      Mp3Metadata m => AudioMetadata(
+        file: file,
+        album: m.album,
+        artist: m.bandOrOrchestra ?? m.leadPerformer ?? m.originalArtist,
+        duration: m.duration,
+        lyrics: m.lyric,
+        sampleRate: m.samplerate,
+        title: m.songName,
+        bitrate: m.bitrate,
+        trackNumber: m.trackNumber,
+        trackTotal: m.trackTotal,
+        discNumber: m.discNumber,
+        totalDisc: m.totalDics,
+        year: m.originalReleaseYear == null && m.year == null
+            ? null
+            : DateTime(m.originalReleaseYear ?? m.year!),
+      ),
+      Mp4Metadata m => AudioMetadata(
+        file: file,
+        album: m.album,
+        artist: m.artist,
+        duration: m.duration,
+        lyrics: m.lyrics,
+        sampleRate: m.sampleRate,
+        title: m.title,
+        bitrate: m.bitrate,
+        trackNumber: m.trackNumber,
+        trackTotal: m.totalTracks,
+        discNumber: m.discNumber,
+        totalDisc: m.totalDiscs,
+        year: m.year,
+      ),
+      ApeMetadata m => AudioMetadata(
+        file: file,
+        album: m.album,
+        artist: m.artist,
+        duration: m.duration,
+        lyrics: m.lyric,
+        sampleRate: m.sampleRate,
+        title: m.title,
+        bitrate: m.bitrate,
+        trackNumber: m.trackNumber,
+        trackTotal: m.trackTotal,
+        discNumber: m.discNumber,
+        totalDisc: m.discTotal,
+        year: m.date,
+      ),
+      RiffMetadata m => AudioMetadata(
+        file: file,
+        album: m.album,
+        artist: m.artist,
+        duration: m.duration,
+        sampleRate: m.samplerate,
+        title: m.title,
+        bitrate: m.bitrate,
+        trackNumber: m.trackNumber,
+        year: m.year,
+      ),
+    };
+
+    switch (detailed) {
+      case VorbisMetadata m:
+        metadata.albumArtist = m.albumArtist.firstOrNull;
+        metadata.genres = m.genres;
+        metadata.pictures = m.pictures;
+        break;
+      case Mp3Metadata m:
+        metadata.genres = m.genres;
+        metadata.pictures = m.pictures;
+        break;
+      case Mp4Metadata m:
+        metadata.genres = m.genre == null ? [] : [m.genre!];
+        metadata.pictures = m.picture == null ? [] : [m.picture!];
+        break;
+      case ApeMetadata m:
+        metadata.genres = m.genres;
+        metadata.pictures = m.pictures;
+        break;
+      case RiffMetadata m:
+        metadata.genres = m.genre == null ? [] : [m.genre!];
+        metadata.pictures = m.pictures;
+        break;
+    }
+    return metadata;
+  }
+
+  Future<List<LyricsSource>> _readSidecarLyrics(File audioFile) async {
     final basePath = audioFile.path.substring(
       0,
       audioFile.path.lastIndexOf('.'),
     );
-    for (final extension in const ['.lrc', '.elrc', '.ass', '.srt', '.vtt']) {
+    final sources = <LyricsSource>[];
+    for (final extension in const [
+      '.lrc',
+      '.elrc',
+      '.qrc',
+      '.yrc',
+      '.krc',
+      '.ttml',
+      '.xml',
+      '.ass',
+      '.ssa',
+      '.srt',
+      '.vtt',
+      '.txt',
+    ]) {
       final file = File('$basePath$extension');
       if (await file.exists()) {
-        return (content: await file.readAsString(), extension: extension);
+        sources.add(
+          LyricsSource(
+            content: await file.readAsString(),
+            kind: LyricsSourceKind.sidecar,
+            extension: extension,
+          ),
+        );
       }
     }
-    return null;
+    return sources;
   }
 
-  double? _replayGainDb(ParserTag metadata) {
-    String? value;
+  ({double? db, String? mode}) _replayGainInfo(ParserTag metadata) {
+    String? trackValue;
+    String? albumValue;
     switch (metadata) {
       case VorbisMetadata m:
-        value =
-            m.replayGainTrackGain.firstOrNull ??
-            m.replayGainAlbumGain.firstOrNull;
+        trackValue = m.replayGainTrackGain.firstOrNull;
+        albumValue = m.replayGainAlbumGain.firstOrNull;
       case Mp3Metadata m:
-        value =
-            m.customMetadata['REPLAYGAIN_TRACK_GAIN'] ??
-            m.customMetadata['REPLAYGAIN_ALBUM_GAIN'];
+        trackValue = _customMetadataValue(
+          m.customMetadata,
+          'REPLAYGAIN_TRACK_GAIN',
+        );
+        albumValue = _customMetadataValue(
+          m.customMetadata,
+          'REPLAYGAIN_ALBUM_GAIN',
+        );
       case Mp4Metadata():
-        value = null;
+        break;
       case RiffMetadata():
-        value = null;
-      case ApeMetadata():
-        value = null;
+        break;
+      case ApeMetadata m:
+        trackValue = _customMetadataValue(m.unknowns, 'REPLAYGAIN_TRACK_GAIN');
+        albumValue = _customMetadataValue(m.unknowns, 'REPLAYGAIN_ALBUM_GAIN');
     }
+    final trackDb = _parseGainDb(trackValue);
+    if (trackDb != null) return (db: trackDb, mode: 'track');
+    final albumDb = _parseGainDb(albumValue);
+    return (db: albumDb, mode: albumDb == null ? null : 'album');
+  }
+
+  double? _parseGainDb(String? value) {
     if (value == null) return null;
-    return double.tryParse(value.replaceAll(RegExp(r'[^0-9+\-.]'), ''));
+    final match = RegExp(r'[+-]?\d+(?:\.\d+)?').firstMatch(value);
+    return match == null ? null : double.tryParse(match.group(0)!);
+  }
+
+  List<LyricsSource> _embeddedLyrics(
+    ParserTag detailed,
+    String? genericLyrics,
+  ) {
+    final candidates = <LyricsSource>[];
+
+    void add(String? value, {String tagName = 'LYRIC', String? language}) {
+      final text = value?.trim();
+      if (text == null || text.isEmpty) return;
+      if (candidates.any(
+        (candidate) =>
+            candidate.content == text && candidate.tagName == tagName,
+      )) {
+        return;
+      }
+      final normalizedTag = tagName.toUpperCase();
+      candidates.add(
+        LyricsSource(
+          content: text,
+          kind: LyricsSourceKind.embedded,
+          tagName: tagName,
+          language: language ?? _lyricsLanguage(tagName),
+          role: _lyricsRole(normalizedTag),
+        ),
+      );
+    }
+
+    add(genericLyrics);
+    switch (detailed) {
+      case VorbisMetadata m:
+        add(m.lyric, tagName: 'LYRIC');
+        _addLyricTags(m.unknowns, add);
+        break;
+      case Mp3Metadata m:
+        add(m.lyric, tagName: 'LYRIC');
+        _addLyricTags(m.customMetadata, add);
+        break;
+      case Mp4Metadata m:
+        add(m.lyrics, tagName: 'LYRIC');
+        break;
+      case ApeMetadata m:
+        add(m.lyric, tagName: 'LYRIC');
+        _addLyricTags(m.unknowns, add);
+        break;
+      case RiffMetadata m:
+        _addLyricTags(m.unknowns, add);
+        break;
+    }
+    return candidates;
+  }
+
+  void _addLyricTags(
+    Map<String, String> values,
+    void Function(String?, {String tagName, String? language}) add,
+  ) {
+    for (final entry in values.entries) {
+      final normalized = entry.key.toUpperCase().replaceAll(
+        RegExp(r'[\s_.:-]'),
+        '',
+      );
+      if (_isLyricsTag(normalized)) {
+        add(entry.value, tagName: entry.key);
+      }
+    }
+  }
+
+  bool _isLyricsTag(String key) {
+    return key == 'LYRIC' ||
+        key.startsWith('LYRICS') ||
+        key.startsWith('SYNCEDLYRICS') ||
+        key.startsWith('UNSYNCEDLYRICS') ||
+        key.startsWith('USLT') ||
+        key.startsWith('SYLT') ||
+        key.startsWith('LRC') ||
+        key.startsWith('QRC') ||
+        key.startsWith('YRC') ||
+        key.startsWith('KRC') ||
+        key.startsWith('TTML');
+  }
+
+  LyricRole _lyricsRole(String normalizedTag) {
+    if (normalizedTag.contains('TRANSLAT') ||
+        normalizedTag.contains('译') ||
+        normalizedTag.contains('翻译')) {
+      return LyricRole.translation;
+    }
+    if (normalizedTag.contains('ROMAN') || normalizedTag.contains('ROMAJI')) {
+      return LyricRole.alternate;
+    }
+    return LyricRole.original;
+  }
+
+  String? _lyricsLanguage(String tagName) {
+    final match = RegExp(
+      r'(?:^|[\s._:-])([a-z]{2,3}(?:[-_][a-z]{2})?)(?:$|[\s._:-])',
+      caseSensitive: false,
+    ).firstMatch(tagName);
+    return match?.group(1)?.toLowerCase();
+  }
+
+  Map<String, String> _metadataMap(
+    File file,
+    ParserTag detailed,
+    AudioMetadata generic,
+  ) {
+    final values = <String, String>{'文件路径': file.path};
+
+    void add(String key, Object? value) {
+      final text = _formatMetadataValue(value);
+      if (text != null) values[key] = text;
+    }
+
+    add('文件格式', _extension(file.path).replaceFirst('.', '').toUpperCase());
+    add('标题', generic.title);
+    add('艺术家', generic.artist);
+    add('专辑', generic.album);
+    add('专辑艺术家', generic.albumArtist);
+    add('时长', generic.duration);
+    add('采样率', generic.sampleRate == null ? null : '${generic.sampleRate} Hz');
+    add('比特率', generic.bitrate == null ? null : '${generic.bitrate} bit/s');
+
+    switch (detailed) {
+      case VorbisMetadata m:
+        add('标签类型', 'Vorbis 注释 / Ogg');
+        add('版本', m.version);
+        add('曲目号', m.trackNumber);
+        add('总曲目数', m.trackTotal);
+        add('碟片号', m.discNumber);
+        add('总碟片数', m.discTotal);
+        add('流派', m.genres);
+        add('发行日期', m.date);
+        add('表演者', m.performer);
+        add('作曲者', m.composer);
+        add('评论', m.comment);
+        add('描述', m.description);
+        add('语言', m.language);
+        add('编码器', m.encoder);
+        add('编码工具', m.encodedUsing);
+        add('编码选项', m.encoderOptions);
+        add('厂商', m.vendor);
+        add('版权', m.copyright);
+        add('ReplayGain 曲目增益', m.replayGainTrackGain);
+        add('ReplayGain 专辑增益', m.replayGainAlbumGain);
+        add('内嵌歌词', m.lyric);
+        for (final entry in m.unknowns.entries) {
+          add(entry.key, entry.value);
+        }
+        break;
+      case Mp3Metadata m:
+        add('标签类型', 'ID3 / MP3');
+        add('曲目号', m.trackNumber);
+        add('总曲目数', m.trackTotal);
+        add('碟片号', m.discNumber);
+        add('总碟片数', m.totalDics);
+        add('流派', m.genres);
+        add('作曲者', m.composer);
+        add('编码器', m.encoderSoftware);
+        add('发行年份', m.year);
+        add('内嵌歌词', m.lyric);
+        for (final entry in m.customMetadata.entries) {
+          add(entry.key, entry.value);
+        }
+        break;
+      case Mp4Metadata m:
+        add('标签类型', 'MP4 / M4A');
+        add('曲目号', m.trackNumber);
+        add('总曲目数', m.totalTracks);
+        add('碟片号', m.discNumber);
+        add('总碟片数', m.totalDiscs);
+        add('流派', m.genre);
+        add('发行日期', m.year);
+        add('内嵌歌词', m.lyrics);
+        break;
+      case ApeMetadata m:
+        add('标签类型', 'APEv2');
+        add('曲目号', m.trackNumber);
+        add('总曲目数', m.trackTotal);
+        add('碟片号', m.discNumber);
+        add('总碟片数', m.discTotal);
+        add('流派', m.genres);
+        add('表演者', m.performer);
+        add('作曲者', m.composer);
+        add('评论', m.comment);
+        add('编码器', m.encodedBy);
+        add('内嵌歌词', m.lyric);
+        for (final entry in m.unknowns.entries) {
+          add(entry.key, entry.value);
+        }
+        break;
+      case RiffMetadata m:
+        add('标签类型', 'RIFF / WAV');
+        add('曲目号', m.trackNumber);
+        add('流派', m.genre);
+        add('编码器', m.encoder);
+        add('出版者', m.publisher);
+        add('评论', m.comment);
+        for (final entry in m.unknowns.entries) {
+          add(entry.key, entry.value);
+        }
+        break;
+    }
+
+    final pictures = _pictures(detailed);
+    add(
+      '封面',
+      pictures.isEmpty
+          ? '未读取到内嵌封面'
+          : pictures
+                .map(
+                  (picture) =>
+                      '${picture.pictureType}，${picture.mimetype}，${picture.bytes.length} 字节',
+                )
+                .join('\n'),
+    );
+    return values;
+  }
+
+  String? _formatMetadataValue(Object? value) {
+    if (value == null) return null;
+    if (value is Iterable) {
+      final items = value
+          .map(_formatMetadataValue)
+          .whereType<String>()
+          .where((item) => item.isNotEmpty)
+          .toList();
+      return items.isEmpty ? null : items.join(' / ');
+    }
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  Uint8List? _coverBytes(ParserTag metadata) {
+    final pictures = _pictures(metadata)
+        .where((picture) => picture.bytes.isNotEmpty)
+        .toList();
+    if (pictures.isEmpty) return null;
+    return pictures
+        .firstWhere(
+          (picture) => picture.pictureType == PictureType.coverFront,
+          orElse: () => pictures.first,
+        )
+        .bytes;
+  }
+
+  List<Picture> _pictures(ParserTag metadata) {
+    return switch (metadata) {
+      VorbisMetadata m => m.pictures,
+      Mp3Metadata m => m.pictures,
+      ApeMetadata m => m.pictures,
+      Mp4Metadata m => m.picture == null ? const [] : [m.picture!],
+      RiffMetadata m => m.pictures,
+    };
+  }
+
+  String? _customMetadataValue(Map<String, String> metadata, String key) {
+    for (final entry in metadata.entries) {
+      if (entry.key.toUpperCase() == key) return entry.value;
+    }
+    return null;
   }
 
   String _extension(String path) =>

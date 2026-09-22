@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../library/presentation/library_page.dart';
 import '../../library/presentation/annual_summary_page.dart';
-import '../../player/presentation/audio_settings_page.dart';
+import '../../library/presentation/sources_page.dart';
 import '../../player/presentation/floating_player.dart';
-import '../../player/presentation/lyrics_page.dart';
+import 'settings_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -39,9 +39,9 @@ class _AppShellState extends State<AppShell> {
 
   Widget _buildPage() {
     return switch (_selectedIndex) {
-      4 => const AudioSettingsPage(),
-      6 => const LyricsPage(),
-      7 => const AnnualSummaryPage(),
+      4 => const SourcesPage(),
+      5 => const AnnualSummaryPage(),
+      6 => const SettingsPage(),
       _ => const LibraryPage(),
     };
   }
@@ -99,29 +99,24 @@ class _NavigationRail extends StatelessWidget {
           ),
           const Spacer(),
           _NavItem(
-            icon: Icons.lyrics_outlined,
-            label: '歌词',
-            selected: selectedIndex == 6,
-            onTap: () => onSelected(6),
-          ),
-          _NavItem(
-            icon: Icons.auto_awesome,
-            label: '年度总结',
-            selected: selectedIndex == 7,
-            onTap: () => onSelected(7),
-          ),
-          const Spacer(),
-          _NavItem(
-            icon: Icons.tune,
-            label: '音频设置',
+            icon: Icons.folder_special_outlined,
+            label: '歌曲来源',
             selected: selectedIndex == 4,
             onTap: () => onSelected(4),
           ),
+          const Spacer(),
+          _NavItem(
+            icon: Icons.auto_awesome,
+            label: '年度总结',
+            selected: selectedIndex == 5,
+            onTap: () => onSelected(5),
+          ),
+          const Spacer(),
           _NavItem(
             icon: Icons.settings_outlined,
             label: '设置',
-            selected: selectedIndex == 5,
-            onTap: () => onSelected(5),
+            selected: selectedIndex == 6,
+            onTap: () => onSelected(6),
           ),
         ],
       ),

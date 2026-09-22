@@ -109,6 +109,29 @@ class $LibraryTracksTable extends LibraryTracks
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _lyricsSourcesJsonMeta = const VerificationMeta(
+    'lyricsSourcesJson',
+  );
+  @override
+  late final GeneratedColumn<String> lyricsSourcesJson =
+      GeneratedColumn<String>(
+        'lyrics_sources_json',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _metadataJsonMeta = const VerificationMeta(
+    'metadataJson',
+  );
+  @override
+  late final GeneratedColumn<String> metadataJson = GeneratedColumn<String>(
+    'metadata_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _replayGainDbMeta = const VerificationMeta(
     'replayGainDb',
   );
@@ -118,6 +141,17 @@ class $LibraryTracksTable extends LibraryTracks
     aliasedName,
     true,
     type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _replayGainModeMeta = const VerificationMeta(
+    'replayGainMode',
+  );
+  @override
+  late final GeneratedColumn<String> replayGainMode = GeneratedColumn<String>(
+    'replay_gain_mode',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
   static const VerificationMeta _playCountMeta = const VerificationMeta(
@@ -166,7 +200,10 @@ class $LibraryTracksTable extends LibraryTracks
     coverColor,
     lyrics,
     lyricsFormat,
+    lyricsSourcesJson,
+    metadataJson,
     replayGainDb,
+    replayGainMode,
     playCount,
     lastPlayedAt,
     updatedAt,
@@ -257,12 +294,39 @@ class $LibraryTracksTable extends LibraryTracks
         ),
       );
     }
+    if (data.containsKey('lyrics_sources_json')) {
+      context.handle(
+        _lyricsSourcesJsonMeta,
+        lyricsSourcesJson.isAcceptableOrUnknown(
+          data['lyrics_sources_json']!,
+          _lyricsSourcesJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('metadata_json')) {
+      context.handle(
+        _metadataJsonMeta,
+        metadataJson.isAcceptableOrUnknown(
+          data['metadata_json']!,
+          _metadataJsonMeta,
+        ),
+      );
+    }
     if (data.containsKey('replay_gain_db')) {
       context.handle(
         _replayGainDbMeta,
         replayGainDb.isAcceptableOrUnknown(
           data['replay_gain_db']!,
           _replayGainDbMeta,
+        ),
+      );
+    }
+    if (data.containsKey('replay_gain_mode')) {
+      context.handle(
+        _replayGainModeMeta,
+        replayGainMode.isAcceptableOrUnknown(
+          data['replay_gain_mode']!,
+          _replayGainModeMeta,
         ),
       );
     }
@@ -338,9 +402,21 @@ class $LibraryTracksTable extends LibraryTracks
         DriftSqlType.string,
         data['${effectivePrefix}lyrics_format'],
       ),
+      lyricsSourcesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lyrics_sources_json'],
+      ),
+      metadataJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}metadata_json'],
+      ),
       replayGainDb: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}replay_gain_db'],
+      ),
+      replayGainMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}replay_gain_mode'],
       ),
       playCount: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -374,7 +450,10 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
   final int coverColor;
   final String? lyrics;
   final String? lyricsFormat;
+  final String? lyricsSourcesJson;
+  final String? metadataJson;
   final double? replayGainDb;
+  final String? replayGainMode;
   final int playCount;
   final DateTime? lastPlayedAt;
   final DateTime updatedAt;
@@ -389,7 +468,10 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     required this.coverColor,
     this.lyrics,
     this.lyricsFormat,
+    this.lyricsSourcesJson,
+    this.metadataJson,
     this.replayGainDb,
+    this.replayGainMode,
     required this.playCount,
     this.lastPlayedAt,
     required this.updatedAt,
@@ -413,8 +495,17 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     if (!nullToAbsent || lyricsFormat != null) {
       map['lyrics_format'] = Variable<String>(lyricsFormat);
     }
+    if (!nullToAbsent || lyricsSourcesJson != null) {
+      map['lyrics_sources_json'] = Variable<String>(lyricsSourcesJson);
+    }
+    if (!nullToAbsent || metadataJson != null) {
+      map['metadata_json'] = Variable<String>(metadataJson);
+    }
     if (!nullToAbsent || replayGainDb != null) {
       map['replay_gain_db'] = Variable<double>(replayGainDb);
+    }
+    if (!nullToAbsent || replayGainMode != null) {
+      map['replay_gain_mode'] = Variable<String>(replayGainMode);
     }
     map['play_count'] = Variable<int>(playCount);
     if (!nullToAbsent || lastPlayedAt != null) {
@@ -442,9 +533,18 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       lyricsFormat: lyricsFormat == null && nullToAbsent
           ? const Value.absent()
           : Value(lyricsFormat),
+      lyricsSourcesJson: lyricsSourcesJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lyricsSourcesJson),
+      metadataJson: metadataJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(metadataJson),
       replayGainDb: replayGainDb == null && nullToAbsent
           ? const Value.absent()
           : Value(replayGainDb),
+      replayGainMode: replayGainMode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replayGainMode),
       playCount: Value(playCount),
       lastPlayedAt: lastPlayedAt == null && nullToAbsent
           ? const Value.absent()
@@ -469,7 +569,12 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       coverColor: serializer.fromJson<int>(json['coverColor']),
       lyrics: serializer.fromJson<String?>(json['lyrics']),
       lyricsFormat: serializer.fromJson<String?>(json['lyricsFormat']),
+      lyricsSourcesJson: serializer.fromJson<String?>(
+        json['lyricsSourcesJson'],
+      ),
+      metadataJson: serializer.fromJson<String?>(json['metadataJson']),
       replayGainDb: serializer.fromJson<double?>(json['replayGainDb']),
+      replayGainMode: serializer.fromJson<String?>(json['replayGainMode']),
       playCount: serializer.fromJson<int>(json['playCount']),
       lastPlayedAt: serializer.fromJson<DateTime?>(json['lastPlayedAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -489,7 +594,10 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       'coverColor': serializer.toJson<int>(coverColor),
       'lyrics': serializer.toJson<String?>(lyrics),
       'lyricsFormat': serializer.toJson<String?>(lyricsFormat),
+      'lyricsSourcesJson': serializer.toJson<String?>(lyricsSourcesJson),
+      'metadataJson': serializer.toJson<String?>(metadataJson),
       'replayGainDb': serializer.toJson<double?>(replayGainDb),
+      'replayGainMode': serializer.toJson<String?>(replayGainMode),
       'playCount': serializer.toJson<int>(playCount),
       'lastPlayedAt': serializer.toJson<DateTime?>(lastPlayedAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -507,7 +615,10 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     int? coverColor,
     Value<String?> lyrics = const Value.absent(),
     Value<String?> lyricsFormat = const Value.absent(),
+    Value<String?> lyricsSourcesJson = const Value.absent(),
+    Value<String?> metadataJson = const Value.absent(),
     Value<double?> replayGainDb = const Value.absent(),
+    Value<String?> replayGainMode = const Value.absent(),
     int? playCount,
     Value<DateTime?> lastPlayedAt = const Value.absent(),
     DateTime? updatedAt,
@@ -522,7 +633,14 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     coverColor: coverColor ?? this.coverColor,
     lyrics: lyrics.present ? lyrics.value : this.lyrics,
     lyricsFormat: lyricsFormat.present ? lyricsFormat.value : this.lyricsFormat,
+    lyricsSourcesJson: lyricsSourcesJson.present
+        ? lyricsSourcesJson.value
+        : this.lyricsSourcesJson,
+    metadataJson: metadataJson.present ? metadataJson.value : this.metadataJson,
     replayGainDb: replayGainDb.present ? replayGainDb.value : this.replayGainDb,
+    replayGainMode: replayGainMode.present
+        ? replayGainMode.value
+        : this.replayGainMode,
     playCount: playCount ?? this.playCount,
     lastPlayedAt: lastPlayedAt.present ? lastPlayedAt.value : this.lastPlayedAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -547,9 +665,18 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       lyricsFormat: data.lyricsFormat.present
           ? data.lyricsFormat.value
           : this.lyricsFormat,
+      lyricsSourcesJson: data.lyricsSourcesJson.present
+          ? data.lyricsSourcesJson.value
+          : this.lyricsSourcesJson,
+      metadataJson: data.metadataJson.present
+          ? data.metadataJson.value
+          : this.metadataJson,
       replayGainDb: data.replayGainDb.present
           ? data.replayGainDb.value
           : this.replayGainDb,
+      replayGainMode: data.replayGainMode.present
+          ? data.replayGainMode.value
+          : this.replayGainMode,
       playCount: data.playCount.present ? data.playCount.value : this.playCount,
       lastPlayedAt: data.lastPlayedAt.present
           ? data.lastPlayedAt.value
@@ -571,7 +698,10 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
           ..write('coverColor: $coverColor, ')
           ..write('lyrics: $lyrics, ')
           ..write('lyricsFormat: $lyricsFormat, ')
+          ..write('lyricsSourcesJson: $lyricsSourcesJson, ')
+          ..write('metadataJson: $metadataJson, ')
           ..write('replayGainDb: $replayGainDb, ')
+          ..write('replayGainMode: $replayGainMode, ')
           ..write('playCount: $playCount, ')
           ..write('lastPlayedAt: $lastPlayedAt, ')
           ..write('updatedAt: $updatedAt')
@@ -591,7 +721,10 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     coverColor,
     lyrics,
     lyricsFormat,
+    lyricsSourcesJson,
+    metadataJson,
     replayGainDb,
+    replayGainMode,
     playCount,
     lastPlayedAt,
     updatedAt,
@@ -610,7 +743,10 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
           other.coverColor == this.coverColor &&
           other.lyrics == this.lyrics &&
           other.lyricsFormat == this.lyricsFormat &&
+          other.lyricsSourcesJson == this.lyricsSourcesJson &&
+          other.metadataJson == this.metadataJson &&
           other.replayGainDb == this.replayGainDb &&
+          other.replayGainMode == this.replayGainMode &&
           other.playCount == this.playCount &&
           other.lastPlayedAt == this.lastPlayedAt &&
           other.updatedAt == this.updatedAt);
@@ -627,7 +763,10 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
   final Value<int> coverColor;
   final Value<String?> lyrics;
   final Value<String?> lyricsFormat;
+  final Value<String?> lyricsSourcesJson;
+  final Value<String?> metadataJson;
   final Value<double?> replayGainDb;
+  final Value<String?> replayGainMode;
   final Value<int> playCount;
   final Value<DateTime?> lastPlayedAt;
   final Value<DateTime> updatedAt;
@@ -643,7 +782,10 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     this.coverColor = const Value.absent(),
     this.lyrics = const Value.absent(),
     this.lyricsFormat = const Value.absent(),
+    this.lyricsSourcesJson = const Value.absent(),
+    this.metadataJson = const Value.absent(),
     this.replayGainDb = const Value.absent(),
+    this.replayGainMode = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lastPlayedAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -660,7 +802,10 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     required int coverColor,
     this.lyrics = const Value.absent(),
     this.lyricsFormat = const Value.absent(),
+    this.lyricsSourcesJson = const Value.absent(),
+    this.metadataJson = const Value.absent(),
     this.replayGainDb = const Value.absent(),
+    this.replayGainMode = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lastPlayedAt = const Value.absent(),
     required DateTime updatedAt,
@@ -684,7 +829,10 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     Expression<int>? coverColor,
     Expression<String>? lyrics,
     Expression<String>? lyricsFormat,
+    Expression<String>? lyricsSourcesJson,
+    Expression<String>? metadataJson,
     Expression<double>? replayGainDb,
+    Expression<String>? replayGainMode,
     Expression<int>? playCount,
     Expression<DateTime>? lastPlayedAt,
     Expression<DateTime>? updatedAt,
@@ -701,7 +849,10 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
       if (coverColor != null) 'cover_color': coverColor,
       if (lyrics != null) 'lyrics': lyrics,
       if (lyricsFormat != null) 'lyrics_format': lyricsFormat,
+      if (lyricsSourcesJson != null) 'lyrics_sources_json': lyricsSourcesJson,
+      if (metadataJson != null) 'metadata_json': metadataJson,
       if (replayGainDb != null) 'replay_gain_db': replayGainDb,
+      if (replayGainMode != null) 'replay_gain_mode': replayGainMode,
       if (playCount != null) 'play_count': playCount,
       if (lastPlayedAt != null) 'last_played_at': lastPlayedAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -720,7 +871,10 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     Value<int>? coverColor,
     Value<String?>? lyrics,
     Value<String?>? lyricsFormat,
+    Value<String?>? lyricsSourcesJson,
+    Value<String?>? metadataJson,
     Value<double?>? replayGainDb,
+    Value<String?>? replayGainMode,
     Value<int>? playCount,
     Value<DateTime?>? lastPlayedAt,
     Value<DateTime>? updatedAt,
@@ -737,7 +891,10 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
       coverColor: coverColor ?? this.coverColor,
       lyrics: lyrics ?? this.lyrics,
       lyricsFormat: lyricsFormat ?? this.lyricsFormat,
+      lyricsSourcesJson: lyricsSourcesJson ?? this.lyricsSourcesJson,
+      metadataJson: metadataJson ?? this.metadataJson,
       replayGainDb: replayGainDb ?? this.replayGainDb,
+      replayGainMode: replayGainMode ?? this.replayGainMode,
       playCount: playCount ?? this.playCount,
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -778,8 +935,17 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     if (lyricsFormat.present) {
       map['lyrics_format'] = Variable<String>(lyricsFormat.value);
     }
+    if (lyricsSourcesJson.present) {
+      map['lyrics_sources_json'] = Variable<String>(lyricsSourcesJson.value);
+    }
+    if (metadataJson.present) {
+      map['metadata_json'] = Variable<String>(metadataJson.value);
+    }
     if (replayGainDb.present) {
       map['replay_gain_db'] = Variable<double>(replayGainDb.value);
+    }
+    if (replayGainMode.present) {
+      map['replay_gain_mode'] = Variable<String>(replayGainMode.value);
     }
     if (playCount.present) {
       map['play_count'] = Variable<int>(playCount.value);
@@ -809,7 +975,10 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
           ..write('coverColor: $coverColor, ')
           ..write('lyrics: $lyrics, ')
           ..write('lyricsFormat: $lyricsFormat, ')
+          ..write('lyricsSourcesJson: $lyricsSourcesJson, ')
+          ..write('metadataJson: $metadataJson, ')
           ..write('replayGainDb: $replayGainDb, ')
+          ..write('replayGainMode: $replayGainMode, ')
           ..write('playCount: $playCount, ')
           ..write('lastPlayedAt: $lastPlayedAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -1294,6 +1463,270 @@ class PlaybackEventsCompanion extends UpdateCompanion<PlaybackEvent> {
   }
 }
 
+class $AppSettingsTable extends AppSettings
+    with TableInfo<$AppSettingsTable, AppSetting> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AppSettingsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueJsonMeta = const VerificationMeta(
+    'valueJson',
+  );
+  @override
+  late final GeneratedColumn<String> valueJson = GeneratedColumn<String>(
+    'value_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [key, valueJson, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'app_settings';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AppSetting> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('value_json')) {
+      context.handle(
+        _valueJsonMeta,
+        valueJson.isAcceptableOrUnknown(data['value_json']!, _valueJsonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueJsonMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {key};
+  @override
+  AppSetting map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AppSetting(
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      valueJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value_json'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AppSettingsTable createAlias(String alias) {
+    return $AppSettingsTable(attachedDatabase, alias);
+  }
+}
+
+class AppSetting extends DataClass implements Insertable<AppSetting> {
+  final String key;
+  final String valueJson;
+  final DateTime updatedAt;
+  const AppSetting({
+    required this.key,
+    required this.valueJson,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key'] = Variable<String>(key);
+    map['value_json'] = Variable<String>(valueJson);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  AppSettingsCompanion toCompanion(bool nullToAbsent) {
+    return AppSettingsCompanion(
+      key: Value(key),
+      valueJson: Value(valueJson),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory AppSetting.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AppSetting(
+      key: serializer.fromJson<String>(json['key']),
+      valueJson: serializer.fromJson<String>(json['valueJson']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'key': serializer.toJson<String>(key),
+      'valueJson': serializer.toJson<String>(valueJson),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  AppSetting copyWith({String? key, String? valueJson, DateTime? updatedAt}) =>
+      AppSetting(
+        key: key ?? this.key,
+        valueJson: valueJson ?? this.valueJson,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  AppSetting copyWithCompanion(AppSettingsCompanion data) {
+    return AppSetting(
+      key: data.key.present ? data.key.value : this.key,
+      valueJson: data.valueJson.present ? data.valueJson.value : this.valueJson,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppSetting(')
+          ..write('key: $key, ')
+          ..write('valueJson: $valueJson, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(key, valueJson, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AppSetting &&
+          other.key == this.key &&
+          other.valueJson == this.valueJson &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
+  final Value<String> key;
+  final Value<String> valueJson;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const AppSettingsCompanion({
+    this.key = const Value.absent(),
+    this.valueJson = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AppSettingsCompanion.insert({
+    required String key,
+    required String valueJson,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : key = Value(key),
+       valueJson = Value(valueJson),
+       updatedAt = Value(updatedAt);
+  static Insertable<AppSetting> custom({
+    Expression<String>? key,
+    Expression<String>? valueJson,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (key != null) 'key': key,
+      if (valueJson != null) 'value_json': valueJson,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AppSettingsCompanion copyWith({
+    Value<String>? key,
+    Value<String>? valueJson,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return AppSettingsCompanion(
+      key: key ?? this.key,
+      valueJson: valueJson ?? this.valueJson,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (valueJson.present) {
+      map['value_json'] = Variable<String>(valueJson.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AppSettingsCompanion(')
+          ..write('key: $key, ')
+          ..write('valueJson: $valueJson, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1301,6 +1734,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $LibraryDirectoriesTable libraryDirectories =
       $LibraryDirectoriesTable(this);
   late final $PlaybackEventsTable playbackEvents = $PlaybackEventsTable(this);
+  late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1309,6 +1743,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     libraryTracks,
     libraryDirectories,
     playbackEvents,
+    appSettings,
   ];
 }
 
@@ -1324,7 +1759,10 @@ typedef $$LibraryTracksTableCreateCompanionBuilder =
       required int coverColor,
       Value<String?> lyrics,
       Value<String?> lyricsFormat,
+      Value<String?> lyricsSourcesJson,
+      Value<String?> metadataJson,
       Value<double?> replayGainDb,
+      Value<String?> replayGainMode,
       Value<int> playCount,
       Value<DateTime?> lastPlayedAt,
       required DateTime updatedAt,
@@ -1342,7 +1780,10 @@ typedef $$LibraryTracksTableUpdateCompanionBuilder =
       Value<int> coverColor,
       Value<String?> lyrics,
       Value<String?> lyricsFormat,
+      Value<String?> lyricsSourcesJson,
+      Value<String?> metadataJson,
       Value<double?> replayGainDb,
+      Value<String?> replayGainMode,
       Value<int> playCount,
       Value<DateTime?> lastPlayedAt,
       Value<DateTime> updatedAt,
@@ -1408,8 +1849,23 @@ class $$LibraryTracksTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get lyricsSourcesJson => $composableBuilder(
+    column: $table.lyricsSourcesJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get metadataJson => $composableBuilder(
+    column: $table.metadataJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<double> get replayGainDb => $composableBuilder(
     column: $table.replayGainDb,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get replayGainMode => $composableBuilder(
+    column: $table.replayGainMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1488,8 +1944,23 @@ class $$LibraryTracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get lyricsSourcesJson => $composableBuilder(
+    column: $table.lyricsSourcesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get metadataJson => $composableBuilder(
+    column: $table.metadataJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get replayGainDb => $composableBuilder(
     column: $table.replayGainDb,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get replayGainMode => $composableBuilder(
+    column: $table.replayGainMode,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -1556,8 +2027,23 @@ class $$LibraryTracksTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get lyricsSourcesJson => $composableBuilder(
+    column: $table.lyricsSourcesJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get metadataJson => $composableBuilder(
+    column: $table.metadataJson,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<double> get replayGainDb => $composableBuilder(
     column: $table.replayGainDb,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get replayGainMode => $composableBuilder(
+    column: $table.replayGainMode,
     builder: (column) => column,
   );
 
@@ -1614,7 +2100,10 @@ class $$LibraryTracksTableTableManager
                 Value<int> coverColor = const Value.absent(),
                 Value<String?> lyrics = const Value.absent(),
                 Value<String?> lyricsFormat = const Value.absent(),
+                Value<String?> lyricsSourcesJson = const Value.absent(),
+                Value<String?> metadataJson = const Value.absent(),
                 Value<double?> replayGainDb = const Value.absent(),
+                Value<String?> replayGainMode = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
                 Value<DateTime?> lastPlayedAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -1630,7 +2119,10 @@ class $$LibraryTracksTableTableManager
                 coverColor: coverColor,
                 lyrics: lyrics,
                 lyricsFormat: lyricsFormat,
+                lyricsSourcesJson: lyricsSourcesJson,
+                metadataJson: metadataJson,
                 replayGainDb: replayGainDb,
+                replayGainMode: replayGainMode,
                 playCount: playCount,
                 lastPlayedAt: lastPlayedAt,
                 updatedAt: updatedAt,
@@ -1648,7 +2140,10 @@ class $$LibraryTracksTableTableManager
                 required int coverColor,
                 Value<String?> lyrics = const Value.absent(),
                 Value<String?> lyricsFormat = const Value.absent(),
+                Value<String?> lyricsSourcesJson = const Value.absent(),
+                Value<String?> metadataJson = const Value.absent(),
                 Value<double?> replayGainDb = const Value.absent(),
+                Value<String?> replayGainMode = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
                 Value<DateTime?> lastPlayedAt = const Value.absent(),
                 required DateTime updatedAt,
@@ -1664,7 +2159,10 @@ class $$LibraryTracksTableTableManager
                 coverColor: coverColor,
                 lyrics: lyrics,
                 lyricsFormat: lyricsFormat,
+                lyricsSourcesJson: lyricsSourcesJson,
+                metadataJson: metadataJson,
                 replayGainDb: replayGainDb,
+                replayGainMode: replayGainMode,
                 playCount: playCount,
                 lastPlayedAt: lastPlayedAt,
                 updatedAt: updatedAt,
@@ -2040,6 +2538,177 @@ typedef $$PlaybackEventsTableProcessedTableManager =
       PlaybackEvent,
       PrefetchHooks Function()
     >;
+typedef $$AppSettingsTableCreateCompanionBuilder =
+    AppSettingsCompanion Function({
+      required String key,
+      required String valueJson,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$AppSettingsTableUpdateCompanionBuilder =
+    AppSettingsCompanion Function({
+      Value<String> key,
+      Value<String> valueJson,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$AppSettingsTableFilterComposer
+    extends Composer<_$AppDatabase, $AppSettingsTable> {
+  $$AppSettingsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get valueJson => $composableBuilder(
+    column: $table.valueJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AppSettingsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AppSettingsTable> {
+  $$AppSettingsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get valueJson => $composableBuilder(
+    column: $table.valueJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AppSettingsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AppSettingsTable> {
+  $$AppSettingsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get valueJson =>
+      $composableBuilder(column: $table.valueJson, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AppSettingsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AppSettingsTable,
+          AppSetting,
+          $$AppSettingsTableFilterComposer,
+          $$AppSettingsTableOrderingComposer,
+          $$AppSettingsTableAnnotationComposer,
+          $$AppSettingsTableCreateCompanionBuilder,
+          $$AppSettingsTableUpdateCompanionBuilder,
+          (
+            AppSetting,
+            BaseReferences<_$AppDatabase, $AppSettingsTable, AppSetting>,
+          ),
+          AppSetting,
+          PrefetchHooks Function()
+        > {
+  $$AppSettingsTableTableManager(_$AppDatabase db, $AppSettingsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AppSettingsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AppSettingsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AppSettingsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> key = const Value.absent(),
+                Value<String> valueJson = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AppSettingsCompanion(
+                key: key,
+                valueJson: valueJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String key,
+                required String valueJson,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => AppSettingsCompanion.insert(
+                key: key,
+                valueJson: valueJson,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$AppSettingsTable, AppSetting>(table),
+                  BaseReferences<_$AppDatabase, $AppSettingsTable, AppSetting>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AppSettingsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AppSettingsTable,
+      AppSetting,
+      $$AppSettingsTableFilterComposer,
+      $$AppSettingsTableOrderingComposer,
+      $$AppSettingsTableAnnotationComposer,
+      $$AppSettingsTableCreateCompanionBuilder,
+      $$AppSettingsTableUpdateCompanionBuilder,
+      (
+        AppSetting,
+        BaseReferences<_$AppDatabase, $AppSettingsTable, AppSetting>,
+      ),
+      AppSetting,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2050,4 +2719,6 @@ class $AppDatabaseManager {
       $$LibraryDirectoriesTableTableManager(_db, _db.libraryDirectories);
   $$PlaybackEventsTableTableManager get playbackEvents =>
       $$PlaybackEventsTableTableManager(_db, _db.playbackEvents);
+  $$AppSettingsTableTableManager get appSettings =>
+      $$AppSettingsTableTableManager(_db, _db.appSettings);
 }

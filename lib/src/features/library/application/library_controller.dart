@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as path_util;
 
 import '../../player/application/player_controller.dart';
 import '../../player/domain/track.dart';
@@ -74,6 +75,8 @@ class LibraryController extends Notifier<LibraryState> {
             .replaceQueue(library.tracks);
       } else if (library.directories.isNotEmpty) {
         state = state.copyWith(directories: library.directories);
+      } else {
+        await scan(_defaultDirectories());
       }
     } on Object {
       // 数据库暂不可用时保留内存曲库，避免影响应用启动和测试环境。
@@ -88,7 +91,7 @@ class LibraryController extends Notifier<LibraryState> {
   }
 
   Future<void> scan([List<String>? directories]) async {
-    final roots = directories ?? _defaultDirectories();
+    final roots = _normalizeDirectories(directories ?? _defaultDirectories());
     state = state.copyWith(
       directories: roots,
       isScanning: true,
@@ -107,9 +110,35 @@ class LibraryController extends Notifier<LibraryState> {
     }
   }
 
+  List<String> _normalizeDirectories(Iterable<String> directories) {
+    final normalized = <String>{};
+    for (final value in directories) {
+      final directory = value.trim();
+      if (directory.isEmpty) continue;
+      normalized.add(path_util.normalize(Directory(directory).absolute.path));
+    }
+    return normalized.toList();
+  }
+
   List<String> _defaultDirectories() {
     final home = Platform.environment['HOME'];
     if (home == null || home.isEmpty) return const [];
+
+    // Linux 桌面环境通常通过 user-dirs.dirs 声明 XDG 音乐目录。
+    final userDirs = File('$home/.config/user-dirs.dirs');
+    if (userDirs.existsSync()) {
+      final line = userDirs
+          .readAsLinesSync()
+          .where((line) => line.trimLeft().startsWith('XDG_MUSIC_DIR='))
+          .firstOrNull;
+      if (line != null) {
+        final match = RegExp(r'XDG_MUSIC_DIR="?([^"\n]+)"?').firstMatch(line);
+        final configured = match?.group(1)?.replaceFirst(r'$HOME', home);
+        if (configured != null && configured.isNotEmpty) {
+          return [Directory(configured).path];
+        }
+      }
+    }
     return [Directory('$home/Music').path];
   }
 }

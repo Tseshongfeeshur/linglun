@@ -130,57 +130,189 @@ class _TrackTile extends ConsumerWidget {
     final minutes = track.duration.inMinutes;
     final seconds = (track.duration.inSeconds % 60).toString().padLeft(2, '0');
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      leading: _Cover(color: Color(track.coverColor)),
-      title: Text(
-        track.title,
-        style: TextStyle(
-          color: isCurrent ? Theme.of(context).colorScheme.primary : null,
-          fontWeight: isCurrent ? FontWeight.w600 : null,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapUp: (details) =>
+          _showTrackMenu(context, track, details.globalPosition),
+      onLongPress: () => _showTrackMenu(context, track, null),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        leading: _Cover(track: track),
+        title: Text(
+          track.title,
+          style: TextStyle(
+            color: isCurrent ? Theme.of(context).colorScheme.primary : null,
+            fontWeight: isCurrent ? FontWeight.w600 : null,
+          ),
         ),
-      ),
-      subtitle: Text('${track.artist}  ·  ${track.album}'),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '$minutes:$seconds',
-            style: const TextStyle(color: Colors.white54),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: () =>
-                ref.read(playerControllerProvider.notifier).playTrack(track),
-            tooltip: '播放',
-            icon: Icon(
-              isCurrent && playerState.isPlaying
-                  ? Icons.equalizer
-                  : Icons.play_arrow,
+        subtitle: Text('${track.artist}  ·  ${track.album}'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$minutes:$seconds',
+              style: const TextStyle(color: Colors.white54),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            IconButton(
+              onPressed: () =>
+                  ref.read(playerControllerProvider.notifier).playTrack(track),
+              tooltip: '播放',
+              icon: Icon(
+                isCurrent && playerState.isPlaying
+                    ? Icons.equalizer
+                    : Icons.play_arrow,
+              ),
+            ),
+          ],
+        ),
+        onTap: () =>
+            ref.read(playerControllerProvider.notifier).playTrack(track),
       ),
-      onTap: () => ref.read(playerControllerProvider.notifier).playTrack(track),
+    );
+  }
+
+  Future<void> _showTrackMenu(
+    BuildContext context,
+    Track track,
+    Offset? position,
+  ) async {
+    // 桌面端右键菜单提供元数据入口，长按同时兼容触控板和测试环境。
+    final selected = await showMenu<bool>(
+      context: context,
+      position: position == null
+          ? const RelativeRect.fromLTRB(300, 220, 0, 0)
+          : RelativeRect.fromLTRB(
+              position.dx,
+              position.dy,
+              position.dx,
+              position.dy,
+            ),
+      items: [
+        const PopupMenuItem<bool>(
+          value: true,
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.info_outline),
+            title: Text('音轨详情'),
+          ),
+        ),
+      ],
+    );
+    if (selected != true || !context.mounted) return;
+
+    // 等菜单路由彻底退出后再创建详情路由，避免两个模态路由叠加。
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _TrackDetailsDialog(track: track),
     );
   }
 }
 
 class _Cover extends StatelessWidget {
-  const _Cover({required this.color});
+  const _Cover({required this.track});
 
-  final Color color;
+  final Track track;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(6),
+    return ClipOval(
+      child: SizedBox(
+        width: 42,
+        height: 42,
+        child: track.coverBytes == null
+            ? ColoredBox(
+                color: Color(track.coverColor),
+                child: const Icon(
+                  Icons.music_note,
+                  color: Colors.white70,
+                  size: 20,
+                ),
+              )
+            : Image.memory(
+                track.coverBytes!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => ColoredBox(
+                  color: Color(track.coverColor),
+                  child: const Icon(
+                    Icons.broken_image_outlined,
+                    color: Colors.white70,
+                  ),
+                ),
+              ),
       ),
-      child: const Icon(Icons.music_note, color: Colors.white70, size: 20),
+    );
+  }
+}
+
+class _TrackDetailsDialog extends StatelessWidget {
+  const _TrackDetailsDialog({required this.track});
+
+  final Track track;
+
+  @override
+  Widget build(BuildContext context) {
+    final lyricSource = track.lyrics;
+    final lyricDocument = track.lyricsDocument;
+    final values = <String, String>{
+      '标题': track.title,
+      '艺术家': track.artist,
+      '专辑': track.album,
+      '时长': track.duration.toString().split('.').first,
+      '播放次数': '${track.playCount}',
+      if (track.replayGainDb != null)
+        'ReplayGain':
+            '${track.replayGainDb!.toStringAsFixed(2)} dB（${track.replayGainMode ?? '未知'}）',
+      ...track.metadata,
+      if (track.lyricsSources.isNotEmpty)
+        '读取到的歌词来源': track.lyricsSources
+            .map((source) => source.label)
+            .join('\n'),
+      '歌词语法格式': lyricSource == null || lyricSource.trim().isEmpty
+          ? '未读取到歌词'
+          : lyricDocument.syntaxLabel,
+      '歌词时间戳格式': lyricSource == null || lyricSource.trim().isEmpty
+          ? '未读取到歌词'
+          : lyricDocument.timingLabel,
+      '解析后纯歌词': lyricSource == null || lyricSource.trim().isEmpty
+          ? '未读取到歌词'
+          : lyricDocument.plainLyrics,
+    };
+    return AlertDialog(
+      title: const Text('音轨详情'),
+      content: SizedBox(
+        width: 620,
+        height: 440,
+        child: ListView.separated(
+          itemCount: values.length,
+          separatorBuilder: (context, index) => const Divider(height: 1),
+          itemBuilder: (_, index) {
+            final entry = values.entries.elementAt(index);
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 110,
+                    child: Text(
+                      entry.key,
+                      style: const TextStyle(color: Colors.white60),
+                    ),
+                  ),
+                  Expanded(child: SelectableText(entry.value)),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('关闭'),
+        ),
+      ],
     );
   }
 }
