@@ -157,14 +157,19 @@ class AppDatabase extends _$AppDatabase {
 
   /// 返回每个年份的播放事件数量，为年度总结保留准确的历史数据。
   Future<Map<int, int>> yearlyPlayCounts() async {
-    final rows = await customSelect(
-      "SELECT CAST(strftime('%Y', played_at) AS INTEGER) AS year, "
-      'COUNT(*) AS count FROM playback_events GROUP BY year',
-      readsFrom: {playbackEvents},
-    ).get();
-    return {
-      for (final row in rows) row.read<int>('year'): row.read<int>('count'),
-    };
+    // Drift 的 DateTimeColumn 默认以整数时间戳保存，不能直接交给 SQLite
+    // 的 strftime 当作文本日期解析；在 Dart 层读取 DateTime 还能避免时区
+    // 和不同 SQLite 构建配置造成的年度边界差异。
+    final events = await select(playbackEvents).get();
+    final counts = <int, int>{};
+    for (final event in events) {
+      counts.update(
+        event.playedAt.year,
+        (count) => count + 1,
+        ifAbsent: () => 1,
+      );
+    }
+    return counts;
   }
 }
 

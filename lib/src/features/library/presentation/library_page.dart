@@ -252,8 +252,8 @@ class _TrackDetailsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lyricSource = track.lyrics;
     final lyricDocument = track.lyricsDocument;
+    final hasLyrics = lyricDocument.plainLyrics.trim().isNotEmpty;
     final values = <String, String>{
       '标题': track.title,
       '艺术家': track.artist,
@@ -268,15 +268,9 @@ class _TrackDetailsDialog extends StatelessWidget {
         '读取到的歌词来源': track.lyricsSources
             .map((source) => source.label)
             .join('\n'),
-      '歌词语法格式': lyricSource == null || lyricSource.trim().isEmpty
-          ? '未读取到歌词'
-          : lyricDocument.syntaxLabel,
-      '歌词时间戳格式': lyricSource == null || lyricSource.trim().isEmpty
-          ? '未读取到歌词'
-          : lyricDocument.timingLabel,
-      '解析后纯歌词': lyricSource == null || lyricSource.trim().isEmpty
-          ? '未读取到歌词'
-          : lyricDocument.plainLyrics,
+      '歌词语法格式': hasLyrics ? lyricDocument.syntaxLabel : '未读取到歌词',
+      '歌词时间戳格式': hasLyrics ? lyricDocument.timingLabel : '未读取到歌词',
+      '解析后纯歌词': hasLyrics ? lyricDocument.plainLyrics : '未读取到歌词',
     };
     return AlertDialog(
       title: const Text('音轨详情'),

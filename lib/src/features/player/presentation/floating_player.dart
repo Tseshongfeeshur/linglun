@@ -63,10 +63,28 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
         final size = Size(constraints.maxWidth, constraints.maxHeight);
         final center = _clampPosition(_position, size);
         // 以完整菜单是否能放入窗口为准，避免使用固定阈值造成菜单越界。
-        final showAbove = center.dy - _panelGap - _controlPanelHeight >= 8;
-        final showLeft =
-            center.dx + _circleSize + _panelGap + _infoPanelWidth >
+        final canShowAbove = center.dy - _panelGap - _controlPanelHeight >= 8;
+        final canShowBelow =
+            center.dy + _circleSize + _panelGap + _controlPanelHeight <=
+            size.height - 8;
+        final spaceAbove = center.dy - 8;
+        final spaceBelow = size.height - 8 - center.dy - _circleSize;
+        final showAbove = canShowAbove
+            ? true
+            : canShowBelow
+            ? false
+            : spaceAbove >= spaceBelow;
+        final canShowRight =
+            center.dx + _circleSize + _panelGap + _infoPanelWidth <=
             size.width - 8;
+        final canShowLeft = center.dx - _panelGap - _infoPanelWidth >= 8;
+        final spaceRight = size.width - 8 - center.dx - _circleSize;
+        final spaceLeft = center.dx - 8;
+        final showLeft = canShowRight
+            ? false
+            : canShowLeft
+            ? true
+            : spaceLeft >= spaceRight;
 
         return Stack(
           clipBehavior: Clip.none,
@@ -92,6 +110,7 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
                 hovered: _hovered,
                 dragging: _dragging,
                 expanded: _expanded,
+                viewport: size,
                 showAbove: showAbove,
                 showLeft: showLeft,
                 onHover: _setHovered,
@@ -234,6 +253,7 @@ class _FloatingCluster extends ConsumerWidget {
     required this.hovered,
     required this.dragging,
     required this.expanded,
+    required this.viewport,
     required this.showAbove,
     required this.showLeft,
     required this.onHover,
@@ -250,6 +270,7 @@ class _FloatingCluster extends ConsumerWidget {
   final bool hovered;
   final bool dragging;
   final bool expanded;
+  final Size viewport;
   final bool showAbove;
   final bool showLeft;
   final ValueChanged<bool> onHover;
@@ -354,15 +375,35 @@ class _FloatingCluster extends ConsumerWidget {
 
     final circleLeft = position.dx - _ringInset;
     final circleTop = position.dy - _ringInset;
-    final infoTargetLeft = showLeft
-        ? position.dx - _panelGap - _infoPanelWidth
-        : position.dx + _circleSize + _panelGap;
-    final infoTargetTop = position.dy + (_circleSize - _infoPanelHeight) / 2;
+    final maxInfoLeft = math.max(8.0, viewport.width - _infoPanelWidth - 8);
+    final maxInfoTop = math.max(8.0, viewport.height - _infoPanelHeight - 8);
+    final maxControlLeft = math.max(
+      8.0,
+      viewport.width - _controlPanelWidth - 8,
+    );
+    final maxControlTop = math.max(
+      8.0,
+      viewport.height - _controlPanelHeight - 8,
+    );
+    final infoTargetLeft =
+        (showLeft
+                ? position.dx - _panelGap - _infoPanelWidth
+                : position.dx + _circleSize + _panelGap)
+            .clamp(8.0, maxInfoLeft)
+            .toDouble();
+    final infoTargetTop = (position.dy + (_circleSize - _infoPanelHeight) / 2)
+        .clamp(8.0, maxInfoTop)
+        .toDouble();
     final controlTargetLeft =
-        position.dx + (_circleSize - _controlPanelWidth) / 2;
-    final controlTargetTop = showAbove
-        ? position.dy - _panelGap - _controlPanelHeight
-        : position.dy + _circleSize + _panelGap;
+        (position.dx + (_circleSize - _controlPanelWidth) / 2)
+            .clamp(8.0, maxControlLeft)
+            .toDouble();
+    final controlTargetTop =
+        (showAbove
+                ? position.dy - _panelGap - _controlPanelHeight
+                : position.dy + _circleSize + _panelGap)
+            .clamp(8.0, maxControlTop)
+            .toDouble();
     final collapsedInfoLeft = position.dx + (_circleSize - _circleSize) / 2;
     final collapsedInfoTop = position.dy + (_circleSize - _circleSize) / 2;
     final collapsedControlLeft = position.dx + (_circleSize - _circleSize) / 2;
@@ -447,11 +488,13 @@ class _FloatingCluster extends ConsumerWidget {
               onPanStart: onDragStart,
               onPanUpdate: onDragUpdate,
               onPanEnd: onDragEnd,
-              child: _ProgressCircle(
-                track: track,
-                progress: _progress(state),
-                hovered: hovered,
-                dragging: dragging,
+              child: ClipOval(
+                child: _ProgressCircle(
+                  track: track,
+                  progress: _progress(state),
+                  hovered: hovered,
+                  dragging: dragging,
+                ),
               ),
             ),
           ),

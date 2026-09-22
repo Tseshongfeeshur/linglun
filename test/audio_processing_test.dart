@@ -42,6 +42,14 @@ void main() {
     expect(graph, contains('alimiter='));
   });
 
+  test('负分贝输出上限转换为小于 1 的线性限幅值', () {
+    final graph = const MpvFilterGraphBuilder().build(
+      AudioProcessingSettings(outputCeilingDb: -6),
+    );
+
+    expect(graph, contains('alimiter=limit=0.5012'));
+  });
+
   test('EQ、Bass 和 Crossfeed 按顺序生成滤镜链', () {
     final settings = AudioProcessingSettings(
       equalizerEnabled: true,

@@ -819,9 +819,6 @@ LyricsDocument _parseTtml(String source) {
           speaker: speaker,
           language: paragraphLanguage,
           role: isTranslation ? LyricRole.translation : LyricRole.original,
-          variants: isTranslation
-              ? const [LyricVariant(text: '', role: LyricRole.translation)]
-              : const [],
         ),
       );
     }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../library/presentation/library_page.dart';
 import '../../library/presentation/annual_summary_page.dart';
+import '../../library/presentation/collection_pages.dart';
 import '../../library/presentation/sources_page.dart';
 import '../../player/presentation/floating_player.dart';
 import 'settings_page.dart';
@@ -39,6 +40,9 @@ class _AppShellState extends State<AppShell> {
 
   Widget _buildPage() {
     return switch (_selectedIndex) {
+      1 => const AlbumsPage(),
+      2 => const ArtistsPage(),
+      3 => const PlaylistsPage(),
       4 => const SourcesPage(),
       5 => const AnnualSummaryPage(),
       6 => const SettingsPage(),

@@ -45,12 +45,12 @@ class LibraryState {
 
 class LibraryController extends Notifier<LibraryState> {
   final _scanner = LibraryScanner();
-  AppDatabase? _database;
   LibraryRepository? _repository;
 
   @override
   LibraryState build() {
-    ref.onDispose(() => _database?.close());
+    // 数据库由进程级共享单例持有，不能在单个 Controller 销毁时关闭，
+    // 否则播放器和曲库 Controller 之间会互相关闭仍在使用的连接。
     unawaited(_initialize());
     return const LibraryState(
       tracks: demoTracks,
@@ -62,7 +62,6 @@ class LibraryController extends Notifier<LibraryState> {
   Future<void> _initialize() async {
     try {
       final database = await sharedLinglunDatabase();
-      _database = database;
       _repository = LibraryRepository(database);
       final library = await _repository!.load();
       if (library.tracks.isNotEmpty) {
@@ -74,7 +73,7 @@ class LibraryController extends Notifier<LibraryState> {
             .read(playerControllerProvider.notifier)
             .replaceQueue(library.tracks);
       } else if (library.directories.isNotEmpty) {
-        state = state.copyWith(directories: library.directories);
+        await scan(library.directories);
       } else {
         await scan(_defaultDirectories());
       }
@@ -101,9 +100,9 @@ class LibraryController extends Notifier<LibraryState> {
     try {
       final tracks = await _scanner.scan(roots);
       state = state.copyWith(tracks: tracks, isScanning: false);
-      if (tracks.isNotEmpty) {
-        ref.read(playerControllerProvider.notifier).replaceQueue(tracks);
-      }
+      // 即使扫描结果为空，也要同步播放器队列，避免界面曲库已经清空而播放器仍
+      // 保留上一轮扫描结果。播放器内部会用示例队列维持非空状态不变量。
+      ref.read(playerControllerProvider.notifier).replaceQueue(tracks);
       await _repository?.replaceLibrary(tracks: tracks, directories: roots);
     } on Object catch (error) {
       state = state.copyWith(isScanning: false, error: '扫描曲库失败：$error');
@@ -115,7 +114,15 @@ class LibraryController extends Notifier<LibraryState> {
     for (final value in directories) {
       final directory = value.trim();
       if (directory.isEmpty) continue;
-      normalized.add(path_util.normalize(Directory(directory).absolute.path));
+      final absolute = Directory(directory).absolute;
+      try {
+        normalized.add(
+          path_util.normalize(absolute.resolveSymbolicLinksSync()),
+        );
+      } on FileSystemException {
+        // 目录可能暂时不存在，仍保存规范化绝对路径供后续扫描。
+        normalized.add(path_util.normalize(absolute.path));
+      }
     }
     return normalized.toList();
   }

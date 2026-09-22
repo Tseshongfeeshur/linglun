@@ -73,7 +73,7 @@ void main() {
   test('解析 QRC 的绝对逐字时间并合并翻译', () {
     final document = parseLyricsFile('''
 [1000,2000]你(1000,500)好(1500,500)
-[1000,2000]You(0,500) too(500,500)
+[1000,2000]You(1000,500) too(1500,500)
 ''', extension: '.qrc');
 
     expect(document.syntax, LyricsSyntax.qrc);

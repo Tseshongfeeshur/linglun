@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
+import 'package:path/path.dart' as path_util;
 // ignore: implementation_imports
 import 'package:audio_metadata_reader/src/metadata/base.dart'
     show
@@ -25,6 +26,10 @@ const supportedAudioExtensions = {
   '.ogg',
   '.opus',
   '.wav',
+  '.aif',
+  '.aiff',
+  '.oga',
+  '.webm',
 };
 
 /// 递归扫描目录并将音频文件转换成应用层的曲目模型。
@@ -44,7 +49,10 @@ class LibraryScanner {
         if (entity is! File) continue;
         final extension = _extension(entity.path);
         if (!supportedAudioExtensions.contains(extension)) continue;
-        if (visited.add(entity.path)) files.add(entity);
+        final normalizedPath = path_util.normalize(
+          File(entity.path).absolute.path,
+        );
+        if (visited.add(normalizedPath)) files.add(File(normalizedPath));
       }
     }
 
@@ -54,9 +62,13 @@ class LibraryScanner {
       if (track != null) tracks.add(track);
     }
 
-    tracks.sort(
-      (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()),
-    );
+    tracks.sort((a, b) {
+      final byTitle = a.title.toLowerCase().compareTo(b.title.toLowerCase());
+      if (byTitle != 0) return byTitle;
+      return (a.path ?? '').toLowerCase().compareTo(
+        (b.path ?? '').toLowerCase(),
+      );
+    });
     return tracks;
   }
 
@@ -115,7 +127,7 @@ class LibraryScanner {
       Mp3Metadata m => AudioMetadata(
         file: file,
         album: m.album,
-        artist: m.bandOrOrchestra ?? m.leadPerformer ?? m.originalArtist,
+        artist: m.leadPerformer ?? m.bandOrOrchestra ?? m.originalArtist,
         duration: m.duration,
         lyrics: m.lyric,
         sampleRate: m.samplerate,
@@ -199,12 +211,7 @@ class LibraryScanner {
   }
 
   Future<List<LyricsSource>> _readSidecarLyrics(File audioFile) async {
-    final basePath = audioFile.path.substring(
-      0,
-      audioFile.path.lastIndexOf('.'),
-    );
-    final sources = <LyricsSource>[];
-    for (final extension in const [
+    const extensions = [
       '.lrc',
       '.elrc',
       '.qrc',
@@ -217,9 +224,32 @@ class LibraryScanner {
       '.srt',
       '.vtt',
       '.txt',
-    ]) {
-      final file = File('$basePath$extension');
-      if (await file.exists()) {
+    ];
+    final stem = path_util
+        .basenameWithoutExtension(audioFile.path)
+        .toLowerCase();
+    final candidates = <String, File>{};
+    try {
+      await for (final entity in audioFile.parent.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final entityStem = path_util
+            .basenameWithoutExtension(entity.path)
+            .toLowerCase();
+        if (entityStem != stem) continue;
+        final extension = path_util.extension(entity.path).toLowerCase();
+        if (extensions.contains(extension)) {
+          candidates[extension] = entity;
+        }
+      }
+    } on Object {
+      // 外挂歌词目录无权限时保留内嵌歌词，不能丢弃整首歌曲。
+    }
+
+    final sources = <LyricsSource>[];
+    for (final extension in extensions) {
+      final file = candidates[extension];
+      if (file == null) continue;
+      try {
         sources.add(
           LyricsSource(
             content: await file.readAsString(),
@@ -227,6 +257,8 @@ class LibraryScanner {
             extension: extension,
           ),
         );
+      } on Object {
+        // 单个歌词文件损坏或不可读时继续尝试其他来源。
       }
     }
     return sources;
@@ -529,8 +561,10 @@ class LibraryScanner {
     return null;
   }
 
-  String _extension(String path) =>
-      path.substring(path.lastIndexOf('.')).toLowerCase();
+  String _extension(String path) {
+    final extension = path_util.extension(path).toLowerCase();
+    return extension;
+  }
 
   String _fileNameWithoutExtension(String path) {
     final name = path.split(Platform.pathSeparator).last;

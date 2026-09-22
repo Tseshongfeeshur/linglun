@@ -24,6 +24,7 @@ flutter run
 ## 目录结构
 
 - `lib/src/features/library`：曲库扫描、元数据、歌词来源和年度统计。
+- `lib/src/features/library/presentation/collection_pages.dart`：专辑、艺术家和当前队列浏览。
 - `lib/src/features/player`：播放状态、歌词领域模型、音频处理设置和悬浮播放器。
 - `lib/src/core/database`：Drift 数据库、曲库索引、播放事件和应用设置。
 - `docs/audio-processing.md`：音频处理链路和后续 DSP 接入边界。

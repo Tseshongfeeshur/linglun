@@ -127,18 +127,31 @@ class PlayerController extends Notifier<PlayerState> {
 
   /// 用曲库扫描结果替换播放队列，同时保留当前播放项（如果仍存在）。
   void replaceQueue(List<Track> tracks) {
-    if (tracks.isEmpty) return;
+    final nextQueue = tracks.isEmpty ? demoTracks : tracks;
     final currentId = state.currentTrack.id;
-    final nextIndex = tracks.indexWhere((track) => track.id == currentId);
+    final nextIndex = nextQueue.indexWhere((track) => track.id == currentId);
+    if (nextIndex == -1 && _player != null) {
+      _stopPlaybackSession();
+      unawaited(_player!.stop());
+    }
     state = state.copyWith(
-      queue: tracks,
+      queue: nextQueue,
       currentIndex: nextIndex == -1 ? 0 : nextIndex,
+      isPlaying: nextIndex == -1 ? false : state.isPlaying,
+      position: nextIndex == -1 ? Duration.zero : state.position,
     );
   }
 
   void seek(Duration position) {
-    state = state.copyWith(position: position);
-    _player?.seek(position);
+    final duration = state.currentTrack.duration;
+    final upperBound = duration > Duration.zero ? duration : position;
+    final bounded = position < Duration.zero
+        ? Duration.zero
+        : position > upperBound
+        ? upperBound
+        : position;
+    state = state.copyWith(position: bounded);
+    _player?.seek(bounded);
   }
 
   void skipNext() {
@@ -275,13 +288,14 @@ class PlayerController extends Notifier<PlayerState> {
   Future<void> _recordPlayback(Track track) async {
     try {
       final database = await sharedLinglunDatabase();
-      await database.recordPlayback(track.id, DateTime.now());
+      final playedAt = DateTime.now();
+      await database.recordPlayback(track.id, playedAt);
       final index = state.queue.indexWhere((item) => item.id == track.id);
       if (index != -1) {
         final queue = [...state.queue];
         queue[index] = queue[index].copyWith(
           playCount: queue[index].playCount + 1,
-          lastPlayedAt: DateTime.now(),
+          lastPlayedAt: playedAt,
         );
         state = state.copyWith(queue: queue);
       }
