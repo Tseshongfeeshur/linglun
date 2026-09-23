@@ -193,6 +193,32 @@ void main() {
     expect(document.lines.single.words, hasLength(2));
   });
 
+  test('TTML 对唱背景行独立计时并合并到主唱歌词组', () {
+    final document = parseLyricsFile('''
+<tt xmlns="http://www.w3.org/ns/ttml">
+  <body><div>
+    <p begin="1s" end="1.2s" role="background" agent="v2">
+      <span begin="0s" end="0.2s">啊</span>
+    </p>
+    <p begin="1.2s" end="3s" agent="v1">主唱歌词</p>
+  </div></body>
+</tt>
+''');
+
+    expect(document.timing, LyricsTiming.word);
+    expect(document.lines, hasLength(1));
+    expect(document.lines.single.text, '主唱歌词');
+    expect(document.lines.single.variants, hasLength(1));
+    final background = document.lines.single.variants.single;
+    expect(background.role, LyricRole.alternate);
+    expect(background.text, '啊');
+    expect(background.start, const Duration(seconds: 1));
+    expect(background.end, const Duration(milliseconds: 1200));
+    expect(background.words.single.start, const Duration(seconds: 1));
+    expect(background.words.single.end, const Duration(milliseconds: 1200));
+    expect(document.hasWordTimestamps, isTrue);
+  });
+
   test('无时间戳歌词归一化为纯歌词结构', () {
     final document = parseLyricsFile('第一行\n第二行', extension: '.txt');
 

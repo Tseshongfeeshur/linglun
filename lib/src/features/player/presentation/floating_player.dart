@@ -1,22 +1,23 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/database/app_database.dart';
 import '../application/player_controller.dart';
 import '../domain/lyrics.dart';
 import '../domain/track.dart';
+import 'amll_playback_page.dart';
 
 const _circleSize = 72.0;
 const _ringSize = 104.0;
 const _ringInset = (_ringSize - _circleSize) / 2;
 const _panelGap = 12.0;
-const _infoPanelWidth = 286.0;
-const _infoPanelHeight = 104.0;
-const _controlPanelWidth = 82.0;
-const _controlPanelHeight = 178.0;
+const _infoPanelMaxWidth = 286.0;
+const _floatingPositionSettingKey = 'player.floating.position.v1';
 
 /// 桌面端悬浮播放器：圆形封面是入口，控制和歌词信息按边界弹出。
 class FloatingPlayer extends ConsumerStatefulWidget {
@@ -28,8 +29,11 @@ class FloatingPlayer extends ConsumerStatefulWidget {
 
 class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
     with SingleTickerProviderStateMixin {
-  Offset _position = const Offset(36, 120);
+  // 使用归一化坐标保存位置，这样窗口尺寸变化后仍能保持相同的相对位置。
+  Offset _positionFactor = const Offset(0, 1);
   Offset? _dragStart;
+  Offset? _pointerDownPosition;
+  double? _seekPreviewProgress;
   bool _hovered = false;
   bool _dragging = false;
   bool _seeking = false;
@@ -44,6 +48,7 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
       vsync: this,
       duration: const Duration(milliseconds: 420),
     );
+    unawaited(_loadFloatingPosition());
   }
 
   @override
@@ -61,30 +66,14 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
-        final center = _clampPosition(_position, size);
-        // 以完整菜单是否能放入窗口为准，避免使用固定阈值造成菜单越界。
-        final canShowAbove = center.dy - _panelGap - _controlPanelHeight >= 8;
-        final canShowBelow =
-            center.dy + _circleSize + _panelGap + _controlPanelHeight <=
-            size.height - 8;
-        final spaceAbove = center.dy - 8;
-        final spaceBelow = size.height - 8 - center.dy - _circleSize;
-        final showAbove = canShowAbove
-            ? true
-            : canShowBelow
-            ? false
-            : spaceAbove >= spaceBelow;
-        final canShowRight =
-            center.dx + _circleSize + _panelGap + _infoPanelWidth <=
-            size.width - 8;
-        final canShowLeft = center.dx - _panelGap - _infoPanelWidth >= 8;
-        final spaceRight = size.width - 8 - center.dx - _circleSize;
-        final spaceLeft = center.dx - 8;
-        final showLeft = canShowRight
-            ? false
-            : canShowLeft
-            ? true
-            : spaceLeft >= spaceRight;
+        final center = _positionForSize(size);
+        final circleCenter =
+            center + const Offset(_circleSize / 2, _circleSize / 2);
+        // 方向只由专辑封面圆心所在的窗口半区决定，不再用菜单尺寸或边距
+        // 参与判断：上半区向下展开，下半区向上展开；左半区向右展开，
+        // 右半区向左展开。圆心位于中线时，控制菜单向下、歌词菜单向左。
+        final showAbove = circleCenter.dy > size.height / 2;
+        final showLeft = circleCenter.dx >= size.width / 2;
 
         return Stack(
           clipBehavior: Clip.none,
@@ -110,25 +99,25 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
                 hovered: _hovered,
                 dragging: _dragging,
                 expanded: _expanded,
-                viewport: size,
+                seekPreviewProgress: _seekPreviewProgress,
                 showAbove: showAbove,
                 showLeft: showLeft,
                 onHover: _setHovered,
-                onTapDown: (details) {
+                onPointerDown: (event) {
+                  _pointerDownPosition = event.position;
                   _seeking = _isNearSeekHandle(
-                    details.globalPosition,
+                    event.position,
                     center,
                     _progress(state),
                   );
                 },
                 onDragStart: (details) {
                   _hoverExitTimer?.cancel();
-                  _seeking = _isNearSeekHandle(
-                    details.globalPosition,
-                    center,
-                    _progress(state),
-                  );
-                  _dragStart = details.globalPosition - center;
+                  // 拖拽识别器可能越过触发阈值后才回调，起点必须使用按下位置，
+                  // 避免把进度环手柄误判成封面移动。
+                  _dragStart =
+                      (_pointerDownPosition ?? details.globalPosition) - center;
+                  _seekPreviewProgress = _seeking ? _progress(state) : null;
                   setState(() {
                     _hovered = true;
                     _dragging = true;
@@ -140,31 +129,43 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
                     final angle = math.atan2(local.dy - 36, local.dx - 36);
                     final progress =
                         ((angle + math.pi / 2) / (math.pi * 2)) % 1;
-                    final duration = track.duration;
-                    ref
-                        .read(playerControllerProvider.notifier)
-                        .seek(duration * progress);
+                    setState(() => _seekPreviewProgress = progress);
                     return;
                   }
+                  final position = _clampPosition(
+                    details.globalPosition - (_dragStart ?? Offset.zero),
+                    size,
+                  );
                   setState(() {
-                    _position = _clampPosition(
-                      details.globalPosition - (_dragStart ?? Offset.zero),
-                      size,
-                    );
+                    _positionFactor = _factorForPosition(position, size);
                   });
                 },
                 onDragEnd: (_) {
                   _hoverExitTimer?.cancel();
+                  final seekProgress = _seekPreviewProgress;
+                  final shouldSeek = _seeking && seekProgress != null;
+                  final shouldPersist = !_seeking;
                   setState(() {
                     _dragStart = null;
+                    _pointerDownPosition = null;
+                    _seekPreviewProgress = null;
                     _seeking = false;
                     _dragging = false;
                     _hovered = true;
                   });
+                  if (shouldSeek) {
+                    ref
+                        .read(playerControllerProvider.notifier)
+                        .seek(track.duration * seekProgress);
+                  } else if (shouldPersist) {
+                    unawaited(_persistFloatingPosition());
+                  }
                 },
                 onTap: () {
                   if (_seeking) {
                     _seeking = false;
+                    _pointerDownPosition = null;
+                    _seekPreviewProgress = null;
                     return;
                   }
                   _openExpanded();
@@ -180,6 +181,23 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
                   sourceCenter: center + const Offset(36, 36),
                   viewport: size,
                   onClose: _closeExpanded,
+                  onPrevious: ref
+                      .read(playerControllerProvider.notifier)
+                      .previous,
+                  onTogglePlay: ref
+                      .read(playerControllerProvider.notifier)
+                      .togglePlay,
+                  onNext: ref.read(playerControllerProvider.notifier).skipNext,
+                  onSeek: ref.read(playerControllerProvider.notifier).seek,
+                  onToggleShuffle: ref
+                      .read(playerControllerProvider.notifier)
+                      .toggleShuffle,
+                  onCycleRepeat: ref
+                      .read(playerControllerProvider.notifier)
+                      .cycleRepeatMode,
+                  onPlayTrack: ref
+                      .read(playerControllerProvider.notifier)
+                      .playTrack,
                 ),
               ),
           ],
@@ -212,14 +230,78 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
   }
 
   Offset _clampPosition(Offset position, Size size) {
-    return Offset(
-      position.dx
-          .clamp(_ringInset + 8, math.max(_ringInset + 8, size.width - 96))
-          .toDouble(),
-      position.dy
-          .clamp(_ringInset + 8, math.max(_ringInset + 8, size.height - 96))
-          .toDouble(),
+    final minimum = Offset(_ringInset + 8, _ringInset + 8);
+    final maximum = Offset(
+      math.max(minimum.dx, size.width - 96),
+      math.max(minimum.dy, size.height - 96),
     );
+    return Offset(
+      position.dx.clamp(minimum.dx, maximum.dx).toDouble(),
+      position.dy.clamp(minimum.dy, maximum.dy).toDouble(),
+    );
+  }
+
+  Offset _positionForSize(Size size) {
+    final minimum = Offset(_ringInset + 8, _ringInset + 8);
+    final maximum = Offset(
+      math.max(minimum.dx, size.width - 96),
+      math.max(minimum.dy, size.height - 96),
+    );
+    return Offset(
+      lerpDouble(minimum.dx, maximum.dx, _positionFactor.dx)!,
+      lerpDouble(minimum.dy, maximum.dy, _positionFactor.dy)!,
+    );
+  }
+
+  Offset _factorForPosition(Offset position, Size size) {
+    final minimum = Offset(_ringInset + 8, _ringInset + 8);
+    final maximum = Offset(
+      math.max(minimum.dx, size.width - 96),
+      math.max(minimum.dy, size.height - 96),
+    );
+    final xRange = maximum.dx - minimum.dx;
+    final yRange = maximum.dy - minimum.dy;
+    return Offset(
+      xRange == 0
+          ? 0
+          : ((position.dx - minimum.dx) / xRange).clamp(0, 1).toDouble(),
+      yRange == 0
+          ? 0
+          : ((position.dy - minimum.dy) / yRange).clamp(0, 1).toDouble(),
+    );
+  }
+
+  Future<void> _loadFloatingPosition() async {
+    try {
+      final database = await sharedLinglunDatabase();
+      final value = await database.loadSetting(_floatingPositionSettingKey);
+      if (!mounted || value == null) return;
+      final decoded = jsonDecode(value);
+      if (decoded is! Map) return;
+      final x = (decoded['x'] as num?)?.toDouble();
+      final y = (decoded['y'] as num?)?.toDouble();
+      if (x == null || y == null) return;
+      setState(() {
+        _positionFactor = Offset(
+          x.clamp(0, 1).toDouble(),
+          y.clamp(0, 1).toDouble(),
+        );
+      });
+    } catch (_) {
+      // 位置设置读取失败不应影响播放器显示，继续使用左下角默认位置。
+    }
+  }
+
+  Future<void> _persistFloatingPosition() async {
+    try {
+      final database = await sharedLinglunDatabase();
+      await database.saveSetting(
+        _floatingPositionSettingKey,
+        jsonEncode({'x': _positionFactor.dx, 'y': _positionFactor.dy}),
+      );
+    } catch (_) {
+      // 设置保存失败不应阻断播放或拖动交互。
+    }
   }
 
   bool _isNearSeekHandle(
@@ -253,11 +335,11 @@ class _FloatingCluster extends ConsumerWidget {
     required this.hovered,
     required this.dragging,
     required this.expanded,
-    required this.viewport,
+    required this.seekPreviewProgress,
     required this.showAbove,
     required this.showLeft,
     required this.onHover,
-    required this.onTapDown,
+    required this.onPointerDown,
     required this.onDragStart,
     required this.onDragUpdate,
     required this.onDragEnd,
@@ -270,11 +352,11 @@ class _FloatingCluster extends ConsumerWidget {
   final bool hovered;
   final bool dragging;
   final bool expanded;
-  final Size viewport;
+  final double? seekPreviewProgress;
   final bool showAbove;
   final bool showLeft;
   final ValueChanged<bool> onHover;
-  final GestureTapDownCallback onTapDown;
+  final ValueChanged<PointerDownEvent> onPointerDown;
   final GestureDragStartCallback onDragStart;
   final GestureDragUpdateCallback onDragUpdate;
   final GestureDragEndCallback onDragEnd;
@@ -288,8 +370,6 @@ class _FloatingCluster extends ConsumerWidget {
     final controller = ref.read(playerControllerProvider.notifier);
     final panelsExpanded = !expanded && (hovered || dragging);
     final bubble = _MorphingGlassBubble(
-      width: _controlPanelWidth,
-      height: _controlPanelHeight,
       expanded: panelsExpanded,
       instant: dragging,
       child: Column(
@@ -314,8 +394,7 @@ class _FloatingCluster extends ConsumerWidget {
       ),
     );
     final info = _MorphingGlassBubble(
-      width: _infoPanelWidth,
-      height: _infoPanelHeight,
+      maxWidth: _infoPanelMaxWidth,
       expanded: panelsExpanded,
       instant: dragging,
       child: Column(
@@ -326,21 +405,20 @@ class _FloatingCluster extends ConsumerWidget {
             '${track.title} - ${track.artist}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: const TextStyle(color: Colors.white60),
           ),
-          const SizedBox(height: 8),
           if (currentLine == null)
             Text(
               track.lyrics == null || track.lyrics!.trim().isEmpty
                   ? '暂无歌词'
                   : lyrics.timing == LyricsTiming.none
                   ? '歌词没有时间信息'
-                  : '当前没有歌词',
+                  : '',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Theme.of(context).colorScheme.primary,
-                fontSize: 13,
+                fontSize: 14,
               ),
             )
           else ...[
@@ -375,61 +453,56 @@ class _FloatingCluster extends ConsumerWidget {
 
     final circleLeft = position.dx - _ringInset;
     final circleTop = position.dy - _ringInset;
-    final maxInfoLeft = math.max(8.0, viewport.width - _infoPanelWidth - 8);
-    final maxInfoTop = math.max(8.0, viewport.height - _infoPanelHeight - 8);
-    final maxControlLeft = math.max(
-      8.0,
-      viewport.width - _controlPanelWidth - 8,
+    final circleCenterX = position.dx + _circleSize / 2;
+    final circleCenterY = position.dy + _circleSize / 2;
+    final infoRightAnchor = position.dx - _panelGap;
+    final infoLeftAnchor = position.dx + _circleSize + _panelGap;
+    final controlTopAnchor = position.dy - _panelGap;
+    final controlBottomAnchor = position.dy + _circleSize + _panelGap;
+
+    // 菜单的外层锚点只负责从圆心移动到目标边缘，尺寸由内容自身决定。
+    // 这样窗口大小或拖动位置变化时可以立即重定位，而悬停状态变化仍有
+    // 独立的展开动画。
+    final infoMenu = _MenuMotion(
+      expanded: panelsExpanded,
+      instant: dragging,
+      collapsedAnchor: Offset(circleCenterX, circleCenterY),
+      expandedAnchor: Offset(
+        showLeft ? infoRightAnchor : infoLeftAnchor,
+        circleCenterY,
+      ),
+      collapsedTranslation: const Offset(-.5, -.5),
+      expandedTranslation: showLeft
+          ? const Offset(-1, -.5)
+          : const Offset(0, -.5),
+      child: panel(info),
     );
-    final maxControlTop = math.max(
-      8.0,
-      viewport.height - _controlPanelHeight - 8,
+    final controlMenu = _MenuMotion(
+      expanded: panelsExpanded,
+      instant: dragging,
+      collapsedAnchor: Offset(circleCenterX, circleCenterY),
+      expandedAnchor: Offset(
+        circleCenterX,
+        showAbove ? controlTopAnchor : controlBottomAnchor,
+      ),
+      collapsedTranslation: const Offset(-.5, -.5),
+      expandedTranslation: showAbove
+          ? const Offset(-.5, -1)
+          : const Offset(-.5, 0),
+      child: panel(bubble),
     );
-    final infoTargetLeft =
-        (showLeft
-                ? position.dx - _panelGap - _infoPanelWidth
-                : position.dx + _circleSize + _panelGap)
-            .clamp(8.0, maxInfoLeft)
-            .toDouble();
-    final infoTargetTop = (position.dy + (_circleSize - _infoPanelHeight) / 2)
-        .clamp(8.0, maxInfoTop)
-        .toDouble();
-    final controlTargetLeft =
-        (position.dx + (_circleSize - _controlPanelWidth) / 2)
-            .clamp(8.0, maxControlLeft)
-            .toDouble();
-    final controlTargetTop =
-        (showAbove
-                ? position.dy - _panelGap - _controlPanelHeight
-                : position.dy + _circleSize + _panelGap)
-            .clamp(8.0, maxControlTop)
-            .toDouble();
-    final collapsedInfoLeft = position.dx + (_circleSize - _circleSize) / 2;
-    final collapsedInfoTop = position.dy + (_circleSize - _circleSize) / 2;
-    final collapsedControlLeft = position.dx + (_circleSize - _circleSize) / 2;
-    final collapsedControlTop = position.dy + (_circleSize - _circleSize) / 2;
-    final infoBridgeStart = showLeft
-        ? infoTargetLeft + _infoPanelWidth
-        : position.dx + _circleSize;
-    final infoBridgeEnd = showLeft ? position.dx : infoTargetLeft;
-    final infoBridgeLeft = math.min(infoBridgeStart, infoBridgeEnd);
-    final infoBridgeWidth = (infoBridgeEnd - infoBridgeStart).abs();
-    final controlBridgeStart = showAbove
-        ? controlTargetTop + _controlPanelHeight
-        : position.dy + _circleSize;
-    final controlBridgeEnd = showAbove ? position.dy : controlTargetTop;
-    final controlBridgeTop = math.min(controlBridgeStart, controlBridgeEnd);
-    final controlBridgeHeight = (controlBridgeEnd - controlBridgeStart).abs();
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        if (!expanded && hovered && infoBridgeWidth > 0)
+        // 透明桥接区只在菜单已经打开后出现，避免未悬停时扩大封面圆的
+        // 命中范围；菜单位置变化时桥接区也会立即跟随新锚点。
+        if (!expanded && hovered)
           Positioned(
-            left: infoBridgeLeft,
-            top: infoTargetTop,
-            width: infoBridgeWidth,
-            height: _infoPanelHeight,
+            left: showLeft ? infoRightAnchor : position.dx + _circleSize,
+            top: position.dy,
+            width: _panelGap,
+            height: _circleSize,
             child: MouseRegion(
               opaque: false,
               onEnter: (_) => onHover(true),
@@ -437,12 +510,14 @@ class _FloatingCluster extends ConsumerWidget {
               child: const SizedBox.expand(),
             ),
           ),
-        if (!expanded && hovered && controlBridgeHeight > 0)
+        if (!expanded && hovered)
           Positioned(
-            left: controlTargetLeft,
-            top: controlBridgeTop,
-            width: _controlPanelWidth,
-            height: controlBridgeHeight,
+            left: position.dx,
+            top: showAbove
+                ? position.dy - _panelGap
+                : position.dy + _circleSize,
+            width: _circleSize,
+            height: _panelGap,
             child: MouseRegion(
               opaque: false,
               onEnter: (_) => onHover(true),
@@ -450,30 +525,8 @@ class _FloatingCluster extends ConsumerWidget {
               child: const SizedBox.expand(),
             ),
           ),
-        if (!expanded)
-          AnimatedPositioned(
-            duration: dragging
-                ? Duration.zero
-                : const Duration(milliseconds: 240),
-            curve: Curves.easeOutCubic,
-            left: panelsExpanded ? infoTargetLeft : collapsedInfoLeft,
-            top: panelsExpanded ? infoTargetTop : collapsedInfoTop,
-            width: panelsExpanded ? _infoPanelWidth : _circleSize,
-            height: panelsExpanded ? _infoPanelHeight : _circleSize,
-            child: panel(info),
-          ),
-        if (!expanded)
-          AnimatedPositioned(
-            duration: dragging
-                ? Duration.zero
-                : const Duration(milliseconds: 240),
-            curve: Curves.easeOutCubic,
-            left: panelsExpanded ? controlTargetLeft : collapsedControlLeft,
-            top: panelsExpanded ? controlTargetTop : collapsedControlTop,
-            width: panelsExpanded ? _controlPanelWidth : _circleSize,
-            height: panelsExpanded ? _controlPanelHeight : _circleSize,
-            child: panel(bubble),
-          ),
+        if (!expanded) infoMenu,
+        if (!expanded) controlMenu,
         Positioned(
           left: circleLeft,
           top: circleTop,
@@ -482,16 +535,18 @@ class _FloatingCluster extends ConsumerWidget {
           child: MouseRegion(
             onEnter: (_) => onHover(true),
             onExit: (_) => onHover(false),
-            child: GestureDetector(
-              onTapDown: onTapDown,
-              onTap: dragging ? null : onTap,
-              onPanStart: onDragStart,
-              onPanUpdate: onDragUpdate,
-              onPanEnd: onDragEnd,
-              child: ClipOval(
+            child: Listener(
+              onPointerDown: onPointerDown,
+              child: GestureDetector(
+                onTap: dragging ? null : onTap,
+                onPanStart: onDragStart,
+                onPanUpdate: onDragUpdate,
+                onPanEnd: onDragEnd,
+                // 只裁切内部封面。进度环和手柄位于封面外侧，若在这里裁切
+                // 整个组件，手柄经过圆周边缘时会被截断。
                 child: _ProgressCircle(
                   track: track,
-                  progress: _progress(state),
+                  progress: seekPreviewProgress ?? _progress(state),
                   hovered: hovered,
                   dragging: dragging,
                 ),
@@ -504,55 +559,142 @@ class _FloatingCluster extends ConsumerWidget {
   }
 }
 
-class _MorphingGlassBubble extends StatelessWidget {
-  const _MorphingGlassBubble({
-    required this.child,
-    required this.width,
-    required this.height,
+/// 只在“展开/收起”状态变化时播放位移动画。
+///
+/// 圆被拖动或窗口尺寸变化时，锚点会立即更新，不会因为新的目标位置
+/// 触发一段额外的位移动画，从而避免菜单与圆产生滞后。
+class _MenuMotion extends StatefulWidget {
+  const _MenuMotion({
     required this.expanded,
     required this.instant,
+    required this.collapsedAnchor,
+    required this.expandedAnchor,
+    required this.collapsedTranslation,
+    required this.expandedTranslation,
+    required this.child,
   });
 
-  final Widget child;
-  final double width;
-  final double height;
   final bool expanded;
   final bool instant;
+  final Offset collapsedAnchor;
+  final Offset expandedAnchor;
+  final Offset collapsedTranslation;
+  final Offset expandedTranslation;
+  final Widget child;
+
+  @override
+  State<_MenuMotion> createState() => _MenuMotionState();
+}
+
+class _MenuMotionState extends State<_MenuMotion>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+      value: widget.expanded ? 1 : 0,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _MenuMotion oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.instant) {
+      _controller.value = widget.expanded ? 1 : 0;
+    } else if (widget.expanded != oldWidget.expanded) {
+      _controller.animateTo(
+        widget.expanded ? 1 : 0,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Align(
+    return AnimatedBuilder(
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) {
+        final progress = Curves.easeOutCubic.transform(_controller.value);
+        final anchor = Offset.lerp(
+          widget.collapsedAnchor,
+          widget.expandedAnchor,
+          progress,
+        )!;
+        final translation = Offset.lerp(
+          widget.collapsedTranslation,
+          widget.expandedTranslation,
+          progress,
+        )!;
+        return Positioned(
+          left: anchor.dx,
+          top: anchor.dy,
+          child: FractionalTranslation(translation: translation, child: child),
+        );
+      },
+    );
+  }
+}
+
+class _MorphingGlassBubble extends StatelessWidget {
+  const _MorphingGlassBubble({
+    required this.child,
+    required this.expanded,
+    required this.instant,
+    this.maxWidth,
+  });
+
+  final Widget child;
+  final bool expanded;
+  final bool instant;
+  final double? maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = instant
+        ? Duration.zero
+        : const Duration(milliseconds: 240);
+    final constraints = maxWidth == null
+        ? const BoxConstraints()
+        : BoxConstraints(maxWidth: maxWidth!);
+    return AnimatedSize(
+      duration: duration,
+      curve: Curves.easeOutCubic,
       alignment: Alignment.center,
       child: AnimatedContainer(
-        duration: instant ? Duration.zero : const Duration(milliseconds: 240),
+        duration: duration,
         curve: Curves.easeOutCubic,
-        width: expanded ? width : _circleSize,
-        height: expanded ? height : _circleSize,
+        constraints: constraints,
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
           color: Colors.white.withAlpha(22),
           border: Border.all(color: Colors.white.withAlpha(28)),
-          borderRadius: BorderRadius.circular(34),
+          borderRadius: BorderRadius.circular(expanded ? 34 : 99),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(34),
+          borderRadius: BorderRadius.circular(expanded ? 34 : 99),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              child: OverflowBox(
-                alignment: Alignment.topCenter,
-                minWidth: 0,
-                maxWidth: width - 24,
-                minHeight: 0,
-                maxHeight: height - 20,
-                child: SizedBox(
-                  width: width - 24,
-                  height: height - 20,
-                  child: child,
-                ),
-              ),
-            ),
+            child: expanded
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    child: child,
+                  )
+                : const SizedBox.square(dimension: _circleSize),
           ),
         ),
       ),
@@ -575,7 +717,9 @@ class _LyricPreviewLine extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: Theme.of(context).colorScheme.primary,
-          fontSize: 13,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          wordSpacing: 1,
         ),
       );
     }
@@ -590,9 +734,11 @@ class _LyricPreviewLine extends StatelessWidget {
               text: word.text,
               style: TextStyle(
                 color: word.start <= position
-                    ? Theme.of(context).colorScheme.primary
+                    ? Theme.of(context).colorScheme.onSurface
                     : Colors.white54,
-                fontSize: 13,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1,
               ),
             ),
         ],
@@ -619,7 +765,7 @@ class _LyricPreviewVariant extends StatelessWidget {
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: Colors.white54, fontSize: 12),
+        style: const TextStyle(color: Colors.white54, fontSize: 13),
       );
     }
     return RichText(
@@ -632,7 +778,7 @@ class _LyricPreviewVariant extends StatelessWidget {
               text: word.text,
               style: TextStyle(
                 color: word.start <= position ? Colors.white70 : Colors.white38,
-                fontSize: 12,
+                fontSize: 13,
               ),
             ),
         ],
@@ -769,6 +915,13 @@ class _ExpandedPlayer extends StatelessWidget {
     required this.sourceCenter,
     required this.viewport,
     required this.onClose,
+    required this.onPrevious,
+    required this.onTogglePlay,
+    required this.onNext,
+    required this.onSeek,
+    required this.onToggleShuffle,
+    required this.onCycleRepeat,
+    required this.onPlayTrack,
   });
 
   final Track track;
@@ -777,12 +930,20 @@ class _ExpandedPlayer extends StatelessWidget {
   final Offset sourceCenter;
   final Size viewport;
   final VoidCallback onClose;
+  final VoidCallback onPrevious;
+  final VoidCallback onTogglePlay;
+  final VoidCallback onNext;
+  final ValueChanged<Duration> onSeek;
+  final VoidCallback onToggleShuffle;
+  final VoidCallback onCycleRepeat;
+  final ValueChanged<Track> onPlayTrack;
 
   @override
   Widget build(BuildContext context) {
     final curved = CurvedAnimation(
       parent: animation,
       curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
     );
     final pageCenter = Offset(viewport.width / 2, viewport.height / 2);
     final maxRadius =
@@ -802,60 +963,35 @@ class _ExpandedPlayer extends StatelessWidget {
             radius: lerpDouble(_ringSize / 2, maxRadius, value)!,
           ),
           child: Stack(
+            fit: StackFit.expand,
             children: [
-              BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                child: ColoredBox(
-                  color: Theme.of(context).scaffoldBackgroundColor
-                      .withAlpha(244),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        left: coverCenter.dx - 52,
-                        top: coverCenter.dy - 52,
-                        child: _ProgressCircle(
-                          track: track,
-                          progress: _progress(state),
-                          hovered: false,
-                          dragging: false,
-                        ),
-                      ),
-                      Opacity(
-                        opacity: value,
-                        child: Center(
-                          child: Padding(
-                            padding: const EdgeInsets.only(top: 180),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  track.title,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall,
-                                ),
-                                Text(
-                                  track.artist,
-                                  style: const TextStyle(color: Colors.white60),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 22,
-                        right: 22,
-                        child: Opacity(
-                          opacity: value,
-                          child: IconButton(
-                            onPressed: onClose,
-                            tooltip: '关闭播放页',
-                            icon: const Icon(Icons.close),
-                          ),
-                        ),
-                      ),
-                    ],
+              FadeTransition(
+                opacity: curved,
+                child: AmllPlaybackPage(
+                  track: track,
+                  state: state,
+                  onClose: onClose,
+                  onPrevious: onPrevious,
+                  onTogglePlay: onTogglePlay,
+                  onNext: onNext,
+                  onSeek: onSeek,
+                  onToggleShuffle: onToggleShuffle,
+                  onCycleRepeat: onCycleRepeat,
+                  onPlayTrack: onPlayTrack,
+                ),
+              ),
+              Positioned(
+                left: coverCenter.dx - 52,
+                top: coverCenter.dy - 52,
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity: (1 - value).clamp(0, 1),
+                    child: _ProgressCircle(
+                      track: track,
+                      progress: _progress(state),
+                      hovered: false,
+                      dragging: false,
+                    ),
                   ),
                 ),
               ),

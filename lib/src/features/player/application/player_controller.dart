@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart' hide Track;
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import '../../../core/database/app_database.dart';
 import '../domain/audio_processing.dart';
@@ -9,6 +10,8 @@ import '../domain/track.dart';
 
 final playerControllerProvider =
     NotifierProvider<PlayerController, PlayerState>(PlayerController.new);
+
+enum RepeatMode { off, all, one }
 
 /// 当前播放器状态。后续将由 libmpv 事件流驱动，而不是由页面自行维护。
 class PlayerState {
@@ -18,6 +21,8 @@ class PlayerState {
     required this.isPlaying,
     required this.position,
     required this.audioSettings,
+    this.shuffleEnabled = false,
+    this.repeatMode = RepeatMode.off,
   });
 
   final List<Track> queue;
@@ -25,6 +30,8 @@ class PlayerState {
   final bool isPlaying;
   final Duration position;
   final AudioProcessingSettings audioSettings;
+  final bool shuffleEnabled;
+  final RepeatMode repeatMode;
 
   bool get normalizationEnabled => audioSettings.normalizationEnabled;
 
@@ -36,6 +43,8 @@ class PlayerState {
     bool? isPlaying,
     Duration? position,
     AudioProcessingSettings? audioSettings,
+    bool? shuffleEnabled,
+    RepeatMode? repeatMode,
   }) {
     return PlayerState(
       queue: queue ?? this.queue,
@@ -43,6 +52,8 @@ class PlayerState {
       isPlaying: isPlaying ?? this.isPlaying,
       position: position ?? this.position,
       audioSettings: audioSettings ?? this.audioSettings,
+      shuffleEnabled: shuffleEnabled ?? this.shuffleEnabled,
+      repeatMode: repeatMode ?? this.repeatMode,
     );
   }
 }
@@ -57,6 +68,7 @@ class PlayerController extends Notifier<PlayerState> {
   DateTime? _lastPlaybackTick;
   bool _sessionCounted = false;
   final _filterGraphBuilder = const MpvFilterGraphBuilder();
+  final _random = math.Random();
 
   @override
   PlayerState build() {
@@ -155,14 +167,73 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   void skipNext() {
-    final nextIndex = (state.currentIndex + 1) % state.queue.length;
+    if (state.queue.length < 2) {
+      if (state.repeatMode != RepeatMode.off) {
+        playTrack(state.currentTrack);
+      }
+      return;
+    }
+    if (state.shuffleEnabled) {
+      final candidates = [
+        for (var index = 0; index < state.queue.length; index++)
+          if (index != state.currentIndex) index,
+      ];
+      playTrack(state.queue[candidates[_random.nextInt(candidates.length)]]);
+      return;
+    }
+    final sequentialIndex = state.currentIndex + 1;
+    final nextIndex = sequentialIndex < state.queue.length
+        ? sequentialIndex
+        : state.repeatMode == RepeatMode.all
+        ? 0
+        : -1;
+    if (nextIndex == -1) return;
     playTrack(state.queue[nextIndex]);
   }
 
   void previous() {
-    final previousIndex =
-        (state.currentIndex - 1 + state.queue.length) % state.queue.length;
+    if (state.queue.length < 2) return;
+    if (state.shuffleEnabled) {
+      final candidates = [
+        for (var index = 0; index < state.queue.length; index++)
+          if (index != state.currentIndex) index,
+      ];
+      playTrack(state.queue[candidates[_random.nextInt(candidates.length)]]);
+      return;
+    }
+    final previousIndex = state.currentIndex == 0
+        ? state.queue.length - 1
+        : state.currentIndex - 1;
     playTrack(state.queue[previousIndex]);
+  }
+
+  void toggleShuffle() {
+    state = state.copyWith(shuffleEnabled: !state.shuffleEnabled);
+  }
+
+  void cycleRepeatMode() {
+    final nextMode = switch (state.repeatMode) {
+      RepeatMode.off => RepeatMode.all,
+      RepeatMode.all => RepeatMode.one,
+      RepeatMode.one => RepeatMode.off,
+    };
+    state = state.copyWith(repeatMode: nextMode);
+  }
+
+  void _handleTrackCompleted() {
+    _stopPlaybackSession();
+    if (state.repeatMode == RepeatMode.one ||
+        (state.repeatMode == RepeatMode.all && state.queue.length == 1)) {
+      unawaited(playTrack(state.currentTrack));
+      return;
+    }
+    if (state.currentIndex == state.queue.length - 1 &&
+        state.repeatMode == RepeatMode.off &&
+        !state.shuffleEnabled) {
+      state = state.copyWith(isPlaying: false);
+      return;
+    }
+    skipNext();
   }
 
   Player _ensurePlayer() {
@@ -179,8 +250,7 @@ class PlayerController extends Notifier<PlayerState> {
     });
     player.stream.completed.listen((completed) {
       if (completed) {
-        _stopPlaybackSession();
-        skipNext();
+        _handleTrackCompleted();
       }
     });
     player.stream.error.listen((error) {

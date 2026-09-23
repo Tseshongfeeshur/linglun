@@ -62,6 +62,8 @@ class LyricWord {
 class LyricVariant {
   const LyricVariant({
     required this.text,
+    this.start,
+    this.end,
     this.words = const [],
     this.role = LyricRole.alternate,
     this.language,
@@ -69,6 +71,8 @@ class LyricVariant {
   });
 
   final String text;
+  final Duration? start;
+  final Duration? end;
   final List<LyricWord> words;
   final LyricRole role;
   final String? language;
@@ -106,6 +110,7 @@ class LyricLine {
   bool get isWordSynchronized => words.isNotEmpty;
 
   LyricLine copyWith({
+    Duration? start,
     Duration? end,
     String? translation,
     List<LyricWord>? translationWords,
@@ -115,7 +120,7 @@ class LyricLine {
     List<LyricVariant>? variants,
   }) {
     return LyricLine(
-      start: start,
+      start: start ?? this.start,
       end: end ?? this.end,
       text: text,
       words: words,
@@ -173,6 +178,14 @@ class LyricsDocument {
   final Map<String, String> metadata;
 
   bool get hasTimestamps => timing != LyricsTiming.none;
+
+  /// 含独立逐字时间的对唱/背景声部也属于逐字歌词。
+  bool get hasWordTimestamps => lines.any(
+    (line) =>
+        line.words.isNotEmpty ||
+        line.translationWords.isNotEmpty ||
+        line.variants.any((variant) => variant.words.isNotEmpty),
+  );
 
   String get plainLyrics {
     if (plainLines.isNotEmpty) return plainLines.join('\n');
@@ -760,9 +773,8 @@ LyricsDocument _parseTtml(String source) {
       final paragraphBegin = _parseTtmlTime(_xmlAttribute(paragraph, 'begin'));
       final paragraphStart = paragraphBegin?.value;
       final paragraphEndValue = _parseTtmlTime(_xmlAttribute(paragraph, 'end'));
-      final paragraphEnd = paragraphEndValue == null
-          ? null
-          : _resolveTtmlTime(paragraphEndValue, paragraphStart);
+      // p 的 begin/end 都相对父时间容器；不能把 end 再叠加到 begin 上。
+      final paragraphEnd = paragraphEndValue?.value;
       final paragraphLanguage = _xmlAttribute(paragraph, 'lang');
       final role = _xmlAttribute(paragraph, 'role');
       final speaker = _firstNonEmpty([
@@ -775,6 +787,7 @@ LyricsDocument _parseTtml(String source) {
         language: paragraphLanguage,
         rootLanguage: rootLanguage,
       );
+      final isBackground = _isBackgroundRole(role);
       final wordElements = paragraph.descendants
           .whereType<XmlElement>()
           .where((element) => element.name.local.toLowerCase() == 'span')
@@ -819,7 +832,11 @@ LyricsDocument _parseTtml(String source) {
           words: words,
           speaker: speaker,
           language: paragraphLanguage,
-          role: isTranslation ? LyricRole.translation : LyricRole.original,
+          role: isBackground
+              ? LyricRole.alternate
+              : isTranslation
+              ? LyricRole.translation
+              : LyricRole.original,
         ),
       );
     }
@@ -871,7 +888,13 @@ LyricsDocument _timedDocument(
       ? _mergeTranslations(withInferredEnds)
       : withInferredEnds;
   final withEnds = _inferLineEnds(merged);
-  final timing = withEnds.any((line) => line.isWordSynchronized)
+  final timing =
+      withEnds.any(
+        (line) =>
+            line.isWordSynchronized ||
+            line.translationWords.isNotEmpty ||
+            line.variants.any((variant) => variant.words.isNotEmpty),
+      )
       ? LyricsTiming.word
       : LyricsTiming.line;
   return LyricsDocument(
@@ -899,13 +922,88 @@ List<LyricLine> _inferLineEnds(List<LyricLine> lines) {
 List<LyricLine> _mergeTranslations(List<LyricLine> lines) {
   final merged = <LyricLine>[];
   for (final line in lines) {
+    if (merged.isEmpty) {
+      merged.add(line);
+      continue;
+    }
+
+    final preceding = merged.last;
+    if (line.role == LyricRole.alternate &&
+        _lyricIntervalsOverlap(preceding, line)) {
+      merged.removeLast();
+      merged.add(
+        preceding.copyWith(
+          start: preceding.start <= line.start ? preceding.start : line.start,
+          end: _laterEnd(preceding.end, line.end),
+          variants: [
+            ...preceding.variants,
+            LyricVariant(
+              text: line.text,
+              start: line.start,
+              end: line.end,
+              words: line.words,
+              language: line.language,
+              speaker: line.speaker,
+              role: LyricRole.alternate,
+            ),
+          ],
+        ),
+      );
+      continue;
+    }
+
+    if (line.role == LyricRole.original &&
+        preceding.role == LyricRole.alternate &&
+        _lyricIntervalsOverlap(preceding, line)) {
+      merged.removeLast();
+      merged.add(
+        line.copyWith(
+          start: line.start <= preceding.start ? line.start : preceding.start,
+          end: _laterEnd(line.end, preceding.end),
+          variants: [
+            ...line.variants,
+            LyricVariant(
+              text: preceding.text,
+              start: preceding.start,
+              end: preceding.end,
+              words: preceding.words,
+              language: preceding.language,
+              speaker: preceding.speaker,
+              role: LyricRole.alternate,
+            ),
+          ],
+        ),
+      );
+      continue;
+    }
+
     if (merged.isEmpty || !_sameLyricTiming(merged.last, line)) {
       merged.add(line);
       continue;
     }
 
     final previous = merged.removeLast();
-    if (line.role == LyricRole.translation || previous.translation == null) {
+    if (line.role == LyricRole.alternate) {
+      merged.add(
+        previous.copyWith(
+          start: previous.start <= line.start ? previous.start : line.start,
+          end: _laterEnd(previous.end, line.end),
+          variants: [
+            ...previous.variants,
+            LyricVariant(
+              text: line.text,
+              start: line.start,
+              end: line.end,
+              words: line.words,
+              language: line.language,
+              speaker: line.speaker,
+              role: LyricRole.alternate,
+            ),
+          ],
+        ),
+      );
+    } else if (line.role == LyricRole.translation ||
+        previous.translation == null) {
       merged.add(
         previous.copyWith(
           end: _laterEnd(previous.end, line.end),
@@ -921,7 +1019,10 @@ List<LyricLine> _mergeTranslations(List<LyricLine> lines) {
             ...previous.variants,
             LyricVariant(
               text: line.text,
+              start: line.start,
+              end: line.end,
               words: line.words,
+              language: line.language,
               speaker: line.speaker,
               role: LyricRole.alternate,
             ),
@@ -931,6 +1032,12 @@ List<LyricLine> _mergeTranslations(List<LyricLine> lines) {
     }
   }
   return merged;
+}
+
+bool _lyricIntervalsOverlap(LyricLine first, LyricLine second) {
+  final firstEnd = first.end ?? first.start;
+  final secondEnd = second.end ?? second.start;
+  return first.start <= secondEnd && second.start <= firstEnd;
 }
 
 Duration? _laterEnd(Duration? first, Duration? second) {
@@ -1155,6 +1262,15 @@ bool _isTranslation({String? role, String? language, String? rootLanguage}) {
   return language != null &&
       rootLanguage != null &&
       language.toLowerCase() != rootLanguage.toLowerCase();
+}
+
+bool _isBackgroundRole(String? role) {
+  final normalized = role?.toLowerCase().trim() ?? '';
+  return normalized.contains('background') ||
+      normalized == 'bg' ||
+      normalized.contains('backing') ||
+      normalized.contains('alternate') ||
+      normalized.contains('duet');
 }
 
 String _cleanTtmlText(String value) =>

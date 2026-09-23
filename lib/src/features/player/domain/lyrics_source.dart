@@ -139,7 +139,13 @@ LyricsDocument _mergeExternalTranslation(
       lines: lines,
       offset: original.offset,
       syntax: original.syntax,
-      timing: lines.any((line) => line.isWordSynchronized)
+      timing:
+          lines.any(
+            (line) =>
+                line.isWordSynchronized ||
+                line.translationWords.isNotEmpty ||
+                line.variants.any((variant) => variant.words.isNotEmpty),
+          )
           ? LyricsTiming.word
           : LyricsTiming.line,
       metadata: original.metadata,
