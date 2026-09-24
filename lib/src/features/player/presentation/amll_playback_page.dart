@@ -5,17 +5,17 @@ import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../../../core/theme/app_typography.dart';
 import '../application/player_controller.dart';
 import '../domain/lyrics.dart';
 import '../domain/track.dart';
 
 const _pageAnimationCurve = Curves.easeOutCubic;
-const _lyricDefaultFontSize = 40.0;
-const _lyricWordSpacing = 2.5;
-const _lyricVerticalPaddingEm = .55;
+const _lyricDefaultFontSize = 38.0;
+const _lyricLetterSpacing = .1;
+const _lyricVerticalPaddingEm = .4;
 const _lyricFocusPosition = 1 / 3;
-const _lyricDesktopHorizontalInset = 30.0;
-const _lyricDesktopWidthFactor = .8;
+const _lyricLineMotionDuration = Duration(milliseconds: 1500);
 const _minimumInterludeGap = Duration(seconds: 7);
 
 /// AMLL 风格的首个播放页：宽屏突出封面与歌词双栏，窄屏切换为歌词主视图。
@@ -389,11 +389,7 @@ class _WideTrackColumn extends StatelessWidget {
           children: [
             Expanded(
               child: Center(
-                child: _AlbumCover(
-                  track: track,
-                  size: coverSize,
-                  isPlaying: state.isPlaying,
-                ),
+                child: _AlbumCover(track: track, size: coverSize),
               ),
             ),
             _TrackMetadata(track: track, compact: false),
@@ -458,7 +454,7 @@ class _NarrowPlaybackLayout extends StatelessWidget {
           Expanded(
             child: showLyrics
                 ? _LyricsViewport(track: track, state: state, onSeek: onSeek)
-                : _ImmersiveCover(track: track, isPlaying: state.isPlaying),
+                : _ImmersiveCover(track: track),
           ),
           _TrackMetadata(track: track, compact: true),
           const SizedBox(height: 12),
@@ -485,10 +481,9 @@ class _NarrowPlaybackLayout extends StatelessWidget {
 }
 
 class _ImmersiveCover extends StatelessWidget {
-  const _ImmersiveCover({required this.track, required this.isPlaying});
+  const _ImmersiveCover({required this.track});
 
   final Track track;
-  final bool isPlaying;
 
   @override
   Widget build(BuildContext context) {
@@ -499,7 +494,7 @@ class _ImmersiveCover extends StatelessWidget {
           constraints.maxHeight * .9,
         );
         return Center(
-          child: _AlbumCover(track: track, size: size, isPlaying: isPlaying),
+          child: _AlbumCover(track: track, size: size),
         );
       },
     );
@@ -507,60 +502,47 @@ class _ImmersiveCover extends StatelessWidget {
 }
 
 class _AlbumCover extends StatelessWidget {
-  const _AlbumCover({
-    required this.track,
-    required this.size,
-    required this.isPlaying,
-  });
+  const _AlbumCover({required this.track, required this.size});
 
   final Track track;
   final double size;
-  final bool isPlaying;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedScale(
-      key: const ValueKey('amll-album-cover-scale'),
-      scale: isPlaying ? 1 : .75,
-      duration: Duration(milliseconds: isPlaying ? 600 : 500),
-      curve: isPlaying
-          ? const Cubic(.3, .2, .2, 1.4)
-          : const Cubic(.4, .2, .1, 1),
-      filterQuality: FilterQuality.medium,
-      child: SizedBox.square(
-        dimension: size,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(math.max(10, size * .025)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(95),
-                blurRadius: size * (isPlaying ? .09 : .06),
-                spreadRadius: isPlaying ? 2 : 0,
-                offset: Offset(0, size * (isPlaying ? .025 : .02)),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(math.max(10, size * .025)),
-            child: track.coverBytes == null
-                ? ColoredBox(
-                    color: Color(track.coverColor),
-                    child: const Center(
-                      child: Icon(
-                        Icons.album_rounded,
-                        color: Colors.white70,
-                        size: 78,
-                      ),
+    return SizedBox.square(
+      key: const ValueKey('amll-album-cover'),
+      dimension: size,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(math.max(10, size * .025)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(95),
+              blurRadius: size * .09,
+              spreadRadius: 2,
+              offset: Offset(0, size * .025),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(math.max(10, size * .025)),
+          child: track.coverBytes == null
+              ? ColoredBox(
+                  color: Color(track.coverColor),
+                  child: const Center(
+                    child: Icon(
+                      Icons.album_rounded,
+                      color: Colors.white70,
+                      size: 78,
                     ),
-                  )
-                : Image.memory(
-                    track.coverBytes!,
-                    fit: BoxFit.cover,
-                    gaplessPlayback: true,
-                    filterQuality: FilterQuality.medium,
                   ),
-          ),
+                )
+              : Image.memory(
+                  track.coverBytes!,
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  filterQuality: FilterQuality.medium,
+                ),
         ),
       ),
     );
@@ -914,13 +896,14 @@ class _LyricsViewport extends StatefulWidget {
 class _LyricsViewportState extends State<_LyricsViewport>
     with TickerProviderStateMixin {
   late final Ticker _ticker;
-  late final AnimationController _scrollAnimation;
   late final AnimationController _lineMotion;
   late final ValueNotifier<Duration> _playhead;
   late LyricsDocument _document;
   final Stopwatch _clock = Stopwatch();
   Duration _anchorPosition = Duration.zero;
   int _activeIndex = -1;
+  int? _pendingActiveIndex;
+  int _activeSyncGeneration = 0;
   Map<String, int> _speakerOrder = const {};
   double _lyricsWidth = 0;
   double _lyricsHeight = 0;
@@ -929,7 +912,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
   double _lyricFontSize = _lyricDefaultFontSize;
   bool _isLyricsHovered = false;
   Duration? _interludeResetPosition;
-  int _motionDirection = 0;
+  double _lineScrollDelta = 0;
   bool _hasSyncedInitialFocus = false;
   Size? _previousLyricsSize;
   final ScrollController _scrollController = ScrollController();
@@ -939,20 +922,19 @@ class _LyricsViewportState extends State<_LyricsViewport>
     super.initState();
     _document = widget.track.lyricsDocument;
     _speakerOrder = _buildSpeakerOrder(_document);
-    _anchorPosition = widget.state.position;
-    _playhead = ValueNotifier(widget.state.position);
-    _scrollAnimation = AnimationController.unbounded(vsync: this)
-      ..addListener(_applyScrollAnimation);
+    final initialPosition = widget.state.position;
+    _anchorPosition = initialPosition;
+    _playhead = ValueNotifier(initialPosition);
     _lineMotion = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 620),
+      duration: _lyricLineMotionDuration,
       value: 1,
     );
     _ticker = createTicker(_tick);
     if (widget.state.isPlaying) _clock.start();
     _setPlaying(widget.state.isPlaying);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncActiveLine(widget.state.position);
+      if (mounted) _syncActiveLine(initialPosition);
     });
   }
 
@@ -966,9 +948,11 @@ class _LyricsViewportState extends State<_LyricsViewport>
       _speakerOrder = _buildSpeakerOrder(_document);
       _interludeResetPosition = null;
       _activeIndex = -1;
+      _pendingActiveIndex = null;
+      _activeSyncGeneration++;
       _hasSyncedInitialFocus = false;
       _lineMotion.value = 1;
-      _scrollAnimation.stop();
+      _lineScrollDelta = 0;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _scrollController.hasClients) {
           _scrollController.jumpTo(0);
@@ -1019,7 +1003,6 @@ class _LyricsViewportState extends State<_LyricsViewport>
   @override
   void dispose() {
     _ticker.dispose();
-    _scrollAnimation.dispose();
     _lineMotion.dispose();
     _playhead.dispose();
     _scrollController.dispose();
@@ -1056,29 +1039,47 @@ class _LyricsViewportState extends State<_LyricsViewport>
         _activeLyricInterlude(_document.lines, adjustedPosition) != null
         ? -1
         : _activeLineIndex(_document.lines, adjustedPosition);
-    if (nextIndex == _activeIndex && _hasSyncedInitialFocus) return;
-    if (_hasSyncedInitialFocus) {
-      _motionDirection = nextIndex.compareTo(_activeIndex);
-      _lineMotion.forward(from: 0);
-    }
-    _activeIndex = nextIndex;
+    final visibleIndex = _pendingActiveIndex ?? _activeIndex;
+    if (nextIndex == visibleIndex && _hasSyncedInitialFocus) return;
+    final animateLayout = _hasSyncedInitialFocus;
+    final generation = ++_activeSyncGeneration;
+    _pendingActiveIndex = nextIndex;
     _hasSyncedInitialFocus = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {});
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !_scrollController.hasClients) return;
+      if (!mounted || generation != _activeSyncGeneration) return;
+      _activeIndex = nextIndex;
+      _pendingActiveIndex = null;
+      if (_scrollController.hasClients && _lyricsWidth > 0) {
+        // 在同一个帧回调中完成“跳到目标位置、记录 FLIP 位移、启动动画、
+        // 重建活动行”。这样高亮渐变和列表滚动不会相差一帧以上。
         final maxOffset = _scrollController.position.maxScrollExtent;
         if (nextIndex < 0) {
-          _scrollToInterlude(maxOffset);
+          _scrollToInterlude(maxOffset, animate: animateLayout);
         } else {
-          _scrollToLine(nextIndex, maxOffset);
+          _scrollToLine(nextIndex, maxOffset, animate: animateLayout);
+        }
+        return;
+      }
+
+      // 首次布局尚未建立滚动客户区时，先提交活动行，下一帧再进行初始定位。
+      setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            generation != _activeSyncGeneration ||
+            !_scrollController.hasClients) {
+          return;
+        }
+        final maxOffset = _scrollController.position.maxScrollExtent;
+        if (nextIndex < 0) {
+          _scrollToInterlude(maxOffset, animate: false);
+        } else {
+          _scrollToLine(nextIndex, maxOffset, animate: false);
         }
       });
     });
   }
 
-  void _scrollToInterlude(double maxOffset) {
+  void _scrollToInterlude(double maxOffset, {bool animate = true}) {
     final interlude = _activeLyricInterlude(
       _document.lines,
       _playhead.value - _document.offset,
@@ -1110,21 +1111,10 @@ class _LyricsViewportState extends State<_LyricsViewport>
     final target = (focalCenter - _lyricsHeight * _lyricFocusPosition)
         .clamp(0, maxOffset)
         .toDouble();
-    final current = _scrollController.position.pixels;
-    _scrollAnimation
-      ..stop()
-      ..value = current
-      ..animateWith(
-        SpringSimulation(
-          const SpringDescription(mass: .9, stiffness: 90, damping: 15),
-          current,
-          target,
-          0,
-        ),
-      );
+    _moveListTo(target, animate: animate);
   }
 
-  void _scrollToLine(int index, double maxOffset) {
+  void _scrollToLine(int index, double maxOffset, {bool animate = true}) {
     if (_lyricsWidth <= 0 || index < 0 || index >= _document.lines.length) {
       return;
     }
@@ -1164,29 +1154,24 @@ class _LyricsViewportState extends State<_LyricsViewport>
                 _lyricsHeight * _lyricFocusPosition)
             .clamp(0, maxOffset)
             .toDouble();
-    final current = _scrollController.position.pixels;
-    _scrollAnimation
-      ..stop()
-      ..value = current
-      ..animateWith(
-        SpringSimulation(
-          const SpringDescription(mass: .9, stiffness: 90, damping: 15),
-          current,
-          target,
-          0,
-        ),
-      );
+    _moveListTo(target, animate: animate);
   }
 
-  void _applyScrollAnimation() {
+  void _moveListTo(double target, {required bool animate}) {
     if (!_scrollController.hasClients) return;
-    final position = _scrollController.position;
-    final target = _scrollAnimation.value
-        .clamp(position.minScrollExtent, position.maxScrollExtent)
+    final scrollPosition = _scrollController.position;
+    final clampedTarget = target
+        .clamp(scrollPosition.minScrollExtent, scrollPosition.maxScrollExtent)
         .toDouble();
-    if ((position.pixels - target).abs() > .1) {
-      _scrollController.jumpTo(target);
+    final current = scrollPosition.pixels;
+    _lineScrollDelta = animate ? clampedTarget - current : 0;
+    _scrollController.jumpTo(clampedTarget);
+    if (animate) {
+      _lineMotion.forward(from: 0);
+    } else {
+      _lineMotion.value = 1;
     }
+    setState(() {});
   }
 
   @override
@@ -1233,10 +1218,16 @@ class _LyricsViewportState extends State<_LyricsViewport>
                     _previousLyricsSize != null &&
                     _previousLyricsSize != lyricsSize;
                 _previousLyricsSize = lyricsSize;
-                _lyricFontSize = math.max(
-                  14,
-                  MediaQuery.sizeOf(context).height * .05,
-                );
+                final viewportSize = MediaQuery.sizeOf(context);
+                _lyricFontSize = viewportSize.width <= 768
+                    ? math.max(12, viewportSize.width * .08)
+                    : math.max(
+                        12,
+                        math.max(
+                          viewportSize.height * .05,
+                          viewportSize.width * .025,
+                        ),
+                      );
                 if (_document.lines.isNotEmpty) {
                   final compact = MediaQuery.sizeOf(context).width <= 768;
                   final direction = Directionality.of(context);
@@ -1280,6 +1271,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
                       _scrollToLine(
                         _activeIndex,
                         _scrollController.position.maxScrollExtent,
+                        animate: false,
                       );
                     }
                   });
@@ -1299,27 +1291,29 @@ class _LyricsViewportState extends State<_LyricsViewport>
                         },
                         child: ValueListenableBuilder<Duration>(
                           valueListenable: _playhead,
-                          builder: (context, position, _) =>
-                              _document.hasTimestamps
-                              ? _TimedLyricsList(
-                                  document: _document,
-                                  position: position,
-                                  controller: _scrollController,
-                                  activeIndex: _activeIndex,
-                                  speakerOrder: _speakerOrder,
-                                  isPlaying: widget.state.isPlaying,
-                                  isHovered: _isLyricsHovered,
-                                  fontSize: _lyricFontSize,
-                                  viewportWidth: _lyricsWidth,
-                                  lineMotion: _lineMotion,
-                                  motionDirection: _motionDirection,
-                                  interludeResetPosition:
-                                      _interludeResetPosition,
-                                  topPadding: _listTopPadding,
-                                  bottomPadding: _listBottomPadding,
-                                  onSeek: _seekToLyric,
-                                )
-                              : _UntimedLyricsList(document: _document),
+                          builder: (context, position, _) {
+                            final lyrics = _document.hasTimestamps
+                                ? _TimedLyricsList(
+                                    document: _document,
+                                    position: position,
+                                    controller: _scrollController,
+                                    activeIndex: _activeIndex,
+                                    speakerOrder: _speakerOrder,
+                                    isPlaying: widget.state.isPlaying,
+                                    isHovered: _isLyricsHovered,
+                                    fontSize: _lyricFontSize,
+                                    viewportWidth: _lyricsWidth,
+                                    lineMotion: _lineMotion,
+                                    lineScrollDelta: _lineScrollDelta,
+                                    interludeResetPosition:
+                                        _interludeResetPosition,
+                                    topPadding: _listTopPadding,
+                                    bottomPadding: _listBottomPadding,
+                                    onSeek: _seekToLyric,
+                                  )
+                                : _UntimedLyricsList(document: _document);
+                            return lyrics;
+                          },
                         ),
                       );
               },
@@ -1343,7 +1337,7 @@ class _TimedLyricsList extends StatelessWidget {
     required this.fontSize,
     required this.viewportWidth,
     required this.lineMotion,
-    required this.motionDirection,
+    required this.lineScrollDelta,
     required this.interludeResetPosition,
     required this.topPadding,
     required this.bottomPadding,
@@ -1360,7 +1354,7 @@ class _TimedLyricsList extends StatelessWidget {
   final double fontSize;
   final double viewportWidth;
   final Animation<double> lineMotion;
-  final int motionDirection;
+  final double lineScrollDelta;
   final Duration? interludeResetPosition;
   final double topPadding;
   final double bottomPadding;
@@ -1394,151 +1388,164 @@ class _TimedLyricsList extends StatelessWidget {
     final interludeSpacer = canShowInterlude
         ? _interludeSpacerExtent(fontSize, MediaQuery.sizeOf(context).height)
         : 0.0;
-    return ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (bounds) => const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.transparent,
-          Colors.white,
-          Colors.white,
-          Colors.transparent,
-        ],
-        stops: [0, .12, .88, 1],
-      ).createShader(bounds),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ListView.builder(
-            key: const ValueKey('timed-lyrics-list'),
-            controller: controller,
-            itemExtentBuilder: (index, _) => index >= lines.length
-                ? null
-                : _measureLyricRowExtent(
-                        lines[index],
-                        viewportWidth,
-                        Directionality.of(context),
-                        context: context,
-                        compact: compact,
-                        defaultTextStyle: DefaultTextStyle.of(context).style,
-                        textHeightBehavior: _effectiveTextHeightBehavior(
-                          context,
-                        ),
-                        textScaler: MediaQuery.textScalerOf(context),
-                        lyricFontSize: fontSize,
-                      ) +
-                      (canShowInterlude && interlude.anchor == index
-                          ? interludeSpacer
-                          : 0),
-            padding: EdgeInsets.only(
-              top:
-                  topPadding +
-                  (canShowInterlude && interlude.anchor == -1
-                      ? interludeSpacer
-                      : 0),
-              bottom: bottomPadding,
-            ),
-            itemCount: lines.length,
-            itemBuilder: (context, index) {
-              final line = lines[index];
-              final distance = (index - activeIndex).abs();
-              final lineExtent = _measureLyricRowExtent(
-                line,
-                viewportWidth,
-                Directionality.of(context),
-                context: context,
-                compact: compact,
-                defaultTextStyle: DefaultTextStyle.of(context).style,
-                textHeightBehavior: _effectiveTextHeightBehavior(context),
-                textScaler: MediaQuery.textScalerOf(context),
-                lyricFontSize: fontSize,
-              );
-              final extraExtent = canShowInterlude && interlude.anchor == index
-                  ? interludeSpacer
-                  : 0.0;
-              final row = _AnimatedLyricRow(
-                key: ValueKey('lyric-row-${line.start.inMicroseconds}-$index'),
-                line: line,
-                isBeforeActive: index < activeIndex,
-                nextLineStart: index + 1 < lines.length
-                    ? lines[index + 1].start
-                    : null,
-                position: adjustedPosition,
-                distance: distance,
-                active: distance == 0,
-                isPlaying: isPlaying,
-                isHovered: isHovered,
-                fontSize: fontSize,
-                lineMotion: lineMotion,
-                motionDirection: motionDirection,
-                compact: compact,
-                speakerOrder: speakerOrder,
-                onTap: () => onSeek(line.start + document.offset),
-              );
-              return SizedBox(
-                height: lineExtent + extraExtent,
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: SizedBox(
-                    height: lineExtent,
-                    width: double.infinity,
-                    child: row,
-                  ),
-                ),
-              );
-            },
-          ),
-          if (canShowInterlude)
-            AnimatedBuilder(
-              animation: controller,
-              builder: (context, _) {
-                final top = _interludeTop(
-                  interlude,
-                  lines,
-                  controller.hasClients ? controller.offset : 0,
-                  topPadding,
+    final lineDelays = _calculateLyricLineDelays(
+      lines,
+      activeIndex: activeIndex,
+    );
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (bounds) => const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.transparent,
+            Colors.white,
+            Colors.white,
+            Colors.transparent,
+          ],
+          stops: [0, .12, .88, 1],
+        ).createShader(bounds),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ListView.builder(
+              key: const ValueKey('timed-lyrics-list'),
+              controller: controller,
+              itemExtentBuilder: (index, _) => index >= lines.length
+                  ? null
+                  : _measureLyricRowExtent(
+                          lines[index],
+                          viewportWidth,
+                          Directionality.of(context),
+                          context: context,
+                          compact: compact,
+                          defaultTextStyle: DefaultTextStyle.of(context).style,
+                          textHeightBehavior: _effectiveTextHeightBehavior(
+                            context,
+                          ),
+                          textScaler: MediaQuery.textScalerOf(context),
+                          lyricFontSize: fontSize,
+                        ) +
+                        (canShowInterlude && interlude.anchor == index
+                            ? interludeSpacer
+                            : 0),
+              padding: EdgeInsets.only(
+                top:
+                    topPadding +
+                    (canShowInterlude && interlude.anchor == -1
+                        ? interludeSpacer
+                        : 0),
+                bottom: bottomPadding,
+              ),
+              itemCount: lines.length,
+              itemBuilder: (context, index) {
+                final line = lines[index];
+                final distance = (index - activeIndex).abs();
+                final blurDistance = index < activeIndex
+                    ? activeIndex - index + 1
+                    : index - activeIndex;
+                final lineExtent = _measureLyricRowExtent(
+                  line,
                   viewportWidth,
-                  fontSize,
-                  compact,
-                  MediaQuery.textScalerOf(context),
                   Directionality.of(context),
-                  DefaultTextStyle.of(context).style,
-                  _effectiveTextHeightBehavior(context),
-                  context,
+                  context: context,
+                  compact: compact,
+                  defaultTextStyle: DefaultTextStyle.of(context).style,
+                  textHeightBehavior: _effectiveTextHeightBehavior(context),
+                  textScaler: MediaQuery.textScalerOf(context),
+                  lyricFontSize: fontSize,
                 );
-                return Positioned(
-                  top: top,
-                  left: 0,
-                  right: 0,
-                  child: SizedBox(
-                    height: interludeSpacer,
-                    child: Align(
-                      alignment:
-                          _isRightAligned(
-                            interlude.anchor + 1 < lines.length
-                                ? _lineSpeaker(lines[interlude.anchor + 1])
-                                : null,
-                            speakerOrder,
-                          )
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: _InterludeDots(
-                        key: const ValueKey('interlude-dots'),
-                        elapsed: adjustedPosition - animationStart!,
-                        duration: animationDuration,
-                        immediate:
-                            interlude.anchor < 0 && resetPosition == null,
-                        fontSize: fontSize,
-                        screenHeight: MediaQuery.sizeOf(context).height,
-                        compact: MediaQuery.sizeOf(context).width <= 500,
-                      ),
+                final extraExtent =
+                    canShowInterlude && interlude.anchor == index
+                    ? interludeSpacer
+                    : 0.0;
+                final row = _AnimatedLyricRow(
+                  key: ValueKey(
+                    'lyric-row-${line.start.inMicroseconds}-$index',
+                  ),
+                  line: line,
+                  position: adjustedPosition,
+                  distance: distance,
+                  blurDistance: blurDistance,
+                  active: distance == 0,
+                  isNonDynamic: !document.hasWordTimestamps,
+                  isPlaying: isPlaying,
+                  isHovered: isHovered,
+                  fontSize: fontSize,
+                  lineMotion: lineMotion,
+                  lineDelay: lineDelays[index],
+                  lineScrollDelta: lineScrollDelta,
+                  lineSpring: _lyricPositionSpring(lines, activeIndex),
+                  compact: compact,
+                  speakerOrder: speakerOrder,
+                  onTap: () => onSeek(line.start + document.offset),
+                );
+                return SizedBox(
+                  height: lineExtent + extraExtent,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: SizedBox(
+                      height: lineExtent,
+                      width: double.infinity,
+                      child: row,
                     ),
                   ),
                 );
               },
             ),
-        ],
+            if (canShowInterlude)
+              AnimatedBuilder(
+                animation: controller,
+                builder: (context, _) {
+                  final top = _interludeTop(
+                    interlude,
+                    lines,
+                    controller.hasClients ? controller.offset : 0,
+                    topPadding,
+                    viewportWidth,
+                    fontSize,
+                    compact,
+                    MediaQuery.textScalerOf(context),
+                    Directionality.of(context),
+                    DefaultTextStyle.of(context).style,
+                    _effectiveTextHeightBehavior(context),
+                    context,
+                  );
+                  return Positioned(
+                    top: top,
+                    left: 0,
+                    right: 0,
+                    child: SizedBox(
+                      height: interludeSpacer,
+                      child: Align(
+                        alignment:
+                            _isRightAligned(
+                              interlude.anchor + 1 < lines.length
+                                  ? _lineSpeaker(lines[interlude.anchor + 1])
+                                  : null,
+                              speakerOrder,
+                            )
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: _InterludeDots(
+                          key: const ValueKey('interlude-dots'),
+                          elapsed: adjustedPosition - animationStart!,
+                          duration: animationDuration,
+                          immediate:
+                              interlude.anchor < 0 && resetPosition == null,
+                          fontSize: fontSize,
+                          screenHeight: MediaQuery.sizeOf(context).height,
+                          compact: MediaQuery.sizeOf(context).width <= 500,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1767,31 +1774,34 @@ class _UntimedLyricsList extends StatelessWidget {
     final lines = document.plainLines.isNotEmpty
         ? document.plainLines
         : document.lines.map((line) => line.text).toList();
-    return ShaderMask(
-      blendMode: BlendMode.dstIn,
-      shaderCallback: (bounds) => const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.transparent,
-          Colors.white,
-          Colors.white,
-          Colors.transparent,
-        ],
-        stops: [0, .12, .88, 1],
-      ).createShader(bounds),
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        itemCount: lines.length,
-        separatorBuilder: (context, index) => const SizedBox(height: 8),
-        itemBuilder: (context, index) => Text(
-          lines[index],
-          textAlign: TextAlign.start,
-          style: TextStyle(
-            color: Colors.white.withAlpha(230),
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            height: 1.2,
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (bounds) => const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.transparent,
+            Colors.white,
+            Colors.white,
+            Colors.transparent,
+          ],
+          stops: [0, .12, .88, 1],
+        ).createShader(bounds),
+        child: ListView.separated(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          itemCount: lines.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 8),
+          itemBuilder: (context, index) => Text(
+            lines[index],
+            textAlign: TextAlign.start,
+            style: TextStyle(
+              color: Colors.white.withAlpha(230),
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+              height: 1.2,
+            ),
           ),
         ),
       ),
@@ -1799,36 +1809,94 @@ class _UntimedLyricsList extends StatelessWidget {
   }
 }
 
+List<Duration> _calculateLyricLineDelays(
+  List<LyricLine> lines, {
+  required int activeIndex,
+}) {
+  if (lines.isEmpty) return const [];
+
+  // AMLL 只给当前渲染窗口内的行分配错峰延迟。Flutter 的 ListView 会复用
+  // 子树，因此用焦点前后固定的 overscan 行数近似其布局窗口，并保持延迟
+  // 只由行索引决定，避免滚动动画本身改变延迟而产生抖动。
+  final delays = List<Duration>.filled(lines.length, Duration.zero);
+  final focus = activeIndex.clamp(0, lines.length - 1);
+  final first = math.max(0, focus - 6);
+  final last = math.min(lines.length, focus + 9);
+  var delay = Duration.zero;
+  var baseDelay = const Duration(milliseconds: 50);
+  for (var index = first; index < last; index++) {
+    delays[index] = delay;
+    delay += baseDelay;
+    if (index >= focus) {
+      baseDelay = Duration(
+        microseconds: (baseDelay.inMicroseconds / 1.05).round(),
+      );
+    }
+  }
+
+  // AMLL 的延迟是从当前可视窗口顶部累计出来的。Flutter 这里使用 FLIP
+  // 位移，若仍以窗口顶部为零点，活动行会在高亮切换后才开始移动。因此把
+  // 活动行归零，并让上方行带少量负延迟，使它们从第一帧就处于预滚动状态。
+  final focusDelay = delays[focus];
+  const upperLead = Duration(milliseconds: 36);
+  for (var index = first; index < last; index++) {
+    delays[index] = delays[index] - focusDelay;
+    if (index < focus) delays[index] -= upperLead;
+  }
+  return delays;
+}
+
+SpringDescription _lyricPositionSpring(List<LyricLine> lines, int activeIndex) {
+  if (activeIndex <= 0 || activeIndex >= lines.length) {
+    return const SpringDescription(mass: .9, stiffness: 90, damping: 15);
+  }
+
+  final interval = lines[activeIndex].start - lines[activeIndex - 1].start;
+  final intervalMs = interval.inMilliseconds.clamp(100, 800).toDouble();
+  var ratio = 1 - (intervalMs - 100) / 700;
+  ratio = math.pow(ratio, .2).toDouble();
+  final stiffness = 170 + ratio * 50;
+  return SpringDescription(
+    mass: .9,
+    stiffness: stiffness,
+    damping: math.sqrt(stiffness) * 2.2,
+  );
+}
+
 class _AnimatedLyricRow extends StatelessWidget {
   const _AnimatedLyricRow({
     super.key,
     required this.line,
-    required this.isBeforeActive,
-    required this.nextLineStart,
     required this.position,
     required this.distance,
+    required this.blurDistance,
     required this.active,
+    required this.isNonDynamic,
     required this.isPlaying,
     required this.isHovered,
     required this.fontSize,
     required this.lineMotion,
-    required this.motionDirection,
+    required this.lineDelay,
+    required this.lineScrollDelta,
+    required this.lineSpring,
     required this.compact,
     required this.speakerOrder,
     required this.onTap,
   });
 
   final LyricLine line;
-  final bool isBeforeActive;
-  final Duration? nextLineStart;
   final Duration position;
   final int distance;
+  final int blurDistance;
   final bool active;
+  final bool isNonDynamic;
   final bool isPlaying;
   final bool isHovered;
   final double fontSize;
   final Animation<double> lineMotion;
-  final int motionDirection;
+  final Duration lineDelay;
+  final double lineScrollDelta;
+  final SpringDescription lineSpring;
   final bool compact;
   final Map<String, int> speakerOrder;
   final VoidCallback onTap;
@@ -1837,20 +1905,9 @@ class _AnimatedLyricRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final blur = distance == 0 || isHovered
         ? 0.0
-        : math.min(5.0, (distance + 1) * (compact ? .8 : 1.0));
+        : math.min(5.0, (1 + blurDistance) * (compact ? .8 : 1.0));
     final isDuet = _isRightAligned(_lineSpeaker(line), speakerOrder);
-    final baseWords = line.words.isNotEmpty
-        ? line.words
-        : [
-            LyricWord(
-              start: line.start,
-              end: line.end ?? nextLineStart,
-              text: line.text,
-            ),
-          ];
-    final lineOpacity = active ? .85 : 1.0;
-    final desktopInset = compact ? 0.0 : _lyricDesktopHorizontalInset;
-    final lineWidthFactor = compact ? 1.0 : _lyricDesktopWidthFactor;
+    final lineOpacity = active ? .85 : (isNonDynamic ? .2 : 1.0);
     final verticalPadding = fontSize * _lyricVerticalPaddingEm;
     final subLineGap = fontSize * .3;
     final content = AnimatedOpacity(
@@ -1866,42 +1923,50 @@ class _AnimatedLyricRow extends StatelessWidget {
           child: child,
         ),
         child: AnimatedScale(
-          scale: active ? 1 : .97,
+          scale: active || !isPlaying ? 1 : .97,
           alignment: isDuet ? Alignment.centerRight : Alignment.centerLeft,
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeOutCubic,
-          child: InkWell(
-            onTap: onTap,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                desktopInset,
-                verticalPadding,
-                desktopInset,
-                verticalPadding,
-              ),
-              child: Align(
-                alignment: isDuet
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
-                child: FractionallySizedBox(
-                  widthFactor: lineWidthFactor,
+          child: _LyricHoverBackground(
+            key: ValueKey('lyric-hover-${line.start.inMicroseconds}'),
+            borderRadius: fontSize * .25,
+            child: InkWell(
+              onTap: onTap,
+              hoverColor: Colors.transparent,
+              focusColor: Colors.transparent,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              borderRadius: BorderRadius.circular(fontSize * .25),
+              child: Padding(
+                padding: EdgeInsets.all(verticalPadding),
+                child: Align(
+                  alignment: isDuet
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: isDuet
                         ? CrossAxisAlignment.end
                         : CrossAxisAlignment.start,
                     children: [
-                      _LyricText(
-                        text: line.text,
-                        words: baseWords,
-                        position: position,
-                        color: Colors.white.withAlpha(active ? 102 : 51),
-                        fontSize: fontSize,
-                        weight: FontWeight.w600,
-                        textAlign: isDuet ? TextAlign.end : TextAlign.start,
-                        animateWords: active && line.words.isNotEmpty,
-                        emphasizeLongWords: active && line.words.isNotEmpty,
-                        active: active,
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(end: active ? 1 : 0),
+                        duration: Duration(milliseconds: active ? 300 : 450),
+                        curve: Curves.easeOut,
+                        builder: (context, maskProgress, _) => _LyricText(
+                          text: line.text,
+                          words: line.words,
+                          position: position,
+                          color: Colors.white,
+                          baseAlpha: .2 + .2 * maskProgress,
+                          highlightAlpha: .2 + .8 * maskProgress,
+                          fontSize: fontSize,
+                          weight: FontWeight(450),
+                          textAlign: isDuet ? TextAlign.end : TextAlign.start,
+                          animateWords: active && line.words.isNotEmpty,
+                          emphasizeLongWords: active && line.words.isNotEmpty,
+                          active: active,
+                        ),
                       ),
                       if (line.translation != null &&
                           line.translation!.trim().isNotEmpty) ...[
@@ -1943,17 +2008,61 @@ class _AnimatedLyricRow extends StatelessWidget {
       animation: lineMotion,
       child: RepaintBoundary(child: content),
       builder: (context, child) {
-        final delay = math.min(distance * 50, 450) / 620;
-        final progress = ((lineMotion.value - delay) / (1 - delay)).clamp(
-          0.0,
-          1.0,
+        // AMLL 为每个可见行累加约 50ms 的延迟，并在焦点行之后逐步缩短延迟。
+        // 这里使用同一时钟计算每行自己的时间段，避免整列表同帧跳动。
+        final elapsed =
+            lineMotion.value *
+                _lyricLineMotionDuration.inMicroseconds /
+                1000000 -
+            lineDelay.inMicroseconds / 1000000;
+        final eased = elapsed <= 0
+            ? 0.0
+            : SpringSimulation(lineSpring, 0, 1, 0).x(elapsed).clamp(0.0, 1.05);
+        // 列表先跳到新的焦点位置，再用 FLIP 偏移从旧画面归位。
+        // 每一行拥有独立延迟，因此不会出现所有行同帧同步抖动。
+        final offset = (1 - eased) * lineScrollDelta;
+        final row = Transform.translate(
+          offset: Offset(0, offset),
+          child: child,
         );
-        final eased = Curves.easeOutCubic.transform(progress);
-        final side = isBeforeActive ? -1 : 1;
-        final offset =
-            (1 - eased) * motionDirection * side * math.min(distance, 5) * 8;
-        return Transform.translate(offset: Offset(0, offset), child: child);
+        return row;
       },
+    );
+  }
+}
+
+/// 对齐 AMLL 的歌词行悬停反馈，仅改变外层背景，不改变文字排版尺寸。
+class _LyricHoverBackground extends StatefulWidget {
+  const _LyricHoverBackground({
+    required this.borderRadius,
+    required this.child,
+    super.key,
+  });
+
+  final double borderRadius;
+  final Widget child;
+
+  @override
+  State<_LyricHoverBackground> createState() => _LyricHoverBackgroundState();
+}
+
+class _LyricHoverBackgroundState extends State<_LyricHoverBackground> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.ease,
+        decoration: BoxDecoration(
+          color: _hovered ? Colors.white.withAlpha(17) : Colors.transparent,
+          borderRadius: BorderRadius.circular(widget.borderRadius),
+        ),
+        child: widget.child,
+      ),
     );
   }
 }
@@ -1997,39 +2106,47 @@ class _AnimatedBackgroundLyric extends StatelessWidget {
     final visible = active || !isPlaying;
     final alignment = _variantAlignment(variant, line, speakerOrder);
     final backgroundRightAligned = alignment == TextAlign.end;
-    return AnimatedSlide(
-      offset: visible
-          ? Offset.zero
-          : Offset(0, backgroundRightAligned ? -.8 : .8),
+    final targetProgress = visible ? 1.0 : 0.0;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: targetProgress),
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOut,
-      child: AnimatedScale(
-        scale: active ? 1 : .75,
-        alignment: backgroundRightAligned
-            ? Alignment.topRight
-            : Alignment.topLeft,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-        child: AnimatedOpacity(
-          opacity: visible ? 1 : 0,
+      builder: (context, progress, child) {
+        final slide = backgroundRightAligned ? -1 : 1;
+        return Opacity(
+          opacity: progress,
+          child: Transform.translate(
+            offset: Offset(0, (1 - progress) * slide * fontSize * .8),
+            child: Transform.scale(
+              scale: .8 + progress * .2,
+              alignment: backgroundRightAligned
+                  ? Alignment.topRight
+                  : Alignment.topLeft,
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: Opacity(
+        opacity: .4,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(end: active ? 1 : 0),
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
-          child: Opacity(
-            opacity: .4,
-            child: _LyricText(
-              text: variant.text,
-              words: variant.words,
-              position: position,
-              color: Colors.white,
-              fontSize: _backgroundFontSize(fontSize),
-              weight: FontWeight.w600,
-              textAlign: backgroundRightAligned
-                  ? TextAlign.end
-                  : TextAlign.start,
-              animateWords: active && variant.words.isNotEmpty,
-              emphasizeLongWords: active && variant.words.isNotEmpty,
-              active: active,
-            ),
+          builder: (context, maskProgress, _) => _LyricText(
+            text: variant.text,
+            words: variant.words,
+            position: position,
+            color: Colors.white.withValues(alpha: .2 + .2 * maskProgress),
+            baseAlpha: .2 + .2 * maskProgress,
+            highlightAlpha: .2 + .8 * maskProgress,
+            fontSize: _backgroundFontSize(fontSize),
+            weight: FontWeight.w600,
+            textAlign: backgroundRightAligned ? TextAlign.end : TextAlign.start,
+            animateWords: active && variant.words.isNotEmpty,
+            emphasizeLongWords: active && variant.words.isNotEmpty,
+            active: active,
+            isBackground: true,
           ),
         ),
       ),
@@ -2046,10 +2163,13 @@ class _LyricText extends StatelessWidget {
     required this.fontSize,
     required this.weight,
     required this.textAlign,
+    this.baseAlpha,
+    this.highlightAlpha = 1,
     this.lineHeight = 1.2,
     this.animateWords = true,
     this.emphasizeLongWords = false,
     this.active = true,
+    this.isBackground = false,
   });
 
   final String text;
@@ -2059,10 +2179,13 @@ class _LyricText extends StatelessWidget {
   final double fontSize;
   final FontWeight weight;
   final TextAlign textAlign;
+  final double? baseAlpha;
+  final double highlightAlpha;
   final double lineHeight;
   final bool animateWords;
   final bool emphasizeLongWords;
   final bool active;
+  final bool isBackground;
 
   @override
   Widget build(BuildContext context) {
@@ -2071,11 +2194,13 @@ class _LyricText extends StatelessWidget {
       context,
       defaultTextStyle.style,
       TextStyle(
-        color: color,
+        color: baseAlpha == null
+            ? color
+            : color.withValues(alpha: baseAlpha!.clamp(0.0, 1.0)),
         fontSize: fontSize,
         fontWeight: weight,
         height: lineHeight,
-        wordSpacing: _lyricWordSpacing,
+        letterSpacing: _lyricLetterSpacing,
       ),
     );
     final textHeightBehavior = _effectiveTextHeightBehavior(context);
@@ -2110,8 +2235,10 @@ class _LyricText extends StatelessWidget {
               textHeightBehavior: textHeightBehavior,
               textWidthBasis: defaultTextStyle.textWidthBasis,
               active: active,
+              highlightAlpha: highlightAlpha,
               animateWords: animateWords,
               emphasizeLongWords: emphasizeLongWords,
+              isBackground: isBackground,
             ),
             child: Text(
               text,
@@ -2144,8 +2271,10 @@ class _KaraokeLyricPainter extends CustomPainter {
     required this.textHeightBehavior,
     required this.textWidthBasis,
     required this.active,
+    required this.highlightAlpha,
     required this.animateWords,
     required this.emphasizeLongWords,
+    required this.isBackground,
   });
 
   final String text;
@@ -2159,24 +2288,28 @@ class _KaraokeLyricPainter extends CustomPainter {
   final TextHeightBehavior? textHeightBehavior;
   final TextWidthBasis textWidthBasis;
   final bool active;
+  final double highlightAlpha;
   final bool animateWords;
   final bool emphasizeLongWords;
+  final bool isBackground;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final painter = TextPainter(
-      text: TextSpan(text: text, style: style),
+    final painter = _createLyricPainter(
+      text: text,
+      style: style,
       textDirection: textDirection,
       locale: locale,
       textAlign: textAlign,
       textScaler: textScaler,
       textHeightBehavior: textHeightBehavior,
       textWidthBasis: textWidthBasis,
-    )..layout(minWidth: size.width, maxWidth: size.width);
-    final brightPainter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: style.copyWith(color: Colors.white),
+      width: size.width,
+    );
+    final brightPainter = _createLyricPainter(
+      text: text,
+      style: style.copyWith(
+        color: Colors.white.withValues(alpha: highlightAlpha.clamp(0.0, 1.0)),
       ),
       textDirection: textDirection,
       locale: locale,
@@ -2184,15 +2317,22 @@ class _KaraokeLyricPainter extends CustomPainter {
       textScaler: textScaler,
       textHeightBehavior: textHeightBehavior,
       textWidthBasis: textWidthBasis,
-    )..layout(minWidth: size.width, maxWidth: size.width);
+      width: size.width,
+    );
     if (!active || !animateWords || words.isEmpty) {
       painter.paint(canvas, Offset.zero);
       return;
     }
 
-    final glowBleed = style.fontSize! * .75;
+    // 光晕需要在整句隔离层中合成，避免单个字符的清除和变换影响相邻字符。
+    final glowBleed = style.fontSize! * 1.5;
     canvas.saveLayer(
-      Rect.fromLTWH(0, -glowBleed, size.width, size.height + glowBleed * 2),
+      Rect.fromLTRB(
+        -glowBleed,
+        -glowBleed,
+        size.width + glowBleed,
+        size.height + glowBleed,
+      ),
       Paint(),
     );
     painter.paint(canvas, Offset.zero);
@@ -2222,26 +2362,12 @@ class _KaraokeLyricPainter extends CustomPainter {
         total.inMicroseconds,
       );
       final isLastWord = index == words.length - 1;
-      final animationDuration = duration * (isLastWord ? 1.2 : 1);
       final baseFloatProgress = (elapsed.inMicroseconds / duration).clamp(
         0.0,
         1.0,
       );
-      var floatOffset =
-          style.fontSize! * .05 * Curves.easeOut.transform(baseFloatProgress);
-      if (emphasizeLongWords && _shouldEmphasizeWord(word.text, total)) {
-        final characterCount = math.max(1, word.text.trim().characters.length);
-        final averageCharacterDelay =
-            animationDuration * (characterCount - 1) / (5 * characterCount);
-        final emphasisFloatProgress =
-            ((elapsed.inMicroseconds +
-                        const Duration(milliseconds: 400).inMicroseconds -
-                        averageCharacterDelay) /
-                    (animationDuration * 1.4))
-                .clamp(0.0, 1.0);
-        floatOffset +=
-            style.fontSize! * .05 * math.sin(math.pi * emphasisFloatProgress);
-      }
+      final floatOffset =
+          style.fontSize! * .06 * Curves.easeOut.transform(baseFloatProgress);
       if (elapsed < Duration.zero && floatOffset <= 0) continue;
 
       for (final box in boxes) {
@@ -2261,9 +2387,7 @@ class _KaraokeLyricPainter extends CustomPainter {
           floatingRect,
           progress,
           isRtl,
-          style.fontSize!,
           painterOffset,
-          floatingRect,
         );
         canvas.restore();
       }
@@ -2271,6 +2395,9 @@ class _KaraokeLyricPainter extends CustomPainter {
       if (emphasizeLongWords &&
           _shouldEmphasizeWord(word.text, total) &&
           progress > 0) {
+        final wordRect = boxes
+            .map((box) => box.toRect())
+            .reduce((left, right) => left.expandToInclude(right));
         _paintWordEmphasis(
           canvas,
           text: text,
@@ -2282,7 +2409,11 @@ class _KaraokeLyricPainter extends CustomPainter {
           end: end,
           elapsedMicroseconds: elapsedAt - word.start.inMicroseconds,
           isLastWord: isLastWord,
+          isBackground: isBackground,
           painterOffset: Offset(0, -floatOffset),
+          highlightProgress: progress,
+          isRtl: boxes.first.direction == TextDirection.rtl,
+          wordRect: wordRect.shift(Offset(0, -floatOffset)),
         );
       }
     }
@@ -2296,32 +2427,81 @@ class _KaraokeLyricPainter extends CustomPainter {
       oldDelegate.text != text ||
       oldDelegate.words != words ||
       oldDelegate.style != style ||
+      oldDelegate.highlightAlpha != highlightAlpha ||
       oldDelegate.animateWords != animateWords ||
-      oldDelegate.emphasizeLongWords != emphasizeLongWords;
+      oldDelegate.emphasizeLongWords != emphasizeLongWords ||
+      oldDelegate.isBackground != isBackground;
 }
+
+TextPainter _createLyricPainter({
+  required String text,
+  required TextStyle style,
+  required TextDirection textDirection,
+  required Locale? locale,
+  required TextAlign textAlign,
+  required TextScaler textScaler,
+  required TextHeightBehavior? textHeightBehavior,
+  required TextWidthBasis textWidthBasis,
+  required double width,
+}) => TextPainter(
+  text: TextSpan(text: text, style: style),
+  textDirection: textDirection,
+  locale: locale,
+  textAlign: textAlign,
+  textScaler: textScaler,
+  textHeightBehavior: textHeightBehavior,
+  textWidthBasis: textWidthBasis,
+)..layout(minWidth: width, maxWidth: width);
 
 void _paintWordHighlight(
   Canvas canvas,
   TextPainter painter,
-  Rect rect,
+  Rect wordRect,
   double progress,
   bool isRtl,
-  double fontSize,
   Offset painterOffset,
-  Rect wordRect,
 ) {
   if (progress <= 0) return;
-  if (progress >= 1) {
-    canvas.save();
-    canvas.clipRect(wordRect);
-    painter.paint(canvas, painterOffset);
-    canvas.restore();
-    return;
-  }
-  final featherRatio = math.min(.5, fontSize * .5 / wordRect.width);
-  final boundary = isRtl ? 1 - progress : progress;
-  final leadingStop = (boundary - featherRatio / 2).clamp(0.0, 1.0);
-  final trailingStop = (boundary + featherRatio / 2).clamp(0.0, 1.0);
+  final mask = _createWordHighlightMask(wordRect, progress, isRtl);
+  canvas.saveLayer(mask.rect, Paint());
+  canvas.clipRect(wordRect);
+  painter.paint(canvas, painterOffset);
+  canvas.drawRect(
+    mask.rect,
+    Paint()
+      ..shader = mask.shader
+      ..blendMode = BlendMode.dstIn,
+  );
+  canvas.restore();
+}
+
+({Rect rect, Shader shader, double fadeWidth}) _createWordHighlightMask(
+  Rect wordRect,
+  double progress,
+  bool isRtl,
+) {
+  // 羽化宽度按实际字框高度计算，并通过移动遮罩保持连续渐变。
+  final fadeWidth = math.max(1.0, wordRect.height * .5);
+  final boundedProgress = progress.clamp(0.0, 1.0);
+  final maskRect = Rect.fromLTRB(
+    wordRect.left - fadeWidth,
+    wordRect.top,
+    wordRect.right + fadeWidth,
+    wordRect.bottom,
+  );
+  // 完成阶段仍要让渐变继续移动一个羽化宽度，使羽化边缘自然越过
+  // 字符边界，而不是在 progress == 1 时突然切换为纯色。
+  final travelWidth = wordRect.width + fadeWidth;
+  final edge = isRtl
+      ? wordRect.right - boundedProgress * travelWidth
+      : wordRect.left + boundedProgress * travelWidth;
+  final transitionStart = isRtl ? edge : edge - fadeWidth;
+  final transitionEnd = isRtl ? edge + fadeWidth : edge;
+  final totalWidth = math.max(1.0, maskRect.width);
+  final transitionStartStop = ((transitionStart - maskRect.left) / totalWidth)
+      .clamp(0.0, 1.0);
+  final transitionEndStop = ((transitionEnd - maskRect.left) / totalWidth)
+      .clamp(0.0, 1.0);
   final colors = isRtl
       ? <Color>[
           Colors.transparent,
@@ -2339,18 +2519,9 @@ void _paintWordHighlight(
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
     colors: colors,
-    stops: [0, leadingStop, trailingStop, 1],
-  ).createShader(wordRect);
-  canvas.saveLayer(wordRect, Paint());
-  canvas.clipRect(wordRect);
-  painter.paint(canvas, painterOffset);
-  canvas.drawRect(
-    wordRect,
-    Paint()
-      ..shader = shader
-      ..blendMode = BlendMode.dstIn,
-  );
-  canvas.restore();
+    stops: [0, transitionStartStop, transitionEndStop, 1],
+  ).createShader(maskRect);
+  return (rect: maskRect, shader: shader, fadeWidth: fadeWidth);
 }
 
 void _paintWordEmphasis(
@@ -2364,13 +2535,30 @@ void _paintWordEmphasis(
   required Duration end,
   required int elapsedMicroseconds,
   required bool isLastWord,
+  required bool isBackground,
   required Offset painterOffset,
+  required double highlightProgress,
+  required bool isRtl,
+  required Rect wordRect,
 }) {
   final duration = math.max(
     const Duration(milliseconds: 1000).inMicroseconds,
     (end - word.start).inMicroseconds,
   );
-  final animationDuration = duration * (isLastWord ? 1.2 : 1);
+  var amount = duration / const Duration(milliseconds: 2000).inMicroseconds;
+  amount = amount > 1 ? math.sqrt(amount) : math.pow(amount, 3).toDouble();
+  var blur = duration / const Duration(milliseconds: 3000).inMicroseconds;
+  blur = blur > 1 ? math.sqrt(blur) : math.pow(blur, 3).toDouble();
+  amount *= .6;
+  blur *= .5;
+  var animationDuration = duration.toDouble();
+  if (isLastWord) {
+    amount *= 1.6;
+    blur *= 1.5;
+    animationDuration *= 1.2;
+  }
+  amount = math.min(1.2, amount);
+  blur = math.min(.8, blur);
   final graphemes = word.text.trim().characters.toList();
   if (graphemes.isEmpty) return;
 
@@ -2386,33 +2574,88 @@ void _paintWordEmphasis(
       0.0,
       1.0,
     );
-    if (progress <= 0 || progress >= 1) continue;
+    if (progress <= 0) continue;
 
     final charBoxes = painter.getBoxesForSelection(
       TextSelection(baseOffset: start, extentOffset: finish),
     );
     if (charBoxes.isEmpty) continue;
-    var blur = duration / const Duration(milliseconds: 3000).inMicroseconds;
-    blur = blur > 1 ? math.sqrt(blur) : math.pow(blur, 3).toDouble();
-    blur *= .5 * (isLastWord ? 1.5 : 1);
-    blur = math.min(.8, blur);
-    final glow = _amllEmphasisEase(progress) * blur;
-    if (glow <= .01) continue;
+    final emphasized = _amllEmphasisEase(progress);
+    final glow = emphasized * blur;
+    final floatProgress =
+        ((elapsedMicroseconds - delay + 400000) / (animationDuration * 1.4))
+            .clamp(0.0, 1.0);
+    final floatOffset =
+        -math.sin(math.pi * floatProgress) * (isBackground ? 0.12 : 0.06);
+    final scale = 1 + emphasized * .1 * amount;
+    final horizontalOffset =
+        -emphasized * .03 * amount * (graphemes.length / 2 - index);
+    final verticalOffset = -emphasized * .03 * amount + floatOffset;
 
-    final blurSigma = glow * style.fontSize! * .3;
+    final blurSigma = math.max(.8, glow * style.fontSize! * .3);
+    final glowAlpha = (glow * 510).round().clamp(0, 255);
     final glowPaint = Paint()
       ..colorFilter = ColorFilter.mode(
-        Colors.white.withAlpha((glow * 170).round()),
+        Colors.white.withAlpha(glowAlpha),
         BlendMode.srcIn,
       )
       ..imageFilter = ui.ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma);
     for (final charBox in charBoxes) {
       final charRect = charBox.toRect().shift(painterOffset);
-      canvas.saveLayer(charRect.inflate(blurSigma * 3), glowPaint);
+      final center = charRect.center;
+      final characterOffset = Offset(
+        horizontalOffset * style.fontSize!,
+        verticalOffset * style.fontSize!,
+      );
+      final transformedRect = charRect.shift(characterOffset);
+      final highlightMask = _createWordHighlightMask(
+        wordRect,
+        highlightProgress,
+        isRtl,
+      );
+
+      // AMLL 的字符动画使用 composite: replace。先清除原字符，再绘制
+      // 变换后的暗色底字和亮色辉光，避免原位置残留第二个影子。
+      canvas.drawRect(
+        charRect.inflate(1),
+        Paint()..blendMode = BlendMode.clear,
+      );
       canvas.save();
-      canvas.clipRect(charRect);
+      canvas.translate(characterOffset.dx, characterOffset.dy);
+      canvas.translate(center.dx, center.dy);
+      canvas.scale(scale, scale);
+      canvas.translate(-center.dx, -center.dy);
+      canvas.clipRect(charRect.inflate(blurSigma));
+      painter.paint(canvas, painterOffset);
+      canvas.restore();
+
+      canvas.saveLayer(transformedRect.inflate(blurSigma * 3), Paint());
+      canvas.saveLayer(transformedRect.inflate(blurSigma * 3), glowPaint);
+      canvas.save();
+      canvas.translate(characterOffset.dx, characterOffset.dy);
+      canvas.translate(center.dx, center.dy);
+      canvas.scale(scale, scale);
+      canvas.translate(-center.dx, -center.dy);
+      canvas.clipRect(charRect.inflate(blurSigma));
       brightPainter.paint(canvas, painterOffset);
       canvas.restore();
+      canvas.restore();
+
+      // text-shadow 只负责光晕，清晰的高亮字符需要在模糊层之后再次绘制。
+      canvas.save();
+      canvas.translate(characterOffset.dx, characterOffset.dy);
+      canvas.translate(center.dx, center.dy);
+      canvas.scale(scale, scale);
+      canvas.translate(-center.dx, -center.dy);
+      canvas.clipRect(charRect.inflate(blurSigma));
+      brightPainter.paint(canvas, painterOffset);
+      canvas.restore();
+      canvas.drawRect(
+        highlightMask.rect,
+        Paint()
+          ..shader = highlightMask.shader
+          ..blendMode = BlendMode.dstIn,
+      );
       canvas.restore();
     }
   }
@@ -2677,7 +2920,7 @@ Duration _effectiveLyricEnd(LyricLine line, Duration nextStart) {
   return latestEnd;
 }
 
-double _translationFontSize(double fontSize) => math.max(fontSize * .5, 10);
+double _translationFontSize(double fontSize) => fontSize * .8;
 
 double _backgroundFontSize(double fontSize) => math.max(fontSize * .7, 10);
 
@@ -2699,9 +2942,8 @@ double _measureLyricRowExtent(
   required TextScaler textScaler,
   required double lyricFontSize,
 }) {
-  final inset = compact ? 0.0 : _lyricDesktopHorizontalInset;
-  final widthFactor = compact ? 1.0 : _lyricDesktopWidthFactor;
-  final lineWidth = math.max(1.0, (viewportWidth - inset * 2) * widthFactor);
+  final horizontalPadding = lyricFontSize * _lyricVerticalPaddingEm;
+  final lineWidth = math.max(1.0, viewportWidth - horizontalPadding * 2);
   var contentHeight = _measureLyricTextHeight(
     line.text,
     context: context,
@@ -2713,7 +2955,6 @@ double _measureLyricRowExtent(
     maxWidth: lineWidth,
     textDirection: textDirection,
     textScaler: textScaler,
-    wordSpacing: _lyricWordSpacing,
   );
   var subLineCount = 0;
 
@@ -2729,7 +2970,6 @@ double _measureLyricRowExtent(
       maxWidth: lineWidth,
       textDirection: textDirection,
       textScaler: textScaler,
-      wordSpacing: _lyricWordSpacing,
     );
     subLineCount++;
   }
@@ -2749,13 +2989,13 @@ double _measureLyricRowExtent(
       maxWidth: lineWidth,
       textDirection: textDirection,
       textScaler: textScaler,
-      wordSpacing: _lyricWordSpacing,
     );
     subLineCount++;
   }
 
   return contentHeight +
       lyricFontSize * _lyricVerticalPaddingEm * 2 +
+      4 +
       math.max(0, subLineCount) * lyricFontSize * .3 +
       2;
 }
@@ -2771,7 +3011,6 @@ double _measureLyricTextHeight(
   required double maxWidth,
   required TextDirection textDirection,
   required TextScaler textScaler,
-  double wordSpacing = _lyricWordSpacing,
 }) {
   final painter = TextPainter(
     text: TextSpan(
@@ -2783,7 +3022,7 @@ double _measureLyricTextHeight(
           fontSize: fontSize,
           fontWeight: weight,
           height: lineHeight,
-          wordSpacing: wordSpacing,
+          letterSpacing: _lyricLetterSpacing,
         ),
       ),
     ),
@@ -2791,7 +3030,7 @@ double _measureLyricTextHeight(
     locale: Localizations.maybeLocaleOf(context),
     textScaler: textScaler,
     textHeightBehavior: textHeightBehavior,
-    textWidthBasis: TextWidthBasis.parent,
+    textWidthBasis: DefaultTextStyle.of(context).textWidthBasis,
     maxLines: null,
     ellipsis: null,
   )..layout(maxWidth: maxWidth);
@@ -2809,6 +3048,7 @@ TextStyle _resolveLyricTextStyle(
   }
   return style.merge(
     TextStyle(
+      fontFamily: linglunFontFamily,
       height: MediaQuery.maybeLineHeightScaleFactorOverrideOf(context),
       letterSpacing: MediaQuery.maybeLetterSpacingOverrideOf(context),
       wordSpacing: MediaQuery.maybeWordSpacingOverrideOf(context),

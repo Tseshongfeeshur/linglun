@@ -1171,9 +1171,11 @@ Duration _resolveTtmlTime(
     // 逐字歌词常把单词间空格放在前一个片段末尾，不能逐片段 trim，
     // 否则会把英文歌词拼成无空格的连续字符串。
     final clean = _stripLyricMarkup(rawText).replaceAll(RegExp(r'[ \t]+'), ' ');
-    if (clean.trim().isEmpty) return;
+    if (clean.isEmpty) return;
     textBuffer.write(clean);
-    if (start == null) return;
+    // AMLL 会把纯空格作为独立的不可见词保留。这样类似
+    // `<时间>你<时间> <时间>好` 的中文逐字歌词不会在相邻时间标签之间丢空格。
+    if (start == null || clean.trim().isEmpty) return;
     firstStart ??= start;
     words.add(LyricWord(start: start, end: end, text: clean, speaker: speaker));
   }

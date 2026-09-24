@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_typography.dart';
 import '../features/shell/presentation/app_shell.dart';
 
 /// 伶伦应用根组件，统一配置主题和桌面端的初始页面。
@@ -16,6 +17,7 @@ class LinglunApp extends StatelessWidget {
       title: '伶伦',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        fontFamily: linglunFontFamily,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: background,
         colorScheme: const ColorScheme.dark(

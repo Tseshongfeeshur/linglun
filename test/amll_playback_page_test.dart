@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linglun/src/features/player/application/player_controller.dart';
@@ -59,6 +60,8 @@ void main() {
     expect(find.textContaining('[00:'), findsNothing);
     expect(find.byTooltip('上一曲'), findsOneWidget);
     expect(find.byTooltip('播放'), findsOneWidget);
+    expect(find.byKey(const ValueKey('amll-album-cover')), findsOneWidget);
+    expect(find.byKey(const ValueKey('amll-album-cover-scale')), findsNothing);
 
     await tester.tap(find.byTooltip('打开播放队列'));
     await tester.pump(const Duration(milliseconds: 120));
@@ -190,7 +193,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('暂停与播放切换不会改变未高亮歌词的缩放目标', (tester) async {
+  testWidgets('暂停时未高亮歌词恢复原始缩放，播放时才缩小', (tester) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -239,7 +242,7 @@ void main() {
 
     await tester.pumpWidget(buildPage(pausedState));
     await tester.pump(const Duration(milliseconds: 100));
-    expect(tester.widget<AnimatedScale>(inactiveScale).scale, .97);
+    expect(tester.widget<AnimatedScale>(inactiveScale).scale, 1);
 
     await tester.pumpWidget(buildPage(pausedState.copyWith(isPlaying: true)));
     await tester.pump(const Duration(milliseconds: 200));
@@ -247,11 +250,11 @@ void main() {
 
     await tester.pumpWidget(buildPage(pausedState));
     await tester.pump(const Duration(milliseconds: 200));
-    expect(tester.widget<AnimatedScale>(inactiveScale).scale, .97);
+    expect(tester.widget<AnimatedScale>(inactiveScale).scale, 1);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('歌词默认左对齐并使用紧凑翻译样式', (tester) async {
+  testWidgets('歌词默认左对齐、内边距匹配且翻译字号为正文五分之四', (tester) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -297,14 +300,15 @@ void main() {
 
     final mainLyric = tester.widget<Text>(find.text('左对齐主歌词'));
     expect(mainLyric.textAlign, TextAlign.start);
-    expect(mainLyric.style?.fontWeight, FontWeight.w600);
-    expect(mainLyric.style?.wordSpacing, 2.5);
+    expect(mainLyric.style?.fontWeight, const FontWeight(450));
+    expect(mainLyric.style?.wordSpacing, isNull);
+    expect(mainLyric.style?.letterSpacing, .1);
 
     final translation = tester.widget<Text>(find.text('翻译副行'));
     expect(translation.textAlign, TextAlign.start);
     expect(
       translation.style?.fontSize,
-      closeTo(mainLyric.style!.fontSize! * .5, .01),
+      closeTo(mainLyric.style!.fontSize! * .8, .01),
     );
     expect(translation.style?.color?.a, closeTo(77 / 255, .001));
     final rowSize = tester.getSize(
@@ -317,6 +321,35 @@ void main() {
           .any((scale) => scale.filterQuality == null),
       isTrue,
     );
+
+    final listFinder = find.byKey(const ValueKey('timed-lyrics-list'));
+    final scrollConfigurationFinder = find
+        .ancestor(of: listFinder, matching: find.byType(ScrollConfiguration))
+        .first;
+    expect(
+      find.descendant(
+        of: scrollConfigurationFinder,
+        matching: find.byType(Scrollbar),
+      ),
+      findsNothing,
+    );
+
+    final rowFinder = find.byKey(const ValueKey('lyric-row-1000000-0'));
+    final hoverContainerFinder = find.descendant(
+      of: rowFinder,
+      matching: find.byType(AnimatedContainer),
+    );
+    final rowCenter = tester.getRect(rowFinder).center;
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: rowCenter);
+    await tester.pump();
+    await mouse.moveTo(rowCenter);
+    await tester.pump(const Duration(milliseconds: 300));
+    final decoration =
+        tester.widget<AnimatedContainer>(hoverContainerFinder).decoration
+            as BoxDecoration;
+    expect(decoration.color?.a, closeTo(17 / 255, .01));
+    await mouse.removePointer();
     expect(tester.takeException(), isNull);
   });
 
@@ -519,7 +552,7 @@ void main() {
       queue: [track],
       currentIndex: 0,
       isPlaying: false,
-      position: const Duration(seconds: 2),
+      position: const Duration(milliseconds: 2800),
       audioSettings: AudioProcessingSettings(),
     );
 

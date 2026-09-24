@@ -53,6 +53,13 @@ void main() {
     expect(document.timing, LyricsTiming.word);
   });
 
+  test('Enhanced LRC 保留中文逐字歌词之间的空格', () {
+    final document = parseLyrics('<00:01.00>你<00:01.30> <00:01.50>好');
+
+    expect(document.lines.single.text, '你 好');
+    expect(document.lines.single.words.map((word) => word.text), ['你', '好']);
+  });
+
   test('自动识别没有行级时间标签的内嵌 Enhanced LRC', () {
     final document = parseLyricsFile('''
 <00:01.00>你<00:01.30>好
