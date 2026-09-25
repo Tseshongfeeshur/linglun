@@ -140,11 +140,22 @@ class _CollectionGroup extends StatelessWidget {
                 tooltip: '播放',
                 onPressed: () => ref
                     .read(playerControllerProvider.notifier)
-                    .playTrack(track),
+                    .playFromList(
+                      tracks,
+                      track,
+                      shuffle: ref
+                          .read(playerControllerProvider)
+                          .shuffleEnabled,
+                    ),
                 icon: const Icon(Icons.play_arrow),
               ),
-              onTap: () =>
-                  ref.read(playerControllerProvider.notifier).playTrack(track),
+              onTap: () => ref
+                  .read(playerControllerProvider.notifier)
+                  .playFromList(
+                    tracks,
+                    track,
+                    shuffle: ref.read(playerControllerProvider).shuffleEnabled,
+                  ),
             ),
         ],
       ),

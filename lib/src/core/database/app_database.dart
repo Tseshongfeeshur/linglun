@@ -24,6 +24,8 @@ class LibraryTracks extends Table {
   TextColumn get replayGainMode => text().nullable()();
   IntColumn get playCount => integer().withDefault(const Constant(0))();
   DateTimeColumn get lastPlayedAt => dateTime().nullable()();
+  DateTimeColumn get addedAt => dateTime().nullable()();
+  DateTimeColumn get modifiedAt => dateTime().nullable()();
   DateTimeColumn get updatedAt => dateTime()();
 
   @override
@@ -61,7 +63,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -91,6 +93,10 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 8) {
         await m.addColumn(libraryTracks, libraryTracks.lyricsSourcesJson);
+      }
+      if (from < 9) {
+        await m.addColumn(libraryTracks, libraryTracks.addedAt);
+        await m.addColumn(libraryTracks, libraryTracks.modifiedAt);
       }
     },
   );

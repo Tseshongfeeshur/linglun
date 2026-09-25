@@ -21,6 +21,8 @@ class Track {
     this.metadata = const {},
     this.playCount = 0,
     this.lastPlayedAt,
+    this.addedAt,
+    this.modifiedAt,
     this.coverColor = 0xFF263238,
   });
 
@@ -43,6 +45,8 @@ class Track {
   final Map<String, String> metadata;
   final int playCount;
   final DateTime? lastPlayedAt;
+  final DateTime? addedAt;
+  final DateTime? modifiedAt;
   final int coverColor;
 
   /// 统一的歌词文档，供各个界面直接消费，避免渲染层重复解析原始文本。
@@ -67,6 +71,8 @@ class Track {
     String? path,
     int? playCount,
     DateTime? lastPlayedAt,
+    DateTime? addedAt,
+    DateTime? modifiedAt,
   }) {
     return Track(
       id: id,
@@ -84,6 +90,8 @@ class Track {
       metadata: metadata,
       playCount: playCount ?? this.playCount,
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
+      addedAt: addedAt ?? this.addedAt,
+      modifiedAt: modifiedAt ?? this.modifiedAt,
       coverColor: coverColor,
     );
   }

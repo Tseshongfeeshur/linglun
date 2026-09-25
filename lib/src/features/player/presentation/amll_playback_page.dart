@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show precisionErrorTolerance;
 import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
@@ -13,10 +15,73 @@ import '../domain/track.dart';
 const _pageAnimationCurve = Curves.easeOutCubic;
 const _lyricDefaultFontSize = 38.0;
 const _lyricLetterSpacing = .1;
+const _lyricMainFontWeight = FontWeight(450);
+const _lyricTranslationFontWeight = FontWeight.w500;
+const _lyricBackgroundFontWeight = FontWeight.w600;
 const _lyricVerticalPaddingEm = .4;
 const _lyricFocusPosition = 1 / 3;
 const _lyricLineMotionDuration = Duration(milliseconds: 1500);
 const _minimumInterludeGap = Duration(seconds: 7);
+const _lyricAutoFollowDelay = Duration(seconds: 3);
+
+/// 让歌词滚轮采用短时缓动，避免 Linux 鼠标滚轮每个离散事件都瞬移一段距离。
+class _SmoothLyricsScrollController extends ScrollController {
+  _SmoothLyricsScrollController({this.onUserScroll});
+
+  final VoidCallback? onUserScroll;
+
+  @override
+  ScrollPosition createScrollPosition(
+    ScrollPhysics physics,
+    ScrollContext context,
+    ScrollPosition? oldPosition,
+  ) {
+    return _SmoothLyricsScrollPosition(
+      physics: physics,
+      context: context,
+      initialPixels: initialScrollOffset,
+      keepScrollOffset: keepScrollOffset,
+      oldPosition: oldPosition,
+      debugLabel: debugLabel,
+      onUserScroll: onUserScroll,
+    );
+  }
+}
+
+class _SmoothLyricsScrollPosition extends ScrollPositionWithSingleContext {
+  _SmoothLyricsScrollPosition({
+    required super.physics,
+    required super.context,
+    super.initialPixels,
+    super.keepScrollOffset,
+    super.oldPosition,
+    super.debugLabel,
+    this.onUserScroll,
+  });
+
+  final VoidCallback? onUserScroll;
+
+  @override
+  void pointerScroll(double delta) {
+    if (delta == 0) {
+      super.pointerScroll(delta);
+      return;
+    }
+
+    final target = (pixels + delta).clamp(minScrollExtent, maxScrollExtent);
+    if ((target - pixels).abs() <= precisionErrorTolerance) return;
+
+    // 新的滚轮事件会自然打断上一段短动画，从而兼容连续滚轮和触控板输入。
+    onUserScroll?.call();
+    unawaited(
+      animateTo(
+        target,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
+}
 
 /// AMLL 风格的首个播放页：宽屏突出封面与歌词双栏，窄屏切换为歌词主视图。
 class AmllPlaybackPage extends StatefulWidget {
@@ -50,7 +115,7 @@ class AmllPlaybackPage extends StatefulWidget {
 }
 
 class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
-  bool _showLyrics = true;
+  bool _portraitLyricsVisible = false;
   bool _showQueue = false;
   bool _showRemainingTime = false;
 
@@ -75,7 +140,6 @@ class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
                         ? _WidePlaybackLayout(
                             track: widget.track,
                             state: widget.state,
-                            showLyrics: _showLyrics,
                             showRemainingTime: _showRemainingTime,
                             onRemainingTimeChanged: (value) =>
                                 setState(() => _showRemainingTime = value),
@@ -89,7 +153,11 @@ class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
                         : _NarrowPlaybackLayout(
                             track: widget.track,
                             state: widget.state,
-                            showLyrics: _showLyrics,
+                            showLyrics: _portraitLyricsVisible,
+                            onToggleLyrics: () => setState(
+                              () => _portraitLyricsVisible =
+                                  !_portraitLyricsVisible,
+                            ),
                             showRemainingTime: _showRemainingTime,
                             onRemainingTimeChanged: (value) =>
                                 setState(() => _showRemainingTime = value),
@@ -104,10 +172,7 @@ class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
                 ),
               ),
               _PageFooter(
-                showLyrics: _showLyrics,
                 showQueue: _showQueue,
-                onToggleLyrics: () =>
-                    setState(() => _showLyrics = !_showLyrics),
                 onToggleQueue: () => setState(() => _showQueue = !_showQueue),
               ),
             ],
@@ -252,17 +317,6 @@ class _PageHeader extends StatelessWidget {
       height: 58,
       child: Row(
         children: [
-          const SizedBox(width: 26),
-          Icon(Icons.graphic_eq, color: Colors.white.withAlpha(150), size: 18),
-          const SizedBox(width: 10),
-          Text(
-            '正在播放',
-            style: TextStyle(
-              color: Colors.white.withAlpha(180),
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
           const Spacer(),
           IconButton(
             onPressed: onClose,
@@ -281,7 +335,6 @@ class _WidePlaybackLayout extends StatelessWidget {
   const _WidePlaybackLayout({
     required this.track,
     required this.state,
-    required this.showLyrics,
     required this.showRemainingTime,
     required this.onRemainingTimeChanged,
     required this.onPrevious,
@@ -294,7 +347,6 @@ class _WidePlaybackLayout extends StatelessWidget {
 
   final Track track;
   final PlayerState state;
-  final bool showLyrics;
   final bool showRemainingTime;
   final ValueChanged<bool> onRemainingTimeChanged;
   final VoidCallback onPrevious;
@@ -311,37 +363,34 @@ class _WidePlaybackLayout extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            flex: 44,
-            child: _WideTrackColumn(
-              track: track,
-              state: state,
-              showRemainingTime: showRemainingTime,
-              onRemainingTimeChanged: onRemainingTimeChanged,
-              onPrevious: onPrevious,
-              onTogglePlay: onTogglePlay,
-              onNext: onNext,
-              onSeek: onSeek,
-              onToggleShuffle: onToggleShuffle,
-              onCycleRepeat: onCycleRepeat,
-              immersive: !showLyrics,
+            flex: 1,
+            child: SizedBox.expand(
+              key: const ValueKey('wide-track-pane'),
+              child: _WideTrackColumn(
+                track: track,
+                state: state,
+                showRemainingTime: showRemainingTime,
+                onRemainingTimeChanged: onRemainingTimeChanged,
+                onPrevious: onPrevious,
+                onTogglePlay: onTogglePlay,
+                onNext: onNext,
+                onSeek: onSeek,
+                onToggleShuffle: onToggleShuffle,
+                onCycleRepeat: onCycleRepeat,
+              ),
             ),
           ),
           const SizedBox(width: 24),
           Expanded(
-            flex: 56,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 480),
-              reverseDuration: const Duration(milliseconds: 320),
-              switchInCurve: _pageAnimationCurve,
-              switchOutCurve: Curves.easeInCubic,
-              child: showLyrics
-                  ? _LyricsViewport(
-                      key: const ValueKey('wide-lyrics'),
-                      track: track,
-                      state: state,
-                      onSeek: onSeek,
-                    )
-                  : const SizedBox.expand(key: ValueKey('lyrics-hidden')),
+            flex: 1,
+            child: SizedBox.expand(
+              key: const ValueKey('wide-lyrics-pane'),
+              child: _LyricsViewport(
+                key: const ValueKey('wide-lyrics'),
+                track: track,
+                state: state,
+                onSeek: onSeek,
+              ),
             ),
           ),
         ],
@@ -362,7 +411,6 @@ class _WideTrackColumn extends StatelessWidget {
     required this.onSeek,
     required this.onToggleShuffle,
     required this.onCycleRepeat,
-    this.immersive = false,
   });
 
   final Track track;
@@ -375,54 +423,82 @@ class _WideTrackColumn extends StatelessWidget {
   final ValueChanged<Duration> onSeek;
   final VoidCallback onToggleShuffle;
   final VoidCallback onCycleRepeat;
-  final bool immersive;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final coverSize = math.min(
-          constraints.maxWidth * (immersive ? .94 : .84),
-          constraints.maxHeight * (immersive ? .67 : .53),
+        final viewport = MediaQuery.sizeOf(context);
+        final standardCoverSize = math.min(
+          math.min(viewport.height * .45, viewport.width * .38),
+          math.min(constraints.maxWidth, constraints.maxHeight),
         );
-        return Column(
-          children: [
-            Expanded(
-              child: Center(
-                child: _AlbumCover(track: track, size: coverSize),
-              ),
+        final coverDetailsGap = _wideCoverDetailsGap(constraints.maxHeight);
+        final coverSize = standardCoverSize;
+        return Center(
+          child: SizedBox(
+            key: const ValueKey('wide-track-content'),
+            width: coverSize,
+            child: Column(
+              key: const ValueKey('wide-track-stack'),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _AlbumCover(track: track, size: coverSize),
+                SizedBox(
+                  key: const ValueKey('wide-cover-details-gap'),
+                  height: coverDetailsGap,
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _TrackMetadata(
+                      track: track,
+                      compact: false,
+                      alignStart: true,
+                      horizontalArtistsAlbum: true,
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      key: const ValueKey('seek-control-container'),
+                      child: _SeekControl(
+                        width: coverSize,
+                        track: track,
+                        position: state.position,
+                        showRemainingTime: showRemainingTime,
+                        onRemainingTimeChanged: onRemainingTimeChanged,
+                        onSeek: onSeek,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      key: const ValueKey('playback-controls-container'),
+                      child: _PlaybackControls(
+                        state: state,
+                        onPrevious: onPrevious,
+                        onTogglePlay: onTogglePlay,
+                        onNext: onNext,
+                        onToggleShuffle: onToggleShuffle,
+                        onCycleRepeat: onCycleRepeat,
+                        compact: coverSize < 320,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            _TrackMetadata(track: track, compact: false),
-            const SizedBox(height: 18),
-            _SeekControl(
-              track: track,
-              position: state.position,
-              showRemainingTime: showRemainingTime,
-              onRemainingTimeChanged: onRemainingTimeChanged,
-              onSeek: onSeek,
-            ),
-            const SizedBox(height: 10),
-            _PlaybackControls(
-              state: state,
-              onPrevious: onPrevious,
-              onTogglePlay: onTogglePlay,
-              onNext: onNext,
-              onToggleShuffle: onToggleShuffle,
-              onCycleRepeat: onCycleRepeat,
-            ),
-            const SizedBox(height: 12),
-          ],
+          ),
         );
       },
     );
   }
 }
 
-class _NarrowPlaybackLayout extends StatelessWidget {
+class _NarrowPlaybackLayout extends StatefulWidget {
   const _NarrowPlaybackLayout({
     required this.track,
     required this.state,
     required this.showLyrics,
+    required this.onToggleLyrics,
     required this.showRemainingTime,
     required this.onRemainingTimeChanged,
     required this.onPrevious,
@@ -436,6 +512,7 @@ class _NarrowPlaybackLayout extends StatelessWidget {
   final Track track;
   final PlayerState state;
   final bool showLyrics;
+  final VoidCallback onToggleLyrics;
   final bool showRemainingTime;
   final ValueChanged<bool> onRemainingTimeChanged;
   final VoidCallback onPrevious;
@@ -446,55 +523,191 @@ class _NarrowPlaybackLayout extends StatelessWidget {
   final VoidCallback onCycleRepeat;
 
   @override
+  State<_NarrowPlaybackLayout> createState() => _NarrowPlaybackLayoutState();
+}
+
+class _NarrowPlaybackLayoutState extends State<_NarrowPlaybackLayout> {
+  final _coverKey = GlobalKey();
+  double? _renderedCoverWidth;
+
+  void _measureCoverAfterLayout() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.showLyrics) return;
+      final renderObject = _coverKey.currentContext?.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) return;
+      final width = renderObject.size.width;
+      if (_renderedCoverWidth == null ||
+          (width - _renderedCoverWidth!).abs() > .01) {
+        setState(() => _renderedCoverWidth = width);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    _measureCoverAfterLayout();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          Expanded(
-            child: showLyrics
-                ? _LyricsViewport(track: track, state: state, onSeek: onSeek)
-                : _ImmersiveCover(track: track),
-          ),
-          _TrackMetadata(track: track, compact: true),
-          const SizedBox(height: 12),
-          _SeekControl(
-            track: track,
-            position: state.position,
-            showRemainingTime: showRemainingTime,
-            onRemainingTimeChanged: onRemainingTimeChanged,
-            onSeek: onSeek,
-          ),
-          _PlaybackControls(
-            state: state,
-            onPrevious: onPrevious,
-            onTogglePlay: onTogglePlay,
-            onNext: onNext,
-            onToggleShuffle: onToggleShuffle,
-            onCycleRepeat: onCycleRepeat,
-            compact: true,
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final height = constraints.maxHeight;
+          final controlCoverSize = math
+              .min(width * .76, height * .58)
+              .toDouble();
+          final seekWidth = widget.showLyrics
+              ? controlCoverSize
+              : (_renderedCoverWidth ?? controlCoverSize);
+          return Column(
+            children: [
+              Expanded(
+                child: _PortraitMainArea(
+                  track: widget.track,
+                  state: widget.state,
+                  showLyrics: widget.showLyrics,
+                  onToggleLyrics: widget.onToggleLyrics,
+                  onSeek: widget.onSeek,
+                  controlCoverSize: controlCoverSize,
+                  coverKey: _coverKey,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                key: const ValueKey('seek-control-container'),
+                width: seekWidth,
+                child: _SeekControl(
+                  width: seekWidth,
+                  track: widget.track,
+                  position: widget.state.position,
+                  showRemainingTime: widget.showRemainingTime,
+                  onRemainingTimeChanged: widget.onRemainingTimeChanged,
+                  onSeek: widget.onSeek,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                key: const ValueKey('playback-controls-container'),
+                width: seekWidth,
+                child: _PlaybackControls(
+                  state: widget.state,
+                  onPrevious: widget.onPrevious,
+                  onTogglePlay: widget.onTogglePlay,
+                  onNext: widget.onNext,
+                  onToggleShuffle: widget.onToggleShuffle,
+                  onCycleRepeat: widget.onCycleRepeat,
+                  compact: true,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-class _ImmersiveCover extends StatelessWidget {
-  const _ImmersiveCover({required this.track});
+class _PortraitMainArea extends StatelessWidget {
+  const _PortraitMainArea({
+    required this.track,
+    required this.state,
+    required this.showLyrics,
+    required this.onToggleLyrics,
+    required this.onSeek,
+    required this.controlCoverSize,
+    required this.coverKey,
+  });
 
   final Track track;
+  final PlayerState state;
+  final bool showLyrics;
+  final VoidCallback onToggleLyrics;
+  final ValueChanged<Duration> onSeek;
+  final double controlCoverSize;
+  final GlobalKey coverKey;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final size = math.min(
-          constraints.maxWidth * .76,
-          constraints.maxHeight * .9,
-        );
-        return Center(
-          child: _AlbumCover(track: track, size: size),
+        final width = constraints.maxWidth;
+        final height = constraints.maxHeight;
+        final infoHeight = 66.0;
+        final coverSize = math
+            .min(controlCoverSize, math.max(0.0, height - infoHeight - 26))
+            .toDouble();
+        final initialTop = math
+            .max(0.0, (height - coverSize - infoHeight - 18) / 2)
+            .toDouble();
+        final compactCoverSize = math
+            .min(112.0, math.min(width * .27, height * .18))
+            .toDouble();
+        const infoGap = 16.0;
+        final h = compactCoverSize + infoGap;
+        final infoWidth = math.max(0.0, width - h).toDouble();
+        final headerHeight = math.max(compactCoverSize, 86.0).toDouble();
+
+        return Stack(
+          clipBehavior: Clip.hardEdge,
+          children: [
+            if (showLyrics)
+              Positioned(
+                left: 0,
+                right: 0,
+                top: headerHeight + 12,
+                bottom: 0,
+                child: AnimatedOpacity(
+                  opacity: 1,
+                  duration: const Duration(milliseconds: 350),
+                  curve: _pageAnimationCurve,
+                  child: _LyricsViewport(
+                    key: const ValueKey('portrait-lyrics'),
+                    track: track,
+                    state: state,
+                    onSeek: onSeek,
+                  ),
+                ),
+              ),
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 560),
+              curve: Curves.easeInOutCubic,
+              left: showLyrics ? 0.0 : (width - coverSize) / 2,
+              top: showLyrics ? 8.0 : initialTop,
+              width: showLyrics ? compactCoverSize : coverSize,
+              height: showLyrics ? compactCoverSize : coverSize,
+              child: KeyedSubtree(
+                key: coverKey,
+                child: GestureDetector(
+                  key: const ValueKey('portrait-cover-shared-element'),
+                  onTap: onToggleLyrics,
+                  child: _AlbumCoverArtwork(
+                    key: const ValueKey('amll-album-cover'),
+                    track: track,
+                  ),
+                ),
+              ),
+            ),
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 560),
+              curve: Curves.easeInOutCubic,
+              left: showLyrics ? h : (width - infoWidth) / 2,
+              top: showLyrics ? 8.0 : initialTop + coverSize + 16,
+              // 两种状态始终使用同一个最大宽度，避免标题测量结果在过渡中反复变化。
+              width: infoWidth,
+              height: showLyrics ? headerHeight : infoHeight,
+              child: Align(
+                alignment: showLyrics
+                    ? Alignment.centerLeft
+                    : Alignment.topLeft,
+                child: _TrackMetadata(
+                  track: track,
+                  compact: true,
+                  alignStart: showLyrics,
+                  horizontalArtistsAlbum: true,
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -510,50 +723,86 @@ class _AlbumCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox.square(
-      key: const ValueKey('amll-album-cover'),
       dimension: size,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(math.max(10, size * .025)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(95),
-              blurRadius: size * .09,
-              spreadRadius: 2,
-              offset: Offset(0, size * .025),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(math.max(10, size * .025)),
-          child: track.coverBytes == null
-              ? ColoredBox(
-                  color: Color(track.coverColor),
-                  child: const Center(
-                    child: Icon(
-                      Icons.album_rounded,
-                      color: Colors.white70,
-                      size: 78,
-                    ),
-                  ),
-                )
-              : Image.memory(
-                  track.coverBytes!,
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                  filterQuality: FilterQuality.medium,
-                ),
-        ),
+      child: _AlbumCoverArtwork(
+        key: const ValueKey('amll-album-cover'),
+        track: track,
       ),
     );
   }
 }
 
+/// 封面图像本身独立出来，竖屏切换时可在同一个定位节点内做共享元素过渡。
+class _AlbumCoverImage extends StatelessWidget {
+  const _AlbumCoverImage({required this.track});
+
+  final Track track;
+
+  @override
+  Widget build(BuildContext context) {
+    return track.coverBytes == null
+        ? ColoredBox(
+            color: Color(track.coverColor),
+            child: const Center(
+              child: Icon(Icons.album_rounded, color: Colors.white70, size: 78),
+            ),
+          )
+        : Image.memory(
+            track.coverBytes!,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            filterQuality: FilterQuality.medium,
+          );
+  }
+}
+
+class _AlbumCoverArtwork extends StatelessWidget {
+  const _AlbumCoverArtwork({required this.track, super.key});
+
+  final Track track;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = math.min(constraints.maxWidth, constraints.maxHeight);
+        final radius = math.max(10.0, size * .025);
+        return SizedBox.expand(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(95),
+                  blurRadius: size * .09,
+                  spreadRadius: 2,
+                  offset: Offset(0, size * .025),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(radius),
+              child: _AlbumCoverImage(track: track),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _TrackMetadata extends StatelessWidget {
-  const _TrackMetadata({required this.track, required this.compact});
+  const _TrackMetadata({
+    required this.track,
+    required this.compact,
+    this.alignStart = false,
+    this.horizontalArtistsAlbum = false,
+  });
 
   final Track track;
   final bool compact;
+  final bool alignStart;
+  final bool horizontalArtistsAlbum;
 
   @override
   Widget build(BuildContext context) {
@@ -564,45 +813,180 @@ class _TrackMetadata extends StatelessWidget {
     );
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: compact
+      crossAxisAlignment: alignStart
           ? CrossAxisAlignment.start
           : CrossAxisAlignment.center,
       children: [
-        Text(
-          track.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: compact ? TextAlign.start : TextAlign.center,
+        _ScrollingTrackTitle(
+          text: track.title,
           style: titleStyle,
+          textAlign: alignStart ? TextAlign.start : TextAlign.center,
         ),
         const SizedBox(height: 4),
-        Text(
-          track.artist,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: compact ? TextAlign.start : TextAlign.center,
-          style: TextStyle(
-            color: Colors.white.withAlpha(210),
-            fontSize: compact ? 15 : 16,
-          ),
-        ),
-        if (track.album.trim().isNotEmpty) ...[
-          const SizedBox(height: 3),
+        if (horizontalArtistsAlbum)
           Text(
-            track.album,
+            _artistAlbumLabel(track.artist, track.album),
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.ellipsis,
+            textAlign: alignStart ? TextAlign.start : TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withAlpha(190),
+              fontSize: compact ? 14 : 15,
+            ),
+          )
+        else ...[
+          Text(
+            track.artist,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            textAlign: compact ? TextAlign.start : TextAlign.center,
-            style: TextStyle(color: Colors.white.withAlpha(135), fontSize: 13),
+            textAlign: alignStart ? TextAlign.start : TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withAlpha(210),
+              fontSize: compact ? 15 : 16,
+            ),
           ),
+          if (track.album.trim().isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(
+              track.album,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: alignStart ? TextAlign.start : TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withAlpha(135),
+                fontSize: 13,
+              ),
+            ),
+          ],
         ],
       ],
     );
   }
 }
 
+class _ScrollingTrackTitle extends StatefulWidget {
+  const _ScrollingTrackTitle({
+    required this.text,
+    required this.style,
+    required this.textAlign,
+  });
+
+  final String text;
+  final TextStyle style;
+  final TextAlign textAlign;
+
+  @override
+  State<_ScrollingTrackTitle> createState() => _ScrollingTrackTitleState();
+}
+
+class _ScrollingTrackTitleState extends State<_ScrollingTrackTitle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  Timer? _startTimer;
+  double _overflow = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 850),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _ScrollingTrackTitle oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text || oldWidget.style != widget.style) {
+      _startTimer?.cancel();
+      _controller
+        ..stop()
+        ..value = 0;
+      _overflow = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _startTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _updateOverflow(double value) {
+    if ((_overflow - value).abs() < .5) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || (_overflow - value).abs() < .5) return;
+      setState(() => _overflow = value);
+      _startTimer?.cancel();
+      _controller
+        ..stop()
+        ..value = 0;
+      if (value > 0) {
+        _startTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+          if (!mounted) return;
+          final target = _controller.value < .5 ? 1.0 : 0.0;
+          unawaited(
+            _controller.animateTo(
+              target,
+              duration: const Duration(milliseconds: 850),
+              curve: Curves.easeInOutCubic,
+            ),
+          );
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: widget.style),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+          maxLines: 1,
+        )..layout();
+        final naturalWidth = painter.width;
+        final overflow = math.max(0.0, naturalWidth - constraints.maxWidth);
+        _updateOverflow(overflow);
+        return ClipRect(
+          child: SizedBox(
+            height: painter.height,
+            width: constraints.maxWidth,
+            child: AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) => Transform.translate(
+                offset: Offset(
+                  -_overflow * Curves.easeInOut.transform(_controller.value),
+                  0,
+                ),
+                child: child,
+              ),
+              child: SizedBox(
+                width: math.max(naturalWidth, constraints.maxWidth),
+                child: Text(
+                  widget.text,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.visible,
+                  textAlign: widget.textAlign,
+                  style: widget.style,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _SeekControl extends StatefulWidget {
   const _SeekControl({
+    required this.width,
     required this.track,
     required this.position,
     required this.showRemainingTime,
@@ -610,6 +994,7 @@ class _SeekControl extends StatefulWidget {
     required this.onSeek,
   });
 
+  final double width;
   final Track track;
   final Duration position;
   final bool showRemainingTime;
@@ -623,6 +1008,7 @@ class _SeekControl extends StatefulWidget {
 class _SeekControlState extends State<_SeekControl> {
   double? _previewMs;
   bool _dragging = false;
+  bool _hovered = false;
 
   @override
   void didUpdateWidget(covariant _SeekControl oldWidget) {
@@ -641,62 +1027,80 @@ class _SeekControlState extends State<_SeekControl> {
     final rightTime = widget.showRemainingTime
         ? widget.track.duration - shownPosition
         : widget.track.duration;
+    final showHandle = _hovered || _dragging;
+    final trackHeight = _seekTrackHeight(MediaQuery.sizeOf(context).height);
 
-    return Column(
-      children: [
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 3,
-            activeTrackColor: Colors.white,
-            inactiveTrackColor: Colors.white.withAlpha(65),
-            thumbColor: Colors.white,
-            overlayColor: Colors.white.withAlpha(35),
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-          ),
-          child: Slider(
-            min: 0,
-            max: durationMs.toDouble(),
-            value: boundedMs,
-            onChangeStart: (_) => setState(() => _dragging = true),
-            onChanged: widget.track.duration <= Duration.zero
-                ? null
-                : (value) => setState(() => _previewMs = value),
-            onChangeEnd: (value) {
-              setState(() {
-                _previewMs = null;
-                _dragging = false;
-              });
-              widget.onSeek(Duration(milliseconds: value.round()));
-            },
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            children: [
-              Text(_formatDuration(shownPosition), style: _timeTextStyle),
-              const Spacer(),
-              _AudioQualityBadge(track: widget.track),
-              const Spacer(),
-              InkWell(
-                onTap: () =>
-                    widget.onRemainingTimeChanged(!widget.showRemainingTime),
-                borderRadius: BorderRadius.circular(4),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Text(
-                    widget.showRemainingTime
-                        ? '-${_formatDuration(rightTime)}'
-                        : _formatDuration(rightTime),
-                    style: _timeTextStyle,
-                  ),
-                ),
+    return SizedBox(
+      width: widget.width,
+      child: Column(
+        children: [
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: trackHeight,
+              activeTrackColor: Colors.white,
+              inactiveTrackColor: Colors.white.withAlpha(65),
+              // 始终保留相同的手柄和覆盖层尺寸，避免 Flutter 重新计算轨道
+              // 两端内缩量；非悬浮时只隐藏绘制，不改变进度条几何尺寸。
+              thumbColor: showHandle ? Colors.white : Colors.transparent,
+              disabledThumbColor: Colors.transparent,
+              overlayColor: showHandle
+                  ? Colors.white.withAlpha(35)
+                  : Colors.transparent,
+              thumbShape: RoundSliderThumbShape(
+                enabledThumbRadius: 5,
+                elevation: showHandle ? 1 : 0,
+                pressedElevation: showHandle ? 6 : 0,
               ),
-            ],
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+            ),
+            child: MouseRegion(
+              onEnter: (_) => setState(() => _hovered = true),
+              onExit: (_) {
+                if (!_dragging) setState(() => _hovered = false);
+              },
+              child: Slider(
+                min: 0,
+                max: durationMs.toDouble(),
+                value: boundedMs,
+                onChangeStart: (_) => setState(() => _dragging = true),
+                onChanged: widget.track.duration <= Duration.zero
+                    ? null
+                    : (value) => setState(() => _previewMs = value),
+                onChangeEnd: (value) {
+                  setState(() {
+                    _previewMs = null;
+                    _dragging = false;
+                  });
+                  widget.onSeek(Duration(milliseconds: value.round()));
+                },
+              ),
+            ),
           ),
-        ),
-      ],
+          SizedBox(
+            key: const ValueKey('seek-time-row'),
+            width: double.infinity,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              key: const ValueKey('seek-chip-row'),
+              children: [
+                Text(
+                  _formatDuration(shownPosition),
+                  maxLines: 1,
+                  style: _timeTextStyle,
+                ),
+                Flexible(child: _AudioQualityBadge(track: widget.track)),
+                Text(
+                  widget.showRemainingTime
+                      ? '-${_formatDuration(rightTime)}'
+                      : _formatDuration(rightTime),
+                  maxLines: 1,
+                  style: _timeTextStyle,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -706,6 +1110,12 @@ const _timeTextStyle = TextStyle(
   fontSize: 11,
   fontFeatures: [ui.FontFeature.tabularFigures()],
 );
+
+double _seekTrackHeight(double windowHeight) {
+  // 只做轻微变化，避免大窗口下进度条显得过重，小窗口下又过细。
+  final progress = ((windowHeight - 600) / 500).clamp(0.0, 1.0);
+  return 3 + progress * 1.2;
+}
 
 class _AudioQualityBadge extends StatelessWidget {
   const _AudioQualityBadge({required this.track});
@@ -765,7 +1175,7 @@ class _PlaybackControls extends StatelessWidget {
     final mainSize = compact ? 50.0 : 58.0;
     final sideSize = compact ? 40.0 : 46.0;
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         IconButton(
           onPressed: onToggleShuffle,
@@ -828,16 +1238,9 @@ class _PlaybackControls extends StatelessWidget {
 }
 
 class _PageFooter extends StatelessWidget {
-  const _PageFooter({
-    required this.showLyrics,
-    required this.showQueue,
-    required this.onToggleLyrics,
-    required this.onToggleQueue,
-  });
+  const _PageFooter({required this.showQueue, required this.onToggleQueue});
 
-  final bool showLyrics;
   final bool showQueue;
-  final VoidCallback onToggleLyrics;
   final VoidCallback onToggleQueue;
 
   @override
@@ -856,20 +1259,7 @@ class _PageFooter extends StatelessWidget {
             icon: const Icon(Icons.queue_music_rounded),
             iconSize: 20,
           ),
-          IconButton(
-            onPressed: onToggleLyrics,
-            tooltip: showLyrics ? '隐藏歌词' : '显示歌词',
-            color: showLyrics
-                ? Theme.of(context).colorScheme.primary
-                : Colors.white.withAlpha(185),
-            icon: const Icon(Icons.lyrics_rounded),
-            iconSize: 20,
-          ),
           const Spacer(),
-          Text(
-            '伶伦 · 本地播放',
-            style: TextStyle(color: Colors.white.withAlpha(95), fontSize: 11),
-          ),
           const SizedBox(width: 28),
         ],
       ),
@@ -913,13 +1303,20 @@ class _LyricsViewportState extends State<_LyricsViewport>
   bool _isLyricsHovered = false;
   Duration? _interludeResetPosition;
   double _lineScrollDelta = 0;
+  bool _synchronizeLineMotion = false;
   bool _hasSyncedInitialFocus = false;
   Size? _previousLyricsSize;
-  final ScrollController _scrollController = ScrollController();
+  late final _SmoothLyricsScrollController _scrollController;
+  Timer? _autoFollowTimer;
+  bool _userScrollSuppressed = false;
+  bool _userDragActive = false;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = _SmoothLyricsScrollController(
+      onUserScroll: _noteUserScroll,
+    );
     _document = widget.track.lyricsDocument;
     _speakerOrder = _buildSpeakerOrder(_document);
     final initialPosition = widget.state.position;
@@ -953,6 +1350,10 @@ class _LyricsViewportState extends State<_LyricsViewport>
       _hasSyncedInitialFocus = false;
       _lineMotion.value = 1;
       _lineScrollDelta = 0;
+      _synchronizeLineMotion = false;
+      _autoFollowTimer?.cancel();
+      _userScrollSuppressed = false;
+      _userDragActive = false;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && _scrollController.hasClients) {
           _scrollController.jumpTo(0);
@@ -1002,6 +1403,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
 
   @override
   void dispose() {
+    _autoFollowTimer?.cancel();
     _ticker.dispose();
     _lineMotion.dispose();
     _playhead.dispose();
@@ -1018,6 +1420,53 @@ class _LyricsViewportState extends State<_LyricsViewport>
   void _seekToLyric(Duration position) {
     _interludeResetPosition = position - _document.offset;
     widget.onSeek(position);
+  }
+
+  void _noteUserScroll() {
+    _userScrollSuppressed = true;
+    _autoFollowTimer?.cancel();
+    _autoFollowTimer = Timer(_lyricAutoFollowDelay, _resumeAutoFollow);
+  }
+
+  bool _handleLyricsScrollNotification(ScrollNotification notification) {
+    if (notification.depth != 0) return false;
+
+    if (notification is ScrollStartNotification &&
+        notification.dragDetails != null) {
+      _userDragActive = true;
+      _noteUserScroll();
+    } else if (notification is ScrollUpdateNotification &&
+        notification.dragDetails != null) {
+      _userDragActive = true;
+      _noteUserScroll();
+    } else if (notification is ScrollEndNotification && _userDragActive) {
+      _userDragActive = false;
+      _noteUserScroll();
+    }
+    return false;
+  }
+
+  void _resumeAutoFollow() {
+    _autoFollowTimer = null;
+    if (!mounted || _userDragActive) {
+      if (_userDragActive) {
+        _autoFollowTimer = Timer(_lyricAutoFollowDelay, _resumeAutoFollow);
+      }
+      return;
+    }
+    _userScrollSuppressed = false;
+    if (!_hasSyncedInitialFocus ||
+        !_scrollController.hasClients ||
+        _lyricsWidth <= 0) {
+      return;
+    }
+
+    final maxOffset = _scrollController.position.maxScrollExtent;
+    if (_activeIndex < 0) {
+      _scrollToInterlude(maxOffset, synchronize: true);
+    } else {
+      _scrollToLine(_activeIndex, maxOffset, synchronize: true);
+    }
   }
 
   void _tick(Duration _) {
@@ -1050,6 +1499,14 @@ class _LyricsViewportState extends State<_LyricsViewport>
       _activeIndex = nextIndex;
       _pendingActiveIndex = null;
       if (_scrollController.hasClients && _lyricsWidth > 0) {
+        if (_userScrollSuppressed) {
+          // 用户正在浏览歌词时只更新高亮，不抢回用户已经滚到的位置。
+          _lineScrollDelta = 0;
+          _synchronizeLineMotion = false;
+          _lineMotion.value = 1;
+          setState(() {});
+          return;
+        }
         // 在同一个帧回调中完成“跳到目标位置、记录 FLIP 位移、启动动画、
         // 重建活动行”。这样高亮渐变和列表滚动不会相差一帧以上。
         final maxOffset = _scrollController.position.maxScrollExtent;
@@ -1079,7 +1536,11 @@ class _LyricsViewportState extends State<_LyricsViewport>
     });
   }
 
-  void _scrollToInterlude(double maxOffset, {bool animate = true}) {
+  void _scrollToInterlude(
+    double maxOffset, {
+    bool animate = true,
+    bool synchronize = false,
+  }) {
     final interlude = _activeLyricInterlude(
       _document.lines,
       _playhead.value - _document.offset,
@@ -1111,10 +1572,15 @@ class _LyricsViewportState extends State<_LyricsViewport>
     final target = (focalCenter - _lyricsHeight * _lyricFocusPosition)
         .clamp(0, maxOffset)
         .toDouble();
-    _moveListTo(target, animate: animate);
+    _moveListTo(target, animate: animate, synchronize: synchronize);
   }
 
-  void _scrollToLine(int index, double maxOffset, {bool animate = true}) {
+  void _scrollToLine(
+    int index,
+    double maxOffset, {
+    bool animate = true,
+    bool synchronize = false,
+  }) {
     if (_lyricsWidth <= 0 || index < 0 || index >= _document.lines.length) {
       return;
     }
@@ -1154,10 +1620,14 @@ class _LyricsViewportState extends State<_LyricsViewport>
                 _lyricsHeight * _lyricFocusPosition)
             .clamp(0, maxOffset)
             .toDouble();
-    _moveListTo(target, animate: animate);
+    _moveListTo(target, animate: animate, synchronize: synchronize);
   }
 
-  void _moveListTo(double target, {required bool animate}) {
+  void _moveListTo(
+    double target, {
+    required bool animate,
+    bool synchronize = false,
+  }) {
     if (!_scrollController.hasClients) return;
     final scrollPosition = _scrollController.position;
     final clampedTarget = target
@@ -1165,6 +1635,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
         .toDouble();
     final current = scrollPosition.pixels;
     _lineScrollDelta = animate ? clampedTarget - current : 0;
+    _synchronizeLineMotion = animate && synchronize;
     _scrollController.jumpTo(clampedTarget);
     if (animate) {
       _lineMotion.forward(from: 0);
@@ -1179,29 +1650,30 @@ class _LyricsViewportState extends State<_LyricsViewport>
     final hasLyrics =
         _document.lines.isNotEmpty ||
         _document.plainLines.any((line) => line.trim().isNotEmpty);
+    final details = [
+      '语法格式：${_document.syntaxLabel}',
+      '时间戳：${_document.timingLabel}',
+      if (widget.track.lyricsSources.isNotEmpty)
+        '来源：${widget.track.lyricsSources.map((source) => source.label).join('、')}',
+      '歌词行数：${_document.lines.isNotEmpty ? _document.lines.length : _document.plainLines.length}',
+    ].join('\n');
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 18, 8),
       child: Column(
         children: [
           Row(
             children: [
-              Text(
-                '歌词',
-                style: TextStyle(
-                  color: Colors.white.withAlpha(175),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              const Spacer(),
+              Tooltip(
+                message: details,
+                waitDuration: const Duration(milliseconds: 250),
+                child: Icon(
+                  Icons.info_outline_rounded,
+                  key: const ValueKey('lyrics-info'),
+                  size: 18,
+                  color: Colors.white.withAlpha(145),
                 ),
               ),
-              const Spacer(),
-              if (hasLyrics)
-                Text(
-                  '${_document.syntaxLabel} · ${_document.timingLabel}',
-                  style: TextStyle(
-                    color: Colors.white.withAlpha(115),
-                    fontSize: 11,
-                  ),
-                ),
             ],
           ),
           const SizedBox(height: 8),
@@ -1265,7 +1737,10 @@ class _LyricsViewportState extends State<_LyricsViewport>
                         lastExtent / 2,
                   );
                 }
-                if (resized && _activeIndex >= 0) {
+                if (resized &&
+                    _activeIndex >= 0 &&
+                    !_userScrollSuppressed &&
+                    !_userDragActive) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     if (mounted && _scrollController.hasClients) {
                       _scrollToLine(
@@ -1305,6 +1780,8 @@ class _LyricsViewportState extends State<_LyricsViewport>
                                     viewportWidth: _lyricsWidth,
                                     lineMotion: _lineMotion,
                                     lineScrollDelta: _lineScrollDelta,
+                                    synchronizeLineMotion:
+                                        _synchronizeLineMotion,
                                     interludeResetPosition:
                                         _interludeResetPosition,
                                     topPadding: _listTopPadding,
@@ -1312,7 +1789,10 @@ class _LyricsViewportState extends State<_LyricsViewport>
                                     onSeek: _seekToLyric,
                                   )
                                 : _UntimedLyricsList(document: _document);
-                            return lyrics;
+                            return NotificationListener<ScrollNotification>(
+                              onNotification: _handleLyricsScrollNotification,
+                              child: lyrics,
+                            );
                           },
                         ),
                       );
@@ -1338,6 +1818,7 @@ class _TimedLyricsList extends StatelessWidget {
     required this.viewportWidth,
     required this.lineMotion,
     required this.lineScrollDelta,
+    required this.synchronizeLineMotion,
     required this.interludeResetPosition,
     required this.topPadding,
     required this.bottomPadding,
@@ -1355,6 +1836,7 @@ class _TimedLyricsList extends StatelessWidget {
   final double viewportWidth;
   final Animation<double> lineMotion;
   final double lineScrollDelta;
+  final bool synchronizeLineMotion;
   final Duration? interludeResetPosition;
   final double topPadding;
   final double bottomPadding;
@@ -1388,10 +1870,9 @@ class _TimedLyricsList extends StatelessWidget {
     final interludeSpacer = canShowInterlude
         ? _interludeSpacerExtent(fontSize, MediaQuery.sizeOf(context).height)
         : 0.0;
-    final lineDelays = _calculateLyricLineDelays(
-      lines,
-      activeIndex: activeIndex,
-    );
+    final lineDelays = synchronizeLineMotion
+        ? List<Duration>.filled(lines.length, Duration.zero)
+        : _calculateLyricLineDelays(lines, activeIndex: activeIndex);
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
       child: ShaderMask(
@@ -1517,27 +1998,31 @@ class _TimedLyricsList extends StatelessWidget {
                     top: top,
                     left: 0,
                     right: 0,
-                    child: SizedBox(
-                      height: interludeSpacer,
-                      child: Align(
-                        alignment:
-                            _isRightAligned(
-                              interlude.anchor + 1 < lines.length
-                                  ? _lineSpeaker(lines[interlude.anchor + 1])
-                                  : null,
-                              speakerOrder,
-                            )
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: _InterludeDots(
-                          key: const ValueKey('interlude-dots'),
-                          elapsed: adjustedPosition - animationStart!,
-                          duration: animationDuration,
-                          immediate:
-                              interlude.anchor < 0 && resetPosition == null,
-                          fontSize: fontSize,
-                          screenHeight: MediaQuery.sizeOf(context).height,
-                          compact: MediaQuery.sizeOf(context).width <= 500,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: fontSize * _lyricVerticalPaddingEm,
+                      ),
+                      child: SizedBox(
+                        height: interludeSpacer,
+                        child: Align(
+                          alignment:
+                              _isRightAligned(
+                                interlude.anchor + 1 < lines.length
+                                    ? _lineSpeaker(lines[interlude.anchor + 1])
+                                    : null,
+                                speakerOrder,
+                              )
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: _InterludeDots(
+                            key: const ValueKey('interlude-dots'),
+                            elapsed: adjustedPosition - animationStart!,
+                            duration: animationDuration,
+                            immediate:
+                                interlude.anchor < 0 && resetPosition == null,
+                            fontSize: fontSize,
+                            screenHeight: MediaQuery.sizeOf(context).height,
+                          ),
                         ),
                       ),
                     ),
@@ -1558,7 +2043,6 @@ class _InterludeDots extends StatelessWidget {
     required this.immediate,
     required this.fontSize,
     required this.screenHeight,
-    required this.compact,
     super.key,
   });
 
@@ -1567,7 +2051,6 @@ class _InterludeDots extends StatelessWidget {
   final bool immediate;
   final double fontSize;
   final double screenHeight;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -1672,10 +2155,7 @@ class _InterludeDots extends StatelessWidget {
     return SizedBox(
       height: dotHeight + fontSize * .8,
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: compact ? 20 : fontSize,
-          vertical: fontSize * .4,
-        ),
+        padding: EdgeInsets.symmetric(vertical: fontSize * .4),
         child: Opacity(
           opacity: opacity.clamp(0.0, 1.0),
           child: Transform.scale(
@@ -1799,7 +2279,7 @@ class _UntimedLyricsList extends StatelessWidget {
             style: TextStyle(
               color: Colors.white.withAlpha(230),
               fontSize: 22,
-              fontWeight: FontWeight.w600,
+              fontWeight: _lyricMainFontWeight,
               height: 1.2,
             ),
           ),
@@ -1823,7 +2303,7 @@ List<Duration> _calculateLyricLineDelays(
   final first = math.max(0, focus - 6);
   final last = math.min(lines.length, focus + 9);
   var delay = Duration.zero;
-  var baseDelay = const Duration(milliseconds: 50);
+  var baseDelay = const Duration(milliseconds: 45);
   for (var index = first; index < last; index++) {
     delays[index] = delay;
     delay += baseDelay;
@@ -1861,6 +2341,17 @@ SpringDescription _lyricPositionSpring(List<LyricLine> lines, int activeIndex) {
     stiffness: stiffness,
     damping: math.sqrt(stiffness) * 2.2,
   );
+}
+
+double _shapeLyricSpringEntrance(double progress) {
+  const entranceWindow = .2;
+  if (progress <= 0 || progress >= entranceWindow) return progress;
+
+  // 只放慢弹簧最开始的一小段，并让窗口末端的一阶速度与原弹簧连续，
+  // 因此中后段的回弹、阻尼和最终落点都保持原有行为。
+  final normalized = progress / entranceWindow;
+  final eased = normalized * normalized * (2 - normalized);
+  return entranceWindow * eased;
 }
 
 class _AnimatedLyricRow extends StatelessWidget {
@@ -1961,7 +2452,7 @@ class _AnimatedLyricRow extends StatelessWidget {
                           baseAlpha: .2 + .2 * maskProgress,
                           highlightAlpha: .2 + .8 * maskProgress,
                           fontSize: fontSize,
-                          weight: FontWeight(450),
+                          weight: _lyricMainFontWeight,
                           textAlign: isDuet ? TextAlign.end : TextAlign.start,
                           animateWords: active && line.words.isNotEmpty,
                           emphasizeLongWords: active && line.words.isNotEmpty,
@@ -1977,7 +2468,7 @@ class _AnimatedLyricRow extends StatelessWidget {
                           position: position,
                           color: Colors.white.withAlpha(77),
                           fontSize: _translationFontSize(fontSize),
-                          weight: FontWeight.w500,
+                          weight: _lyricTranslationFontWeight,
                           textAlign: isDuet ? TextAlign.end : TextAlign.start,
                           lineHeight: 1.5,
                           animateWords: false,
@@ -2008,16 +2499,17 @@ class _AnimatedLyricRow extends StatelessWidget {
       animation: lineMotion,
       child: RepaintBoundary(child: content),
       builder: (context, child) {
-        // AMLL 为每个可见行累加约 50ms 的延迟，并在焦点行之后逐步缩短延迟。
+        // AMLL 为每个可见行累加约 45ms 的延迟，并在焦点行之后逐步缩短延迟。
         // 这里使用同一时钟计算每行自己的时间段，避免整列表同帧跳动。
         final elapsed =
             lineMotion.value *
                 _lyricLineMotionDuration.inMicroseconds /
                 1000000 -
             lineDelay.inMicroseconds / 1000000;
-        final eased = elapsed <= 0
+        final springProgress = elapsed <= 0
             ? 0.0
             : SpringSimulation(lineSpring, 0, 1, 0).x(elapsed).clamp(0.0, 1.05);
+        final eased = _shapeLyricSpringEntrance(springProgress);
         // 列表先跳到新的焦点位置，再用 FLIP 偏移从旧画面归位。
         // 每一行拥有独立延迟，因此不会出现所有行同帧同步抖动。
         final offset = (1 - eased) * lineScrollDelta;
@@ -2096,7 +2588,7 @@ class _AnimatedBackgroundLyric extends StatelessWidget {
         position: position,
         color: Colors.white.withAlpha(77),
         fontSize: _translationFontSize(fontSize),
-        weight: FontWeight.w500,
+        weight: _lyricTranslationFontWeight,
         textAlign: _variantAlignment(variant, line, speakerOrder),
         lineHeight: 1.5,
         animateWords: false,
@@ -2141,7 +2633,7 @@ class _AnimatedBackgroundLyric extends StatelessWidget {
             baseAlpha: .2 + .2 * maskProgress,
             highlightAlpha: .2 + .8 * maskProgress,
             fontSize: _backgroundFontSize(fontSize),
-            weight: FontWeight.w600,
+            weight: _lyricBackgroundFontWeight,
             textAlign: backgroundRightAligned ? TextAlign.end : TextAlign.start,
             animateWords: active && variant.words.isNotEmpty,
             emphasizeLongWords: active && variant.words.isNotEmpty,
@@ -2218,48 +2710,29 @@ class _LyricText extends StatelessWidget {
         overflow: TextOverflow.clip,
       );
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SizedBox(
-          width: constraints.maxWidth,
-          child: CustomPaint(
-            painter: _KaraokeLyricPainter(
-              text: text,
-              words: words,
-              position: position,
-              style: style,
-              textDirection: Directionality.of(context),
-              locale: locale,
-              textAlign: textAlign,
-              textScaler: MediaQuery.textScalerOf(context),
-              textHeightBehavior: textHeightBehavior,
-              textWidthBasis: defaultTextStyle.textWidthBasis,
-              active: active,
-              highlightAlpha: highlightAlpha,
-              animateWords: animateWords,
-              emphasizeLongWords: emphasizeLongWords,
-              isBackground: isBackground,
-            ),
-            child: Text(
-              text,
-              textAlign: textAlign,
-              style: style.copyWith(color: Colors.transparent),
-              locale: locale,
-              textHeightBehavior: textHeightBehavior,
-              textWidthBasis: defaultTextStyle.textWidthBasis,
-              maxLines: null,
-              softWrap: true,
-              overflow: TextOverflow.clip,
-            ),
-          ),
-        );
-      },
+    return _KaraokeLyricView(
+      text: text,
+      words: words,
+      position: position,
+      style: style,
+      textDirection: Directionality.of(context),
+      locale: locale,
+      textAlign: textAlign,
+      textScaler: MediaQuery.textScalerOf(context),
+      textHeightBehavior: textHeightBehavior,
+      textWidthBasis: defaultTextStyle.textWidthBasis,
+      active: active,
+      baseAlpha: baseAlpha ?? color.a,
+      highlightAlpha: highlightAlpha,
+      animateWords: animateWords,
+      emphasizeLongWords: emphasizeLongWords,
+      isBackground: isBackground,
     );
   }
 }
 
-class _KaraokeLyricPainter extends CustomPainter {
-  const _KaraokeLyricPainter({
+class _KaraokeLyricView extends StatefulWidget {
+  const _KaraokeLyricView({
     required this.text,
     required this.words,
     required this.position,
@@ -2271,6 +2744,7 @@ class _KaraokeLyricPainter extends CustomPainter {
     required this.textHeightBehavior,
     required this.textWidthBasis,
     required this.active,
+    required this.baseAlpha,
     required this.highlightAlpha,
     required this.animateWords,
     required this.emphasizeLongWords,
@@ -2288,14 +2762,143 @@ class _KaraokeLyricPainter extends CustomPainter {
   final TextHeightBehavior? textHeightBehavior;
   final TextWidthBasis textWidthBasis;
   final bool active;
+  final double baseAlpha;
   final double highlightAlpha;
   final bool animateWords;
   final bool emphasizeLongWords;
   final bool isBackground;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final painter = _createLyricPainter(
+  State<_KaraokeLyricView> createState() => _KaraokeLyricViewState();
+}
+
+class _KaraokeLyricViewState extends State<_KaraokeLyricView> {
+  _KaraokeTextLayout? _layout;
+
+  _KaraokeTextLayout _layoutFor(double width) {
+    final style = widget.style.copyWith(color: Colors.white);
+    final cached = _layout;
+    if (cached != null &&
+        cached.matches(
+          text: widget.text,
+          words: widget.words,
+          style: style,
+          textDirection: widget.textDirection,
+          locale: widget.locale,
+          textAlign: widget.textAlign,
+          textScaler: widget.textScaler,
+          textHeightBehavior: widget.textHeightBehavior,
+          textWidthBasis: widget.textWidthBasis,
+          width: width,
+        )) {
+      return cached;
+    }
+
+    // 播放时只改变遮罩与绘制变换；固定字形布局和选择框，避免每帧重新整形文字。
+    final replacement = _KaraokeTextLayout(
+      text: widget.text,
+      words: widget.words,
+      style: style,
+      textDirection: widget.textDirection,
+      locale: widget.locale,
+      textAlign: widget.textAlign,
+      textScaler: widget.textScaler,
+      textHeightBehavior: widget.textHeightBehavior,
+      textWidthBasis: widget.textWidthBasis,
+      width: width,
+    );
+    cached?.dispose();
+    return _layout = replacement;
+  }
+
+  @override
+  void dispose() {
+    _layout?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final layout = _layoutFor(width);
+        final textSize = Size(width, layout.painter.height);
+        final glowBleed = widget.active && widget.emphasizeLongWords
+            ? widget.style.fontSize! * 1.5
+            : 0.0;
+        final paintSize = Size(
+          textSize.width + glowBleed * 2,
+          textSize.height + glowBleed * 2,
+        );
+        return Stack(
+          key: const ValueKey('karaoke-overflow-stack'),
+          clipBehavior: Clip.none,
+          children: [
+            SizedBox.fromSize(size: textSize),
+            Positioned(
+              left: -glowBleed,
+              top: -glowBleed,
+              width: paintSize.width,
+              height: paintSize.height,
+              child: RepaintBoundary(
+                key: const ValueKey('karaoke-expanded-paint-boundary'),
+                child: CustomPaint(
+                  key: const ValueKey('karaoke-glow-paint'),
+                  painter: _KaraokeLyricPainter(
+                    layout: layout,
+                    position: widget.position,
+                    fontSize: widget.style.fontSize!,
+                    contentSize: textSize,
+                    glowBleed: glowBleed,
+                    active: widget.active,
+                    baseAlpha: widget.baseAlpha,
+                    highlightAlpha: widget.highlightAlpha,
+                    animateWords: widget.animateWords,
+                    emphasizeLongWords: widget.emphasizeLongWords,
+                    isBackground: widget.isBackground,
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(glowBleed),
+                    child: SizedBox.fromSize(
+                      size: textSize,
+                      child: Text(
+                        widget.text,
+                        textAlign: widget.textAlign,
+                        style: widget.style.copyWith(color: Colors.transparent),
+                        locale: widget.locale,
+                        textHeightBehavior: widget.textHeightBehavior,
+                        textWidthBasis: widget.textWidthBasis,
+                        maxLines: null,
+                        softWrap: true,
+                        overflow: TextOverflow.clip,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _KaraokeTextLayout {
+  _KaraokeTextLayout({
+    required this.text,
+    required this.words,
+    required this.style,
+    required this.textDirection,
+    required this.locale,
+    required this.textAlign,
+    required this.textScaler,
+    required this.textHeightBehavior,
+    required this.textWidthBasis,
+    required this.width,
+  }) {
+    painter = _createLyricPainter(
       text: text,
       style: style,
       textDirection: textDirection,
@@ -2304,53 +2907,261 @@ class _KaraokeLyricPainter extends CustomPainter {
       textScaler: textScaler,
       textHeightBehavior: textHeightBehavior,
       textWidthBasis: textWidthBasis,
-      width: size.width,
+      width: width,
     );
-    final brightPainter = _createLyricPainter(
-      text: text,
-      style: style.copyWith(
-        color: Colors.white.withValues(alpha: highlightAlpha.clamp(0.0, 1.0)),
-      ),
+    wordLayouts = _buildKaraokeWordLayouts(
+      text,
+      words,
+      painter,
+      style: style,
       textDirection: textDirection,
       locale: locale,
-      textAlign: textAlign,
       textScaler: textScaler,
       textHeightBehavior: textHeightBehavior,
       textWidthBasis: textWidthBasis,
-      width: size.width,
     );
-    if (!active || !animateWords || words.isEmpty) {
-      painter.paint(canvas, Offset.zero);
+  }
+
+  final String text;
+  final List<LyricWord> words;
+  final TextStyle style;
+  final TextDirection textDirection;
+  final Locale? locale;
+  final TextAlign textAlign;
+  final TextScaler textScaler;
+  final TextHeightBehavior? textHeightBehavior;
+  final TextWidthBasis textWidthBasis;
+  final double width;
+  late final TextPainter painter;
+  late final List<_KaraokeWordLayout> wordLayouts;
+
+  bool matches({
+    required String text,
+    required List<LyricWord> words,
+    required TextStyle style,
+    required TextDirection textDirection,
+    required Locale? locale,
+    required TextAlign textAlign,
+    required TextScaler textScaler,
+    required TextHeightBehavior? textHeightBehavior,
+    required TextWidthBasis textWidthBasis,
+    required double width,
+  }) =>
+      this.text == text &&
+      _sameLyricWords(this.words, words) &&
+      this.style == style &&
+      this.textDirection == textDirection &&
+      this.locale == locale &&
+      this.textAlign == textAlign &&
+      this.textScaler == textScaler &&
+      this.textHeightBehavior == textHeightBehavior &&
+      this.textWidthBasis == textWidthBasis &&
+      this.width == width;
+
+  void dispose() {
+    for (final word in wordLayouts) {
+      for (final character in word.characters) {
+        character.dispose();
+      }
+    }
+    painter.dispose();
+  }
+}
+
+class _KaraokeWordLayout {
+  const _KaraokeWordLayout({
+    required this.word,
+    required this.boxes,
+    required this.characters,
+  });
+
+  final LyricWord word;
+  final List<TextBox> boxes;
+  final List<_KaraokeCharacterLayout> characters;
+}
+
+class _KaraokeCharacterLayout {
+  _KaraokeCharacterLayout({
+    required this.grapheme,
+    required this.boxes,
+    required this.painter,
+    required this.paintOffsets,
+  });
+
+  final String grapheme;
+  final List<TextBox> boxes;
+  final TextPainter painter;
+  final List<Offset> paintOffsets;
+
+  void dispose() => painter.dispose();
+}
+
+List<_KaraokeWordLayout> _buildKaraokeWordLayouts(
+  String text,
+  List<LyricWord> words,
+  TextPainter painter, {
+  required TextStyle style,
+  required TextDirection textDirection,
+  required Locale? locale,
+  required TextScaler textScaler,
+  required TextHeightBehavior? textHeightBehavior,
+  required TextWidthBasis textWidthBasis,
+}) {
+  final ranges = _wordRanges(text, words);
+  return List.generate(words.length, (index) {
+    final word = words[index];
+    final range = ranges[index];
+    final boxes = painter.getBoxesForSelection(
+      TextSelection(baseOffset: range.$1, extentOffset: range.$2),
+    );
+    final wordEnd =
+        word.end ??
+        (index + 1 < words.length
+            ? words[index + 1].start
+            : word.start + const Duration(milliseconds: 350));
+    if (!_shouldEmphasizeWord(word.text, wordEnd - word.start)) {
+      return _KaraokeWordLayout(
+        word: word,
+        boxes: List.unmodifiable(boxes),
+        characters: const [],
+      );
+    }
+
+    var charOffset = range.$1;
+    final characters = <_KaraokeCharacterLayout>[];
+    for (final grapheme in word.text.trim().characters) {
+      final start = text.indexOf(grapheme, charOffset);
+      if (start < 0 || start >= range.$2) continue;
+      final finish = math.min(range.$2, start + grapheme.length);
+      charOffset = finish;
+      final charBoxes = painter.getBoxesForSelection(
+        TextSelection(baseOffset: start, extentOffset: finish),
+      );
+      final characterPainter = TextPainter(
+        text: TextSpan(text: grapheme, style: style),
+        textDirection: textDirection,
+        locale: locale,
+        textScaler: textScaler,
+        textHeightBehavior: textHeightBehavior,
+        textWidthBasis: textWidthBasis,
+      )..layout();
+      final localBoxes = characterPainter.getBoxesForSelection(
+        TextSelection(baseOffset: 0, extentOffset: grapheme.length),
+      );
+      final localBox = localBoxes.firstOrNull;
+      if (localBox == null) {
+        characterPainter.dispose();
+        continue;
+      }
+      characters.add(
+        _KaraokeCharacterLayout(
+          grapheme: grapheme,
+          boxes: List.unmodifiable(charBoxes),
+          painter: characterPainter,
+          paintOffsets: List.unmodifiable(
+            charBoxes.map(
+              (box) => Offset(box.left - localBox.left, box.top - localBox.top),
+            ),
+          ),
+        ),
+      );
+    }
+    return _KaraokeWordLayout(
+      word: word,
+      boxes: List.unmodifiable(boxes),
+      characters: List.unmodifiable(characters),
+    );
+  }, growable: false);
+}
+
+bool _sameLyricWords(List<LyricWord> left, List<LyricWord> right) {
+  if (identical(left, right)) return true;
+  if (left.length != right.length) return false;
+  for (var index = 0; index < left.length; index++) {
+    final first = left[index];
+    final second = right[index];
+    if (first.start != second.start ||
+        first.end != second.end ||
+        first.text != second.text ||
+        first.speaker != second.speaker) {
+      return false;
+    }
+  }
+  return true;
+}
+
+class _KaraokeLyricPainter extends CustomPainter {
+  const _KaraokeLyricPainter({
+    required this.layout,
+    required this.position,
+    required this.fontSize,
+    required this.contentSize,
+    required this.glowBleed,
+    required this.active,
+    required this.baseAlpha,
+    required this.highlightAlpha,
+    required this.animateWords,
+    required this.emphasizeLongWords,
+    required this.isBackground,
+  });
+
+  final _KaraokeTextLayout layout;
+  final Duration position;
+  final double fontSize;
+  final Size contentSize;
+  final double glowBleed;
+  final bool active;
+  final double baseAlpha;
+  final double highlightAlpha;
+  final bool animateWords;
+  final bool emphasizeLongWords;
+  final bool isBackground;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final painter = layout.painter;
+    canvas.save();
+    canvas.translate(glowBleed, glowBleed);
+    if (!active || !animateWords || layout.wordLayouts.isEmpty) {
+      _paintTextWithAlpha(
+        canvas,
+        painter,
+        Offset.zero,
+        Offset.zero & contentSize,
+        baseAlpha,
+      );
+      canvas.restore();
       return;
     }
 
-    // 光晕需要在整句隔离层中合成，避免单个字符的清除和变换影响相邻字符。
-    final glowBleed = style.fontSize! * 1.5;
+    // 绘制节点本身带有额外缓冲区，图层范围覆盖字形、缩放和模糊的扩散区域。
     canvas.saveLayer(
       Rect.fromLTRB(
         -glowBleed,
         -glowBleed,
-        size.width + glowBleed,
-        size.height + glowBleed,
+        contentSize.width + glowBleed,
+        contentSize.height + glowBleed,
       ),
       Paint(),
     );
-    painter.paint(canvas, Offset.zero);
-    final ranges = _wordRanges(text, words);
+    _paintTextWithAlpha(
+      canvas,
+      painter,
+      Offset.zero,
+      Offset.zero & contentSize,
+      baseAlpha,
+    );
     final elapsedAt = position.inMicroseconds;
-    for (var index = 0; index < words.length; index++) {
-      final word = words[index];
-      final range = ranges[index];
-      if (range.$2 <= range.$1) continue;
-      final boxes = painter.getBoxesForSelection(
-        TextSelection(baseOffset: range.$1, extentOffset: range.$2),
-      );
+    for (var index = 0; index < layout.wordLayouts.length; index++) {
+      final wordLayout = layout.wordLayouts[index];
+      final word = wordLayout.word;
+      final boxes = wordLayout.boxes;
       if (boxes.isEmpty) continue;
 
       final end =
           word.end ??
-          (index + 1 < words.length
-              ? words[index + 1].start
+          (index + 1 < layout.wordLayouts.length
+              ? layout.wordLayouts[index + 1].word.start
               : word.start + const Duration(milliseconds: 350));
       final elapsed = position - word.start;
       final total = end - word.start;
@@ -2361,33 +3172,37 @@ class _KaraokeLyricPainter extends CustomPainter {
         const Duration(milliseconds: 1000).inMicroseconds,
         total.inMicroseconds,
       );
-      final isLastWord = index == words.length - 1;
+      final isLastWord = index == layout.wordLayouts.length - 1;
       final baseFloatProgress = (elapsed.inMicroseconds / duration).clamp(
         0.0,
         1.0,
       );
       final floatOffset =
-          style.fontSize! * .06 * Curves.easeOut.transform(baseFloatProgress);
+          fontSize * .07 * Curves.easeOut.transform(baseFloatProgress);
       if (elapsed < Duration.zero && floatOffset <= 0) continue;
 
+      final painterOffset = Offset(0, -floatOffset);
       for (final box in boxes) {
         final rect = box.toRect();
         if (rect.width <= 0) continue;
-        final isRtl = box.direction == TextDirection.rtl;
-        final painterOffset = Offset(0, -floatOffset);
         final floatingRect = rect.shift(painterOffset);
-        // 仅在隔离层中清除原字形，再按同一组字形度量绘制浮动词，避免重影。
-        canvas.drawRect(rect, Paint()..blendMode = BlendMode.clear);
         canvas.save();
         canvas.clipRect(floatingRect);
-        painter.paint(canvas, painterOffset);
+        _paintTextWithAlpha(
+          canvas,
+          painter,
+          painterOffset,
+          floatingRect,
+          baseAlpha,
+        );
         _paintWordHighlight(
           canvas,
-          brightPainter,
+          painter,
           floatingRect,
           progress,
-          isRtl,
+          box.direction == TextDirection.rtl,
           painterOffset,
+          highlightAlpha,
         );
         canvas.restore();
       }
@@ -2400,17 +3215,16 @@ class _KaraokeLyricPainter extends CustomPainter {
             .reduce((left, right) => left.expandToInclude(right));
         _paintWordEmphasis(
           canvas,
-          text: text,
-          range: range,
-          painter: painter,
-          brightPainter: brightPainter,
-          style: style,
+          characters: wordLayout.characters,
+          fontSize: fontSize,
           word: word,
           end: end,
           elapsedMicroseconds: elapsedAt - word.start.inMicroseconds,
           isLastWord: isLastWord,
           isBackground: isBackground,
-          painterOffset: Offset(0, -floatOffset),
+          baseAlpha: baseAlpha,
+          highlightAlpha: highlightAlpha,
+          painterOffset: painterOffset,
           highlightProgress: progress,
           isRtl: boxes.first.direction == TextDirection.rtl,
           wordRect: wordRect.shift(Offset(0, -floatOffset)),
@@ -2418,15 +3232,17 @@ class _KaraokeLyricPainter extends CustomPainter {
       }
     }
     canvas.restore();
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant _KaraokeLyricPainter oldDelegate) =>
-      oldDelegate.position != position ||
+      (oldDelegate.position != position &&
+          (active && animateWords ||
+              oldDelegate.active && oldDelegate.animateWords)) ||
+      oldDelegate.layout != layout ||
+      oldDelegate.baseAlpha != baseAlpha ||
       oldDelegate.active != active ||
-      oldDelegate.text != text ||
-      oldDelegate.words != words ||
-      oldDelegate.style != style ||
       oldDelegate.highlightAlpha != highlightAlpha ||
       oldDelegate.animateWords != animateWords ||
       oldDelegate.emphasizeLongWords != emphasizeLongWords ||
@@ -2460,10 +3276,14 @@ void _paintWordHighlight(
   double progress,
   bool isRtl,
   Offset painterOffset,
+  double alpha,
 ) {
   if (progress <= 0) return;
   final mask = _createWordHighlightMask(wordRect, progress, isRtl);
-  canvas.saveLayer(mask.rect, Paint());
+  canvas.saveLayer(
+    mask.rect,
+    Paint()..color = Colors.white.withValues(alpha: alpha.clamp(0.0, 1.0)),
+  );
   canvas.clipRect(wordRect);
   painter.paint(canvas, painterOffset);
   canvas.drawRect(
@@ -2472,6 +3292,27 @@ void _paintWordHighlight(
       ..shader = mask.shader
       ..blendMode = BlendMode.dstIn,
   );
+  canvas.restore();
+}
+
+void _paintTextWithAlpha(
+  Canvas canvas,
+  TextPainter painter,
+  Offset offset,
+  Rect bounds,
+  double alpha,
+) {
+  final boundedAlpha = alpha.clamp(0.0, 1.0);
+  if (boundedAlpha <= 0) return;
+  if (boundedAlpha >= 1) {
+    painter.paint(canvas, offset);
+    return;
+  }
+  canvas.saveLayer(
+    bounds,
+    Paint()..color = Colors.white.withValues(alpha: boundedAlpha),
+  );
+  painter.paint(canvas, offset);
   canvas.restore();
 }
 
@@ -2526,16 +3367,15 @@ void _paintWordHighlight(
 
 void _paintWordEmphasis(
   Canvas canvas, {
-  required String text,
-  required (int, int) range,
-  required TextPainter painter,
-  required TextPainter brightPainter,
-  required TextStyle style,
+  required List<_KaraokeCharacterLayout> characters,
+  required double fontSize,
   required LyricWord word,
   required Duration end,
   required int elapsedMicroseconds,
   required bool isLastWord,
   required bool isBackground,
+  required double baseAlpha,
+  required double highlightAlpha,
   required Offset painterOffset,
   required double highlightProgress,
   required bool isRtl,
@@ -2559,40 +3399,31 @@ void _paintWordEmphasis(
   }
   amount = math.min(1.2, amount);
   blur = math.min(.8, blur);
-  final graphemes = word.text.trim().characters.toList();
-  if (graphemes.isEmpty) return;
+  if (characters.isEmpty) return;
 
-  var charOffset = range.$1;
-  for (var index = 0; index < graphemes.length; index++) {
-    final grapheme = graphemes[index];
-    final start = text.indexOf(grapheme, charOffset);
-    if (start < 0 || start >= range.$2) continue;
-    final finish = math.min(range.$2, start + grapheme.length);
-    charOffset = finish;
-    final delay = duration / 2.5 / graphemes.length * index;
+  for (var index = 0; index < characters.length; index++) {
+    final character = characters[index];
+    final delay = duration / 2.5 / characters.length * index;
     final progress = ((elapsedMicroseconds - delay) / animationDuration).clamp(
       0.0,
       1.0,
     );
     if (progress <= 0) continue;
 
-    final charBoxes = painter.getBoxesForSelection(
-      TextSelection(baseOffset: start, extentOffset: finish),
-    );
-    if (charBoxes.isEmpty) continue;
+    if (character.boxes.isEmpty) continue;
     final emphasized = _amllEmphasisEase(progress);
     final glow = emphasized * blur;
     final floatProgress =
         ((elapsedMicroseconds - delay + 400000) / (animationDuration * 1.4))
             .clamp(0.0, 1.0);
     final floatOffset =
-        -math.sin(math.pi * floatProgress) * (isBackground ? 0.12 : 0.06);
+        -math.sin(math.pi * floatProgress) * (isBackground ? 0.13 : 0.07);
     final scale = 1 + emphasized * .1 * amount;
     final horizontalOffset =
-        -emphasized * .03 * amount * (graphemes.length / 2 - index);
+        -emphasized * .03 * amount * (characters.length / 2 - index);
     final verticalOffset = -emphasized * .03 * amount + floatOffset;
 
-    final blurSigma = math.max(.8, glow * style.fontSize! * .3);
+    final blurSigma = math.max(.8, glow * fontSize * .3);
     final glowAlpha = (glow * 510).round().clamp(0, 255);
     final glowPaint = Paint()
       ..colorFilter = ColorFilter.mode(
@@ -2600,65 +3431,138 @@ void _paintWordEmphasis(
         BlendMode.srcIn,
       )
       ..imageFilter = ui.ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma);
-    for (final charBox in charBoxes) {
+
+    final animatedCharacters = <_AnimatedCharacterPaint>[];
+    for (var boxIndex = 0; boxIndex < character.boxes.length; boxIndex++) {
+      final charBox = character.boxes[boxIndex];
       final charRect = charBox.toRect().shift(painterOffset);
       final center = charRect.center;
+      final characterPaintOffset =
+          character.paintOffsets[boxIndex] + painterOffset;
       final characterOffset = Offset(
-        horizontalOffset * style.fontSize!,
-        verticalOffset * style.fontSize!,
+        horizontalOffset * fontSize,
+        verticalOffset * fontSize,
       );
       final transformedRect = charRect.shift(characterOffset);
+      final scaleBleed = (scale - 1) * charRect.shortestSide / 2;
       final highlightMask = _createWordHighlightMask(
         wordRect,
         highlightProgress,
         isRtl,
       );
-
-      // AMLL 的字符动画使用 composite: replace。先清除原字符，再绘制
-      // 变换后的暗色底字和亮色辉光，避免原位置残留第二个影子。
-      canvas.drawRect(
-        charRect.inflate(1),
-        Paint()..blendMode = BlendMode.clear,
+      animatedCharacters.add(
+        _AnimatedCharacterPaint(
+          character: character,
+          charRect: charRect,
+          center: center,
+          characterPaintOffset: characterPaintOffset,
+          characterOffset: characterOffset,
+          scale: scale,
+          scaleBleed: scaleBleed,
+          transformedRect: transformedRect,
+          highlightMask: highlightMask,
+        ),
       );
-      canvas.save();
-      canvas.translate(characterOffset.dx, characterOffset.dy);
-      canvas.translate(center.dx, center.dy);
-      canvas.scale(scale, scale);
-      canvas.translate(-center.dx, -center.dy);
-      canvas.clipRect(charRect.inflate(blurSigma));
-      painter.paint(canvas, painterOffset);
+    }
+
+    // 先清除所有原字形，再绘制动画，避免后一个字符清掉前一个字符的辉光。
+    for (final item in animatedCharacters) {
+      final clearBounds = item.transformedRect.inflate(item.scaleBleed + 2);
+      canvas.saveLayer(
+        clearBounds,
+        Paint()..blendMode = BlendMode.dstOut,
+      );
+      _paintTransformedCharacter(
+        canvas,
+        item,
+        (character) => character.painter.paint(
+          canvas,
+          item.characterPaintOffset,
+        ),
+      );
+      canvas.restore();
+    }
+
+    for (final item in animatedCharacters) {
+      final characterLayerBounds = item.transformedRect.inflate(
+        math.max(fontSize * .5, blurSigma * 4) + item.scaleBleed + 2,
+      );
+
+      // 辉光只由字符自己的强调进度控制，不再被逐字进度遮罩截断。
+      canvas.saveLayer(characterLayerBounds, glowPaint);
+      _paintTransformedCharacter(
+        canvas,
+        item,
+        (character) => _paintTextWithAlpha(
+          canvas,
+          character.painter,
+          item.characterPaintOffset,
+          item.charRect,
+          highlightAlpha,
+        ),
+      );
       canvas.restore();
 
-      canvas.saveLayer(transformedRect.inflate(blurSigma * 3), Paint());
-      canvas.saveLayer(transformedRect.inflate(blurSigma * 3), glowPaint);
-      canvas.save();
-      canvas.translate(characterOffset.dx, characterOffset.dy);
-      canvas.translate(center.dx, center.dy);
-      canvas.scale(scale, scale);
-      canvas.translate(-center.dx, -center.dy);
-      canvas.clipRect(charRect.inflate(blurSigma));
-      brightPainter.paint(canvas, painterOffset);
-      canvas.restore();
-      canvas.restore();
-
-      // text-shadow 只负责光晕，清晰的高亮字符需要在模糊层之后再次绘制。
-      canvas.save();
-      canvas.translate(characterOffset.dx, characterOffset.dy);
-      canvas.translate(center.dx, center.dy);
-      canvas.scale(scale, scale);
-      canvas.translate(-center.dx, -center.dy);
-      canvas.clipRect(charRect.inflate(blurSigma));
-      brightPainter.paint(canvas, painterOffset);
-      canvas.restore();
+      // 清晰字形保留原有的高亮羽化边缘。
+      canvas.saveLayer(characterLayerBounds, Paint());
+      _paintTransformedCharacter(
+        canvas,
+        item,
+        (character) => _paintTextWithAlpha(
+          canvas,
+          character.painter,
+          item.characterPaintOffset,
+          item.charRect,
+          highlightAlpha,
+        ),
+      );
       canvas.drawRect(
-        highlightMask.rect,
+        item.highlightMask.rect,
         Paint()
-          ..shader = highlightMask.shader
+          ..shader = item.highlightMask.shader
           ..blendMode = BlendMode.dstIn,
       );
       canvas.restore();
     }
   }
+}
+
+class _AnimatedCharacterPaint {
+  const _AnimatedCharacterPaint({
+    required this.character,
+    required this.charRect,
+    required this.center,
+    required this.characterPaintOffset,
+    required this.characterOffset,
+    required this.scale,
+    required this.scaleBleed,
+    required this.transformedRect,
+    required this.highlightMask,
+  });
+
+  final _KaraokeCharacterLayout character;
+  final Rect charRect;
+  final Offset center;
+  final Offset characterPaintOffset;
+  final Offset characterOffset;
+  final double scale;
+  final double scaleBleed;
+  final Rect transformedRect;
+  final ({Rect rect, Shader shader, double fadeWidth}) highlightMask;
+}
+
+void _paintTransformedCharacter(
+  Canvas canvas,
+  _AnimatedCharacterPaint item,
+  void Function(_KaraokeCharacterLayout character) paintCharacter,
+) {
+  canvas.save();
+  canvas.translate(item.characterOffset.dx, item.characterOffset.dy);
+  canvas.translate(item.center.dx, item.center.dy);
+  canvas.scale(item.scale, item.scale);
+  canvas.translate(-item.center.dx, -item.center.dy);
+  paintCharacter(item.character);
+  canvas.restore();
 }
 
 double _amllEmphasisEase(double value) {
@@ -2948,7 +3852,7 @@ double _measureLyricRowExtent(
     line.text,
     context: context,
     fontSize: lyricFontSize,
-    weight: FontWeight.w600,
+    weight: _lyricMainFontWeight,
     lineHeight: 1.2,
     defaultTextStyle: defaultTextStyle,
     textHeightBehavior: textHeightBehavior,
@@ -2963,7 +3867,7 @@ double _measureLyricRowExtent(
       line.translation!,
       context: context,
       fontSize: _translationFontSize(lyricFontSize),
-      weight: FontWeight.w500,
+      weight: _lyricTranslationFontWeight,
       lineHeight: 1.5,
       defaultTextStyle: defaultTextStyle,
       textHeightBehavior: textHeightBehavior,
@@ -2982,7 +3886,9 @@ double _measureLyricRowExtent(
       fontSize: isTranslation
           ? _translationFontSize(lyricFontSize)
           : _backgroundFontSize(lyricFontSize),
-      weight: isTranslation ? FontWeight.w500 : FontWeight.w600,
+      weight: isTranslation
+          ? _lyricTranslationFontWeight
+          : _lyricBackgroundFontWeight,
       lineHeight: isTranslation ? 1.5 : 1.2,
       defaultTextStyle: defaultTextStyle,
       textHeightBehavior: textHeightBehavior,
@@ -3115,6 +4021,20 @@ TextAlign _variantAlignment(
   return _isRightAligned(variant.speaker ?? _lineSpeaker(line), speakerOrder)
       ? TextAlign.end
       : TextAlign.start;
+}
+
+String _artistAlbumLabel(String artist, String album) {
+  final normalizedArtist = artist.trim();
+  final normalizedAlbum = album.trim();
+  if (normalizedArtist.isEmpty) return normalizedAlbum;
+  if (normalizedAlbum.isEmpty) return normalizedArtist;
+  return '$normalizedArtist · $normalizedAlbum';
+}
+
+double _wideCoverDetailsGap(double height) {
+  // 只在较大的窗口中逐步增加间距，避免窗口变高时封面与控制区被拉得过开。
+  final progress = ((height - 560) / 360).clamp(0.0, 1.0);
+  return 16 + progress * 12;
 }
 
 String _formatDuration(Duration duration) {

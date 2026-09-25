@@ -110,6 +110,11 @@ class PlayerController extends Notifier<PlayerState> {
       isPlaying: true,
       position: Duration.zero,
     );
+    await _openCurrentTrack();
+  }
+
+  Future<void> _openCurrentTrack() async {
+    final track = state.currentTrack;
     _stopPlaybackSession();
 
     if (track.path != null) {
@@ -123,6 +128,35 @@ class PlayerController extends Notifier<PlayerState> {
         _stopPlaybackSession();
       }
     }
+  }
+
+  /// 从用户当前浏览的列表建立一次性播放队列，并立即播放点击的曲目。
+  /// 随机模式下只在建队列时洗牌一次，后续播放仍由同一个队列推进。
+  Future<void> playFromList(
+    Iterable<Track> tracks,
+    Track selected, {
+    bool shuffle = false,
+  }) async {
+    final uniqueTracks = <String, Track>{
+      for (final track in tracks) track.id: track,
+    };
+    if (!uniqueTracks.containsKey(selected.id)) return;
+
+    final queue = uniqueTracks.values.toList();
+    var currentIndex = queue.indexWhere((track) => track.id == selected.id);
+    if (shuffle) {
+      queue.shuffle(_random);
+      queue.remove(selected);
+      queue.insert(0, selected);
+      currentIndex = 0;
+    }
+    state = state.copyWith(
+      queue: queue,
+      currentIndex: currentIndex,
+      isPlaying: true,
+      position: Duration.zero,
+    );
+    await _openCurrentTrack();
   }
 
   void setNormalizationEnabled(bool enabled) {
@@ -173,14 +207,6 @@ class PlayerController extends Notifier<PlayerState> {
       }
       return;
     }
-    if (state.shuffleEnabled) {
-      final candidates = [
-        for (var index = 0; index < state.queue.length; index++)
-          if (index != state.currentIndex) index,
-      ];
-      playTrack(state.queue[candidates[_random.nextInt(candidates.length)]]);
-      return;
-    }
     final sequentialIndex = state.currentIndex + 1;
     final nextIndex = sequentialIndex < state.queue.length
         ? sequentialIndex
@@ -193,14 +219,6 @@ class PlayerController extends Notifier<PlayerState> {
 
   void previous() {
     if (state.queue.length < 2) return;
-    if (state.shuffleEnabled) {
-      final candidates = [
-        for (var index = 0; index < state.queue.length; index++)
-          if (index != state.currentIndex) index,
-      ];
-      playTrack(state.queue[candidates[_random.nextInt(candidates.length)]]);
-      return;
-    }
     final previousIndex = state.currentIndex == 0
         ? state.queue.length - 1
         : state.currentIndex - 1;
@@ -208,7 +226,21 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   void toggleShuffle() {
-    state = state.copyWith(shuffleEnabled: !state.shuffleEnabled);
+    if (state.shuffleEnabled) {
+      state = state.copyWith(shuffleEnabled: false);
+    } else {
+      enableShuffleAndReshuffle();
+    }
+  }
+
+  /// 开启随机播放时立即重排当前队列，并保持正在播放的曲目为首项。
+  void enableShuffleAndReshuffle() {
+    if (state.shuffleEnabled) return;
+    final current = state.currentTrack;
+    final queue = [...state.queue]..shuffle(_random);
+    queue.remove(current);
+    queue.insert(0, current);
+    state = state.copyWith(queue: queue, currentIndex: 0, shuffleEnabled: true);
   }
 
   void cycleRepeatMode() {
@@ -228,8 +260,7 @@ class PlayerController extends Notifier<PlayerState> {
       return;
     }
     if (state.currentIndex == state.queue.length - 1 &&
-        state.repeatMode == RepeatMode.off &&
-        !state.shuffleEnabled) {
+        state.repeatMode == RepeatMode.off) {
       state = state.copyWith(isPlaying: false);
       return;
     }

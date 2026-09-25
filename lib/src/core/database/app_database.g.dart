@@ -177,6 +177,28 @@ class $LibraryTracksTable extends LibraryTracks
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _addedAtMeta = const VerificationMeta(
+    'addedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> addedAt = GeneratedColumn<DateTime>(
+    'added_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _modifiedAtMeta = const VerificationMeta(
+    'modifiedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> modifiedAt = GeneratedColumn<DateTime>(
+    'modified_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -206,6 +228,8 @@ class $LibraryTracksTable extends LibraryTracks
     replayGainMode,
     playCount,
     lastPlayedAt,
+    addedAt,
+    modifiedAt,
     updatedAt,
   ];
   @override
@@ -345,6 +369,18 @@ class $LibraryTracksTable extends LibraryTracks
         ),
       );
     }
+    if (data.containsKey('added_at')) {
+      context.handle(
+        _addedAtMeta,
+        addedAt.isAcceptableOrUnknown(data['added_at']!, _addedAtMeta),
+      );
+    }
+    if (data.containsKey('modified_at')) {
+      context.handle(
+        _modifiedAtMeta,
+        modifiedAt.isAcceptableOrUnknown(data['modified_at']!, _modifiedAtMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -426,6 +462,14 @@ class $LibraryTracksTable extends LibraryTracks
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_played_at'],
       ),
+      addedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}added_at'],
+      ),
+      modifiedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}modified_at'],
+      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -456,6 +500,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
   final String? replayGainMode;
   final int playCount;
   final DateTime? lastPlayedAt;
+  final DateTime? addedAt;
+  final DateTime? modifiedAt;
   final DateTime updatedAt;
   const LibraryTrack({
     required this.id,
@@ -474,6 +520,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     this.replayGainMode,
     required this.playCount,
     this.lastPlayedAt,
+    this.addedAt,
+    this.modifiedAt,
     required this.updatedAt,
   });
   @override
@@ -510,6 +558,12 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     map['play_count'] = Variable<int>(playCount);
     if (!nullToAbsent || lastPlayedAt != null) {
       map['last_played_at'] = Variable<DateTime>(lastPlayedAt);
+    }
+    if (!nullToAbsent || addedAt != null) {
+      map['added_at'] = Variable<DateTime>(addedAt);
+    }
+    if (!nullToAbsent || modifiedAt != null) {
+      map['modified_at'] = Variable<DateTime>(modifiedAt);
     }
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -549,6 +603,12 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       lastPlayedAt: lastPlayedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastPlayedAt),
+      addedAt: addedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(addedAt),
+      modifiedAt: modifiedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(modifiedAt),
       updatedAt: Value(updatedAt),
     );
   }
@@ -577,6 +637,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       replayGainMode: serializer.fromJson<String?>(json['replayGainMode']),
       playCount: serializer.fromJson<int>(json['playCount']),
       lastPlayedAt: serializer.fromJson<DateTime?>(json['lastPlayedAt']),
+      addedAt: serializer.fromJson<DateTime?>(json['addedAt']),
+      modifiedAt: serializer.fromJson<DateTime?>(json['modifiedAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
   }
@@ -600,6 +662,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       'replayGainMode': serializer.toJson<String?>(replayGainMode),
       'playCount': serializer.toJson<int>(playCount),
       'lastPlayedAt': serializer.toJson<DateTime?>(lastPlayedAt),
+      'addedAt': serializer.toJson<DateTime?>(addedAt),
+      'modifiedAt': serializer.toJson<DateTime?>(modifiedAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
   }
@@ -621,6 +685,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     Value<String?> replayGainMode = const Value.absent(),
     int? playCount,
     Value<DateTime?> lastPlayedAt = const Value.absent(),
+    Value<DateTime?> addedAt = const Value.absent(),
+    Value<DateTime?> modifiedAt = const Value.absent(),
     DateTime? updatedAt,
   }) => LibraryTrack(
     id: id ?? this.id,
@@ -643,6 +709,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
         : this.replayGainMode,
     playCount: playCount ?? this.playCount,
     lastPlayedAt: lastPlayedAt.present ? lastPlayedAt.value : this.lastPlayedAt,
+    addedAt: addedAt.present ? addedAt.value : this.addedAt,
+    modifiedAt: modifiedAt.present ? modifiedAt.value : this.modifiedAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   LibraryTrack copyWithCompanion(LibraryTracksCompanion data) {
@@ -681,6 +749,10 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       lastPlayedAt: data.lastPlayedAt.present
           ? data.lastPlayedAt.value
           : this.lastPlayedAt,
+      addedAt: data.addedAt.present ? data.addedAt.value : this.addedAt,
+      modifiedAt: data.modifiedAt.present
+          ? data.modifiedAt.value
+          : this.modifiedAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -704,6 +776,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
           ..write('replayGainMode: $replayGainMode, ')
           ..write('playCount: $playCount, ')
           ..write('lastPlayedAt: $lastPlayedAt, ')
+          ..write('addedAt: $addedAt, ')
+          ..write('modifiedAt: $modifiedAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -727,6 +801,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     replayGainMode,
     playCount,
     lastPlayedAt,
+    addedAt,
+    modifiedAt,
     updatedAt,
   );
   @override
@@ -749,6 +825,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
           other.replayGainMode == this.replayGainMode &&
           other.playCount == this.playCount &&
           other.lastPlayedAt == this.lastPlayedAt &&
+          other.addedAt == this.addedAt &&
+          other.modifiedAt == this.modifiedAt &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -769,6 +847,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
   final Value<String?> replayGainMode;
   final Value<int> playCount;
   final Value<DateTime?> lastPlayedAt;
+  final Value<DateTime?> addedAt;
+  final Value<DateTime?> modifiedAt;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
   const LibraryTracksCompanion({
@@ -788,6 +868,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     this.replayGainMode = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lastPlayedAt = const Value.absent(),
+    this.addedAt = const Value.absent(),
+    this.modifiedAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -808,6 +890,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     this.replayGainMode = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lastPlayedAt = const Value.absent(),
+    this.addedAt = const Value.absent(),
+    this.modifiedAt = const Value.absent(),
     required DateTime updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -835,6 +919,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     Expression<String>? replayGainMode,
     Expression<int>? playCount,
     Expression<DateTime>? lastPlayedAt,
+    Expression<DateTime>? addedAt,
+    Expression<DateTime>? modifiedAt,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -855,6 +941,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
       if (replayGainMode != null) 'replay_gain_mode': replayGainMode,
       if (playCount != null) 'play_count': playCount,
       if (lastPlayedAt != null) 'last_played_at': lastPlayedAt,
+      if (addedAt != null) 'added_at': addedAt,
+      if (modifiedAt != null) 'modified_at': modifiedAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -877,6 +965,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     Value<String?>? replayGainMode,
     Value<int>? playCount,
     Value<DateTime?>? lastPlayedAt,
+    Value<DateTime?>? addedAt,
+    Value<DateTime?>? modifiedAt,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -897,6 +987,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
       replayGainMode: replayGainMode ?? this.replayGainMode,
       playCount: playCount ?? this.playCount,
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
+      addedAt: addedAt ?? this.addedAt,
+      modifiedAt: modifiedAt ?? this.modifiedAt,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -953,6 +1045,12 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     if (lastPlayedAt.present) {
       map['last_played_at'] = Variable<DateTime>(lastPlayedAt.value);
     }
+    if (addedAt.present) {
+      map['added_at'] = Variable<DateTime>(addedAt.value);
+    }
+    if (modifiedAt.present) {
+      map['modified_at'] = Variable<DateTime>(modifiedAt.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -981,6 +1079,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
           ..write('replayGainMode: $replayGainMode, ')
           ..write('playCount: $playCount, ')
           ..write('lastPlayedAt: $lastPlayedAt, ')
+          ..write('addedAt: $addedAt, ')
+          ..write('modifiedAt: $modifiedAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1765,6 +1865,8 @@ typedef $$LibraryTracksTableCreateCompanionBuilder =
       Value<String?> replayGainMode,
       Value<int> playCount,
       Value<DateTime?> lastPlayedAt,
+      Value<DateTime?> addedAt,
+      Value<DateTime?> modifiedAt,
       required DateTime updatedAt,
       Value<int> rowid,
     });
@@ -1786,6 +1888,8 @@ typedef $$LibraryTracksTableUpdateCompanionBuilder =
       Value<String?> replayGainMode,
       Value<int> playCount,
       Value<DateTime?> lastPlayedAt,
+      Value<DateTime?> addedAt,
+      Value<DateTime?> modifiedAt,
       Value<DateTime> updatedAt,
       Value<int> rowid,
     });
@@ -1876,6 +1980,16 @@ class $$LibraryTracksTableFilterComposer
 
   ColumnFilters<DateTime> get lastPlayedAt => $composableBuilder(
     column: $table.lastPlayedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get addedAt => $composableBuilder(
+    column: $table.addedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get modifiedAt => $composableBuilder(
+    column: $table.modifiedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1974,6 +2088,16 @@ class $$LibraryTracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get addedAt => $composableBuilder(
+    column: $table.addedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get modifiedAt => $composableBuilder(
+    column: $table.modifiedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -2055,6 +2179,14 @@ class $$LibraryTracksTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<DateTime> get addedAt =>
+      $composableBuilder(column: $table.addedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get modifiedAt => $composableBuilder(
+    column: $table.modifiedAt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
@@ -2106,6 +2238,8 @@ class $$LibraryTracksTableTableManager
                 Value<String?> replayGainMode = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
                 Value<DateTime?> lastPlayedAt = const Value.absent(),
+                Value<DateTime?> addedAt = const Value.absent(),
+                Value<DateTime?> modifiedAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LibraryTracksCompanion(
@@ -2125,6 +2259,8 @@ class $$LibraryTracksTableTableManager
                 replayGainMode: replayGainMode,
                 playCount: playCount,
                 lastPlayedAt: lastPlayedAt,
+                addedAt: addedAt,
+                modifiedAt: modifiedAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -2146,6 +2282,8 @@ class $$LibraryTracksTableTableManager
                 Value<String?> replayGainMode = const Value.absent(),
                 Value<int> playCount = const Value.absent(),
                 Value<DateTime?> lastPlayedAt = const Value.absent(),
+                Value<DateTime?> addedAt = const Value.absent(),
+                Value<DateTime?> modifiedAt = const Value.absent(),
                 required DateTime updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => LibraryTracksCompanion.insert(
@@ -2165,6 +2303,8 @@ class $$LibraryTracksTableTableManager
                 replayGainMode: replayGainMode,
                 playCount: playCount,
                 lastPlayedAt: lastPlayedAt,
+                addedAt: addedAt,
+                modifiedAt: modifiedAt,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

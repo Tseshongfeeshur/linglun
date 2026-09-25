@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/library_controller.dart';
+import '../domain/library_sort.dart';
 import '../../player/application/player_controller.dart';
 import '../../player/domain/track.dart';
 
@@ -14,18 +15,25 @@ class LibraryPage extends ConsumerStatefulWidget {
 
 class _LibraryPageState extends ConsumerState<LibraryPage> {
   String _query = '';
+  LibrarySortField _sortField = LibrarySortField.title;
+  bool _descending = false;
 
   @override
   Widget build(BuildContext context) {
     final libraryState = ref.watch(libraryControllerProvider);
     final sourceTracks = libraryState.tracks;
-    final tracks = sourceTracks.where((track) {
+    final filteredTracks = sourceTracks.where((track) {
       final query = _query.trim().toLowerCase();
       if (query.isEmpty) return true;
       return '${track.title} ${track.artist} ${track.album}'
           .toLowerCase()
           .contains(query);
     }).toList();
+    final tracks = sortLibraryTracks(
+      filteredTracks,
+      field: _sortField,
+      descending: _descending,
+    );
 
     return CustomScrollView(
       slivers: [
@@ -47,10 +55,23 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           ),
         ),
         SliverPadding(
+          padding: const EdgeInsets.fromLTRB(28, 0, 28, 12),
+          sliver: SliverToBoxAdapter(
+            child: _SortBar(
+              field: _sortField,
+              descending: _descending,
+              onFieldChanged: (value) => setState(() => _sortField = value),
+              onDirectionChanged: () =>
+                  setState(() => _descending = !_descending),
+            ),
+          ),
+        ),
+        SliverPadding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
           sliver: SliverList.builder(
             itemCount: tracks.length,
-            itemBuilder: (context, index) => _TrackTile(track: tracks[index]),
+            itemBuilder: (context, index) =>
+                _TrackTile(track: tracks[index], queue: tracks),
           ),
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 28)),
@@ -119,9 +140,10 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
 }
 
 class _TrackTile extends ConsumerWidget {
-  const _TrackTile({required this.track});
+  const _TrackTile({required this.track, required this.queue});
 
   final Track track;
+  final List<Track> queue;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -155,8 +177,13 @@ class _TrackTile extends ConsumerWidget {
             ),
             const SizedBox(width: 8),
             IconButton(
-              onPressed: () =>
-                  ref.read(playerControllerProvider.notifier).playTrack(track),
+              onPressed: () => ref
+                  .read(playerControllerProvider.notifier)
+                  .playFromList(
+                    queue,
+                    track,
+                    shuffle: playerState.shuffleEnabled,
+                  ),
               tooltip: '播放',
               icon: Icon(
                 isCurrent && playerState.isPlaying
@@ -166,8 +193,9 @@ class _TrackTile extends ConsumerWidget {
             ),
           ],
         ),
-        onTap: () =>
-            ref.read(playerControllerProvider.notifier).playTrack(track),
+        onTap: () => ref
+            .read(playerControllerProvider.notifier)
+            .playFromList(queue, track, shuffle: playerState.shuffleEnabled),
       ),
     );
   }
@@ -205,6 +233,47 @@ class _TrackTile extends ConsumerWidget {
     await showDialog<void>(
       context: context,
       builder: (_) => _TrackDetailsDialog(track: track),
+    );
+  }
+}
+
+class _SortBar extends StatelessWidget {
+  const _SortBar({
+    required this.field,
+    required this.descending,
+    required this.onFieldChanged,
+    required this.onDirectionChanged,
+  });
+
+  final LibrarySortField field;
+  final bool descending;
+  final ValueChanged<LibrarySortField> onFieldChanged;
+  final VoidCallback onDirectionChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Text('排序'),
+        const SizedBox(width: 8),
+        DropdownButton<LibrarySortField>(
+          value: field,
+          onChanged: (value) {
+            if (value != null) onFieldChanged(value);
+          },
+          items: [
+            for (final value in LibrarySortField.values)
+              DropdownMenuItem(value: value, child: Text(value.label)),
+          ],
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          onPressed: onDirectionChanged,
+          tooltip: descending ? '切换为升序' : '切换为降序',
+          icon: Icon(descending ? Icons.arrow_downward : Icons.arrow_upward),
+        ),
+        Text(descending ? '降序' : '升序'),
+      ],
     );
   }
 }

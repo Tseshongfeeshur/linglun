@@ -35,6 +35,7 @@ const supportedAudioExtensions = {
 /// 递归扫描目录并将音频文件转换成应用层的曲目模型。
 class LibraryScanner {
   Future<List<Track>> scan(Iterable<String> rootPaths) async {
+    final scanTime = DateTime.now();
     final files = <File>[];
     final visited = <String>{};
 
@@ -58,7 +59,7 @@ class LibraryScanner {
 
     final tracks = <Track>[];
     for (final file in files) {
-      final track = await _readTrack(file);
+      final track = await _readTrack(file, addedAt: scanTime);
       if (track != null) tracks.add(track);
     }
 
@@ -72,8 +73,9 @@ class LibraryScanner {
     return tracks;
   }
 
-  Future<Track?> _readTrack(File file) async {
+  Future<Track?> _readTrack(File file, {required DateTime addedAt}) async {
     try {
+      final modifiedAt = (await file.stat()).modified;
       final detailed = readAllMetadata(file, getImage: true);
       final metadata = _summaryMetadata(file, detailed);
       final fallbackTitle = _fileNameWithoutExtension(file.path);
@@ -99,7 +101,15 @@ class LibraryScanner {
         replayGainDb: replayGain.db,
         replayGainMode: replayGain.mode,
         coverColor: _colorForPath(file.path),
-        metadata: _metadataMap(file, detailed, metadata),
+        addedAt: addedAt,
+        modifiedAt: modifiedAt,
+        metadata: _metadataMap(
+          file,
+          detailed,
+          metadata,
+          addedAt: addedAt,
+          modifiedAt: modifiedAt,
+        ),
       );
     } on Object {
       // 损坏或暂不支持的文件不应中断整个曲库扫描。
@@ -403,8 +413,10 @@ class LibraryScanner {
   Map<String, String> _metadataMap(
     File file,
     ParserTag detailed,
-    AudioMetadata generic,
-  ) {
+    AudioMetadata generic, {
+    required DateTime addedAt,
+    required DateTime modifiedAt,
+  }) {
     final values = <String, String>{'文件路径': file.path};
 
     void add(String key, Object? value) {
@@ -420,6 +432,8 @@ class LibraryScanner {
     add('时长', generic.duration);
     add('采样率', generic.sampleRate == null ? null : '${generic.sampleRate} Hz');
     add('比特率', generic.bitrate == null ? null : '${generic.bitrate} bit/s');
+    add('加入曲库时间', addedAt);
+    add('文件修改时间', modifiedAt);
 
     switch (detailed) {
       case VorbisMetadata m:

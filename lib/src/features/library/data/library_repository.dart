@@ -67,6 +67,8 @@ class LibraryRepository {
           replayGainMode: Value(track.replayGainMode),
           playCount: Value(old?.playCount ?? track.playCount),
           lastPlayedAt: Value(old?.lastPlayedAt ?? track.lastPlayedAt),
+          addedAt: Value(old?.addedAt ?? track.addedAt),
+          modifiedAt: Value(track.modifiedAt),
           updatedAt: DateTime.now(),
         );
       }).toList(),
@@ -91,6 +93,8 @@ class LibraryRepository {
       replayGainMode: row.replayGainMode,
       playCount: row.playCount,
       lastPlayedAt: row.lastPlayedAt,
+      addedAt: row.addedAt,
+      modifiedAt: row.modifiedAt,
       coverColor: row.coverColor,
     );
   }
