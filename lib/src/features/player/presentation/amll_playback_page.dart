@@ -11,6 +11,7 @@ import '../../../core/theme/app_typography.dart';
 import '../application/player_controller.dart';
 import '../domain/lyrics.dart';
 import '../domain/track.dart';
+import 'lyric_emphasis.dart';
 
 const _pageAnimationCurve = Curves.easeOutCubic;
 const _lyricDefaultFontSize = 38.0;
@@ -2824,61 +2825,37 @@ class _KaraokeLyricViewState extends State<_KaraokeLyricView> {
         final width = constraints.maxWidth;
         final layout = _layoutFor(width);
         final textSize = Size(width, layout.painter.height);
-        final glowBleed = widget.active && widget.emphasizeLongWords
-            ? widget.style.fontSize! * 1.5
-            : 0.0;
-        final paintSize = Size(
-          textSize.width + glowBleed * 2,
-          textSize.height + glowBleed * 2,
-        );
-        return Stack(
-          key: const ValueKey('karaoke-overflow-stack'),
-          clipBehavior: Clip.none,
-          children: [
-            SizedBox.fromSize(size: textSize),
-            Positioned(
-              left: -glowBleed,
-              top: -glowBleed,
-              width: paintSize.width,
-              height: paintSize.height,
-              child: RepaintBoundary(
-                key: const ValueKey('karaoke-expanded-paint-boundary'),
-                child: CustomPaint(
-                  key: const ValueKey('karaoke-glow-paint'),
-                  painter: _KaraokeLyricPainter(
-                    layout: layout,
-                    position: widget.position,
-                    fontSize: widget.style.fontSize!,
-                    contentSize: textSize,
-                    glowBleed: glowBleed,
-                    active: widget.active,
-                    baseAlpha: widget.baseAlpha,
-                    highlightAlpha: widget.highlightAlpha,
-                    animateWords: widget.animateWords,
-                    emphasizeLongWords: widget.emphasizeLongWords,
-                    isBackground: widget.isBackground,
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(glowBleed),
-                    child: SizedBox.fromSize(
-                      size: textSize,
-                      child: Text(
-                        widget.text,
-                        textAlign: widget.textAlign,
-                        style: widget.style.copyWith(color: Colors.transparent),
-                        locale: widget.locale,
-                        textHeightBehavior: widget.textHeightBehavior,
-                        textWidthBasis: widget.textWidthBasis,
-                        maxLines: null,
-                        softWrap: true,
-                        overflow: TextOverflow.clip,
-                      ),
-                    ),
-                  ),
-                ),
+        return RepaintBoundary(
+          child: CustomPaint(
+            key: const ValueKey('karaoke-glow-paint'),
+            size: textSize,
+            painter: _KaraokeLyricPainter(
+              layout: layout,
+              position: widget.position,
+              fontSize: widget.style.fontSize!,
+              contentSize: textSize,
+              active: widget.active,
+              baseAlpha: widget.baseAlpha,
+              highlightAlpha: widget.highlightAlpha,
+              animateWords: widget.animateWords,
+              emphasizeLongWords: widget.emphasizeLongWords,
+              isBackground: widget.isBackground,
+            ),
+            child: SizedBox.fromSize(
+              size: textSize,
+              child: Text(
+                widget.text,
+                textAlign: widget.textAlign,
+                style: widget.style.copyWith(color: Colors.transparent),
+                locale: widget.locale,
+                textHeightBehavior: widget.textHeightBehavior,
+                textWidthBasis: widget.textWidthBasis,
+                maxLines: null,
+                softWrap: true,
+                overflow: TextOverflow.clip,
               ),
             ),
-          ],
+          ),
         );
       },
     );
@@ -2909,17 +2886,8 @@ class _KaraokeTextLayout {
       textWidthBasis: textWidthBasis,
       width: width,
     );
-    wordLayouts = _buildKaraokeWordLayouts(
-      text,
-      words,
-      painter,
-      style: style,
-      textDirection: textDirection,
-      locale: locale,
-      textScaler: textScaler,
-      textHeightBehavior: textHeightBehavior,
-      textWidthBasis: textWidthBasis,
-    );
+    wordLayouts = _buildKaraokeWordLayouts(text, words, painter);
+    emphasisGroups = _buildKaraokeEmphasisGroups(text, words, painter);
   }
 
   final String text;
@@ -2934,6 +2902,7 @@ class _KaraokeTextLayout {
   final double width;
   late final TextPainter painter;
   late final List<_KaraokeWordLayout> wordLayouts;
+  late final List<_KaraokeEmphasisGroup> emphasisGroups;
 
   bool matches({
     required String text,
@@ -2959,54 +2928,66 @@ class _KaraokeTextLayout {
       this.width == width;
 
   void dispose() {
-    for (final word in wordLayouts) {
-      for (final character in word.characters) {
-        character.dispose();
-      }
-    }
     painter.dispose();
   }
 }
 
 class _KaraokeWordLayout {
-  const _KaraokeWordLayout({
-    required this.word,
-    required this.boxes,
-    required this.characters,
-  });
+  const _KaraokeWordLayout({required this.word, required this.boxes});
 
   final LyricWord word;
   final List<TextBox> boxes;
-  final List<_KaraokeCharacterLayout> characters;
 }
 
-class _KaraokeCharacterLayout {
-  _KaraokeCharacterLayout({
-    required this.grapheme,
-    required this.boxes,
-    required this.painter,
-    required this.paintOffsets,
+class _KaraokeEmphasisGroup {
+  const _KaraokeEmphasisGroup({
+    required this.start,
+    required this.end,
+    required this.isLastWord,
+    required this.characters,
   });
 
-  final String grapheme;
-  final List<TextBox> boxes;
-  final TextPainter painter;
-  final List<Offset> paintOffsets;
+  final Duration start;
+  final Duration end;
+  final bool isLastWord;
+  final List<_KaraokeEmphasisCharacter> characters;
+}
 
-  void dispose() => painter.dispose();
+class _KaraokeEmphasisCharacter {
+  const _KaraokeEmphasisCharacter({
+    required this.box,
+    required this.sourceWordIndex,
+    required this.wordBox,
+  });
+
+  final TextBox box;
+  final int sourceWordIndex;
+  final TextBox wordBox;
+}
+
+class _KaraokeTimedAtom {
+  const _KaraokeTimedAtom({
+    required this.text,
+    required this.start,
+    required this.end,
+    required this.textStart,
+    required this.textEnd,
+    required this.sourceWordIndex,
+  });
+
+  final String text;
+  final Duration start;
+  final Duration end;
+  final int textStart;
+  final int textEnd;
+  final int sourceWordIndex;
 }
 
 List<_KaraokeWordLayout> _buildKaraokeWordLayouts(
   String text,
   List<LyricWord> words,
-  TextPainter painter, {
-  required TextStyle style,
-  required TextDirection textDirection,
-  required Locale? locale,
-  required TextScaler textScaler,
-  required TextHeightBehavior? textHeightBehavior,
-  required TextWidthBasis textWidthBasis,
-}) {
+  TextPainter painter,
+) {
   final ranges = _wordRanges(text, words);
   return List.generate(words.length, (index) {
     final word = words[index];
@@ -3014,64 +2995,204 @@ List<_KaraokeWordLayout> _buildKaraokeWordLayouts(
     final boxes = painter.getBoxesForSelection(
       TextSelection(baseOffset: range.$1, extentOffset: range.$2),
     );
-    final wordEnd =
-        word.end ??
-        (index + 1 < words.length
-            ? words[index + 1].start
-            : word.start + const Duration(milliseconds: 350));
-    if (!_shouldEmphasizeWord(word.text, wordEnd - word.start)) {
-      return _KaraokeWordLayout(
-        word: word,
-        boxes: List.unmodifiable(boxes),
-        characters: const [],
-      );
-    }
+    return _KaraokeWordLayout(word: word, boxes: List.unmodifiable(boxes));
+  }, growable: false);
+}
 
-    var charOffset = range.$1;
-    final characters = <_KaraokeCharacterLayout>[];
-    for (final grapheme in word.text.trim().characters) {
-      final start = text.indexOf(grapheme, charOffset);
-      if (start < 0 || start >= range.$2) continue;
-      final finish = math.min(range.$2, start + grapheme.length);
-      charOffset = finish;
-      final charBoxes = painter.getBoxesForSelection(
-        TextSelection(baseOffset: start, extentOffset: finish),
-      );
-      final characterPainter = TextPainter(
-        text: TextSpan(text: grapheme, style: style),
-        textDirection: textDirection,
-        locale: locale,
-        textScaler: textScaler,
-        textHeightBehavior: textHeightBehavior,
-        textWidthBasis: textWidthBasis,
-      )..layout();
-      final localBoxes = characterPainter.getBoxesForSelection(
-        TextSelection(baseOffset: 0, extentOffset: grapheme.length),
-      );
-      final localBox = localBoxes.firstOrNull;
-      if (localBox == null) {
-        characterPainter.dispose();
-        continue;
-      }
-      characters.add(
-        _KaraokeCharacterLayout(
-          grapheme: grapheme,
-          boxes: List.unmodifiable(charBoxes),
-          painter: characterPainter,
-          paintOffsets: List.unmodifiable(
-            charBoxes.map(
-              (box) => Offset(box.left - localBox.left, box.top - localBox.top),
-            ),
-          ),
+List<_KaraokeEmphasisGroup> _buildKaraokeEmphasisGroups(
+  String text,
+  List<LyricWord> words,
+  TextPainter painter,
+) {
+  final ranges = _wordRanges(text, words);
+  final atoms = <_KaraokeTimedAtom>[];
+  for (var index = 0; index < words.length; index++) {
+    final word = words[index];
+    final fallbackEnd = index + 1 < words.length
+        ? words[index + 1].start
+        : word.start + const Duration(milliseconds: 350);
+    atoms.addAll(
+      _splitKaraokeWord(
+        word,
+        sourceWordIndex: index,
+        textStart: ranges[index].$1,
+        sourceEnd: word.end ?? fallbackEnd,
+      ),
+    );
+  }
+
+  final groups = <_KaraokeEmphasisGroup>[];
+  final mergeable = <_KaraokeTimedAtom>[];
+
+  void emitChunk(List<_KaraokeTimedAtom> chunk) {
+    if (chunk.isEmpty) return;
+    final mergedText = chunk.map((atom) => atom.text).join();
+    final start = chunk
+        .map((atom) => atom.start)
+        .reduce((a, b) => a < b ? a : b);
+    final end = chunk.map((atom) => atom.end).reduce((a, b) => a > b ? a : b);
+    var emphasized = chunk.any(
+      (atom) => _shouldEmphasizeWord(atom.text, atom.end - atom.start),
+    );
+    if (!_isAmlCjkWord(mergedText)) {
+      emphasized = emphasized || _shouldEmphasizeWord(mergedText, end - start);
+    }
+    if (!emphasized) return;
+
+    final characters = <_KaraokeEmphasisCharacter>[];
+    for (final atom in chunk) {
+      final atomText = text.substring(atom.textStart, atom.textEnd);
+      if (atomText.trim().isEmpty) continue;
+      final sourceBoxes = painter.getBoxesForSelection(
+        TextSelection(
+          baseOffset: ranges[atom.sourceWordIndex].$1,
+          extentOffset: ranges[atom.sourceWordIndex].$2,
         ),
       );
+      if (sourceBoxes.isEmpty) continue;
+      var cursor = atom.textStart;
+      for (final grapheme in atomText.trim().characters) {
+        final charStart = text.indexOf(grapheme, cursor);
+        if (charStart < atom.textStart || charStart >= atom.textEnd) continue;
+        final charEnd = math.min(atom.textEnd, charStart + grapheme.length);
+        cursor = charEnd;
+        final charBoxes = painter.getBoxesForSelection(
+          TextSelection(baseOffset: charStart, extentOffset: charEnd),
+        );
+        if (charBoxes.isEmpty) continue;
+        for (final charBox in charBoxes) {
+          final wordBox = _containingTextBox(charBox, sourceBoxes);
+          if (wordBox == null) continue;
+          characters.add(
+            _KaraokeEmphasisCharacter(
+              box: charBox,
+              sourceWordIndex: atom.sourceWordIndex,
+              wordBox: wordBox,
+            ),
+          );
+        }
+      }
     }
-    return _KaraokeWordLayout(
-      word: word,
-      boxes: List.unmodifiable(boxes),
-      characters: List.unmodifiable(characters),
+    if (characters.isEmpty) return;
+    final lastText = words.lastOrNull?.text ?? '';
+    groups.add(
+      _KaraokeEmphasisGroup(
+        start: start,
+        end: end,
+        isLastWord: lastText.trim().isNotEmpty && mergedText.contains(lastText),
+        characters: List.unmodifiable(characters),
+      ),
     );
-  }, growable: false);
+  }
+
+  void flushMergeable() {
+    if (mergeable.isEmpty) return;
+    emitChunk(List<_KaraokeTimedAtom>.of(mergeable));
+    mergeable.clear();
+  }
+
+  for (final atom in atoms) {
+    if (atom.text.trim().isEmpty) {
+      flushMergeable();
+    } else if (_isAmlCjkWord(atom.text)) {
+      flushMergeable();
+      emitChunk([atom]);
+    } else {
+      mergeable.add(atom);
+    }
+  }
+  flushMergeable();
+  return List.unmodifiable(groups);
+}
+
+TextBox? _containingTextBox(TextBox character, List<TextBox> candidates) {
+  TextBox? best;
+  var bestOverlap = -1.0;
+  for (final candidate in candidates) {
+    final overlap = math.max(
+      0.0,
+      math.min(character.bottom, candidate.bottom) -
+          math.max(character.top, candidate.top),
+    );
+    if (overlap > bestOverlap) {
+      best = candidate;
+      bestOverlap = overlap;
+    }
+  }
+  return best;
+}
+
+List<_KaraokeTimedAtom> _splitKaraokeWord(
+  LyricWord word, {
+  required int sourceWordIndex,
+  required int textStart,
+  required Duration sourceEnd,
+}) {
+  final parts = RegExp(r'\s+|\S+').allMatches(word.text);
+  final timedLength = word.text.replaceAll(RegExp(r'\s'), '').length;
+  final timePerUnit =
+      (sourceEnd.inMicroseconds - word.start.inMicroseconds) /
+      math.max(1, timedLength);
+  var textOffset = 0;
+  var timedOffset = 0;
+  final atoms = <_KaraokeTimedAtom>[];
+  Duration timeAt(int offset) => Duration(
+    microseconds: word.start.inMicroseconds + (offset * timePerUnit).round(),
+  );
+
+  void addAtom(
+    String part,
+    int partStart,
+    int partEnd,
+    int timeOffset,
+    int len,
+  ) {
+    atoms.add(
+      _KaraokeTimedAtom(
+        text: part,
+        start: timeAt(timeOffset),
+        end: timeAt(timeOffset + len),
+        textStart: partStart,
+        textEnd: partEnd,
+        sourceWordIndex: sourceWordIndex,
+      ),
+    );
+  }
+
+  for (final match in parts) {
+    final part = match.group(0)!;
+    final partStart = textStart + textOffset;
+    textOffset += part.length;
+    if (part.trim().isEmpty) {
+      addAtom(part, partStart, partStart + part.length, timedOffset, 0);
+      continue;
+    }
+    if (_isAmlCjkWord(part) && part.length > 1) {
+      var partOffset = 0;
+      for (final grapheme in part.characters) {
+        final graphemeStart = partStart + partOffset;
+        addAtom(
+          grapheme,
+          graphemeStart,
+          graphemeStart + grapheme.length,
+          timedOffset + partOffset,
+          grapheme.length,
+        );
+        partOffset += grapheme.length;
+      }
+      timedOffset += part.length;
+    } else {
+      addAtom(
+        part,
+        partStart,
+        partStart + part.length,
+        timedOffset,
+        part.length,
+      );
+      timedOffset += part.length;
+    }
+  }
+  return atoms;
 }
 
 bool _sameLyricWords(List<LyricWord> left, List<LyricWord> right) {
@@ -3096,7 +3217,6 @@ class _KaraokeLyricPainter extends CustomPainter {
     required this.position,
     required this.fontSize,
     required this.contentSize,
-    required this.glowBleed,
     required this.active,
     required this.baseAlpha,
     required this.highlightAlpha,
@@ -3109,7 +3229,6 @@ class _KaraokeLyricPainter extends CustomPainter {
   final Duration position;
   final double fontSize;
   final Size contentSize;
-  final double glowBleed;
   final bool active;
   final double baseAlpha;
   final double highlightAlpha;
@@ -3120,8 +3239,6 @@ class _KaraokeLyricPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final painter = layout.painter;
-    canvas.save();
-    canvas.translate(glowBleed, glowBleed);
     if (!active || !animateWords || layout.wordLayouts.isEmpty) {
       _paintTextWithAlpha(
         canvas,
@@ -3130,17 +3247,18 @@ class _KaraokeLyricPainter extends CustomPainter {
         Offset.zero & contentSize,
         baseAlpha,
       );
-      canvas.restore();
       return;
     }
 
-    // 绘制节点本身带有额外缓冲区，图层范围覆盖字形、缩放和模糊的扩散区域。
+    // 先绘制整句底图，再在同一隔离层中清除词的原位置并绘制浮动词。
+    // 这是旧版稳定的绘制顺序，可避免原字形与浮动字形同时残留。
+    final glowBleed = fontSize * .75;
     canvas.saveLayer(
-      Rect.fromLTRB(
+      Rect.fromLTWH(
+        0,
         -glowBleed,
-        -glowBleed,
-        contentSize.width + glowBleed,
-        contentSize.height + glowBleed,
+        contentSize.width,
+        contentSize.height + glowBleed * 2,
       ),
       Paint(),
     );
@@ -3151,7 +3269,6 @@ class _KaraokeLyricPainter extends CustomPainter {
       Offset.zero & contentSize,
       baseAlpha,
     );
-    final elapsedAt = position.inMicroseconds;
     for (var index = 0; index < layout.wordLayouts.length; index++) {
       final wordLayout = layout.wordLayouts[index];
       final word = wordLayout.word;
@@ -3172,13 +3289,12 @@ class _KaraokeLyricPainter extends CustomPainter {
         const Duration(milliseconds: 1000).inMicroseconds,
         total.inMicroseconds,
       );
-      final isLastWord = index == layout.wordLayouts.length - 1;
       final baseFloatProgress = (elapsed.inMicroseconds / duration).clamp(
         0.0,
         1.0,
       );
-      final floatOffset =
-          fontSize * .07 * Curves.easeOut.transform(baseFloatProgress);
+      var floatOffset =
+          fontSize * .05 * Curves.easeOut.transform(baseFloatProgress);
       if (elapsed < Duration.zero && floatOffset <= 0) continue;
 
       final painterOffset = Offset(0, -floatOffset);
@@ -3186,6 +3302,7 @@ class _KaraokeLyricPainter extends CustomPainter {
         final rect = box.toRect();
         if (rect.width <= 0) continue;
         final floatingRect = rect.shift(painterOffset);
+        canvas.drawRect(rect, Paint()..blendMode = BlendMode.clear);
         canvas.save();
         canvas.clipRect(floatingRect);
         _paintTextWithAlpha(
@@ -3206,32 +3323,18 @@ class _KaraokeLyricPainter extends CustomPainter {
         );
         canvas.restore();
       }
-
-      if (emphasizeLongWords &&
-          _shouldEmphasizeWord(word.text, total) &&
-          progress > 0) {
-        final wordRect = boxes
-            .map((box) => box.toRect())
-            .reduce((left, right) => left.expandToInclude(right));
-        _paintWordEmphasis(
-          canvas,
-          characters: wordLayout.characters,
-          fontSize: fontSize,
-          word: word,
-          end: end,
-          elapsedMicroseconds: elapsedAt - word.start.inMicroseconds,
-          isLastWord: isLastWord,
-          isBackground: isBackground,
-          baseAlpha: baseAlpha,
-          highlightAlpha: highlightAlpha,
-          painterOffset: painterOffset,
-          highlightProgress: progress,
-          isRtl: boxes.first.direction == TextDirection.rtl,
-          wordRect: wordRect.shift(Offset(0, -floatOffset)),
-        );
-      }
     }
-    canvas.restore();
+    if (emphasizeLongWords) {
+      _paintWordEmphasis(
+        canvas,
+        layout: layout,
+        position: position,
+        fontSize: fontSize,
+        baseAlpha: baseAlpha,
+        highlightAlpha: highlightAlpha,
+        isBackground: isBackground,
+      );
+    }
     canvas.restore();
   }
 
@@ -3279,17 +3382,47 @@ void _paintWordHighlight(
   double alpha,
 ) {
   if (progress <= 0) return;
-  final mask = _createWordHighlightMask(wordRect, progress, isRtl);
+  if (progress >= 1) {
+    canvas.save();
+    canvas.clipRect(wordRect);
+    _paintTextWithAlpha(canvas, painter, painterOffset, wordRect, alpha);
+    canvas.restore();
+    return;
+  }
+
+  final featherRatio = math.min(.5, wordRect.height * .5 / wordRect.width);
+  final boundary = isRtl ? 1 - progress : progress;
+  final leadingStop = (boundary - featherRatio / 2).clamp(0.0, 1.0);
+  final trailingStop = (boundary + featherRatio / 2).clamp(0.0, 1.0);
+  final colors = isRtl
+      ? <Color>[
+          Colors.transparent,
+          Colors.transparent,
+          Colors.white,
+          Colors.white,
+        ]
+      : <Color>[
+          Colors.white,
+          Colors.white,
+          Colors.transparent,
+          Colors.transparent,
+        ];
+  final shader = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: colors,
+    stops: [0, leadingStop, trailingStop, 1],
+  ).createShader(wordRect);
   canvas.saveLayer(
-    mask.rect,
+    wordRect,
     Paint()..color = Colors.white.withValues(alpha: alpha.clamp(0.0, 1.0)),
   );
   canvas.clipRect(wordRect);
   painter.paint(canvas, painterOffset);
   canvas.drawRect(
-    mask.rect,
+    wordRect,
     Paint()
-      ..shader = mask.shader
+      ..shader = shader
       ..blendMode = BlendMode.dstIn,
   );
   canvas.restore();
@@ -3316,252 +3449,170 @@ void _paintTextWithAlpha(
   canvas.restore();
 }
 
-({Rect rect, Shader shader, double fadeWidth}) _createWordHighlightMask(
-  Rect wordRect,
-  double progress,
-  bool isRtl,
-) {
-  // 羽化宽度按实际字框高度计算，并通过移动遮罩保持连续渐变。
-  final fadeWidth = math.max(1.0, wordRect.height * .5);
-  final boundedProgress = progress.clamp(0.0, 1.0);
-  final maskRect = Rect.fromLTRB(
-    wordRect.left - fadeWidth,
-    wordRect.top,
-    wordRect.right + fadeWidth,
-    wordRect.bottom,
-  );
-  // 完成阶段仍要让渐变继续移动一个羽化宽度，使羽化边缘自然越过
-  // 字符边界，而不是在 progress == 1 时突然切换为纯色。
-  final travelWidth = wordRect.width + fadeWidth;
-  final edge = isRtl
-      ? wordRect.right - boundedProgress * travelWidth
-      : wordRect.left + boundedProgress * travelWidth;
-  final transitionStart = isRtl ? edge : edge - fadeWidth;
-  final transitionEnd = isRtl ? edge + fadeWidth : edge;
-  final totalWidth = math.max(1.0, maskRect.width);
-  final transitionStartStop = ((transitionStart - maskRect.left) / totalWidth)
-      .clamp(0.0, 1.0);
-  final transitionEndStop = ((transitionEnd - maskRect.left) / totalWidth)
-      .clamp(0.0, 1.0);
-  final colors = isRtl
-      ? <Color>[
-          Colors.transparent,
-          Colors.transparent,
-          Colors.white,
-          Colors.white,
-        ]
-      : <Color>[
-          Colors.white,
-          Colors.white,
-          Colors.transparent,
-          Colors.transparent,
-        ];
-  final shader = LinearGradient(
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-    colors: colors,
-    stops: [0, transitionStartStop, transitionEndStop, 1],
-  ).createShader(maskRect);
-  return (rect: maskRect, shader: shader, fadeWidth: fadeWidth);
-}
-
 void _paintWordEmphasis(
   Canvas canvas, {
-  required List<_KaraokeCharacterLayout> characters,
+  required _KaraokeTextLayout layout,
+  required Duration position,
   required double fontSize,
-  required LyricWord word,
-  required Duration end,
-  required int elapsedMicroseconds,
-  required bool isLastWord,
-  required bool isBackground,
   required double baseAlpha,
   required double highlightAlpha,
-  required Offset painterOffset,
-  required double highlightProgress,
-  required bool isRtl,
-  required Rect wordRect,
+  required bool isBackground,
 }) {
-  final duration = math.max(
-    const Duration(milliseconds: 1000).inMicroseconds,
-    (end - word.start).inMicroseconds,
-  );
-  var amount = duration / const Duration(milliseconds: 2000).inMicroseconds;
-  amount = amount > 1 ? math.sqrt(amount) : math.pow(amount, 3).toDouble();
-  var blur = duration / const Duration(milliseconds: 3000).inMicroseconds;
-  blur = blur > 1 ? math.sqrt(blur) : math.pow(blur, 3).toDouble();
-  amount *= .6;
-  blur *= .5;
-  var animationDuration = duration.toDouble();
-  if (isLastWord) {
-    amount *= 1.6;
-    blur *= 1.5;
-    animationDuration *= 1.2;
-  }
-  amount = math.min(1.2, amount);
-  blur = math.min(.8, blur);
-  if (characters.isEmpty) return;
-
-  for (var index = 0; index < characters.length; index++) {
-    final character = characters[index];
-    final delay = duration / 2.5 / characters.length * index;
-    final progress = ((elapsedMicroseconds - delay) / animationDuration).clamp(
-      0.0,
-      1.0,
+  final elapsedAt = position.inMicroseconds;
+  for (final group in layout.emphasisGroups) {
+    if (group.characters.isEmpty) continue;
+    final baseDuration = math.max(
+      const Duration(milliseconds: 1000).inMicroseconds,
+      (group.end - group.start).inMicroseconds,
     );
-    if (progress <= 0) continue;
+    final duration = baseDuration * (group.isLastWord ? 1.2 : 1);
+    var amount =
+        baseDuration / const Duration(milliseconds: 2000).inMicroseconds;
+    amount = amount > 1 ? math.sqrt(amount) : math.pow(amount, 3).toDouble();
+    var blur = baseDuration / const Duration(milliseconds: 3000).inMicroseconds;
+    blur = blur > 1 ? math.sqrt(blur) : math.pow(blur, 3).toDouble();
+    amount *= .6 * (group.isLastWord ? 1.6 : 1);
+    blur *= .5 * (group.isLastWord ? 1.5 : 1);
+    amount = math.min(1.2, amount);
+    blur = math.min(.8, blur);
 
-    if (character.boxes.isEmpty) continue;
-    final emphasized = _amllEmphasisEase(progress);
-    final glow = emphasized * blur;
-    final floatProgress =
-        ((elapsedMicroseconds - delay + 400000) / (animationDuration * 1.4))
-            .clamp(0.0, 1.0);
-    final floatOffset =
-        -math.sin(math.pi * floatProgress) * (isBackground ? 0.13 : 0.07);
-    final scale = 1 + emphasized * .1 * amount;
-    final horizontalOffset =
-        -emphasized * .03 * amount * (characters.length / 2 - index);
-    final verticalOffset = -emphasized * .03 * amount + floatOffset;
+    for (var index = 0; index < group.characters.length; index++) {
+      final character = group.characters[index];
+      final delay = duration / 2.5 / group.characters.length * index;
+      final elapsed = elapsedAt - group.start.inMicroseconds - delay;
+      if (elapsed <= 0) continue;
+      final progress = (elapsed / duration).clamp(0.0, 1.0);
+      final eased = _amllEmphasisEase(progress);
+      final scale = 1 + eased * .1 * amount;
+      final offsetX =
+          -eased *
+          .03 *
+          amount *
+          (group.characters.length / 2 - index) *
+          fontSize;
+      final emphasisFloatProgress =
+          ((elapsed + const Duration(milliseconds: 400).inMicroseconds) /
+                  (duration * 1.4))
+              .clamp(0.0, 1.0);
+      final floatOffset =
+          -math.sin(math.pi * emphasisFloatProgress) *
+          .05 *
+          fontSize *
+          (isBackground ? 2 : 1);
 
-    final blurSigma = math.max(.8, glow * fontSize * .3);
-    final glowAlpha = (glow * 510).round().clamp(0, 255);
-    final glowPaint = Paint()
-      ..colorFilter = ColorFilter.mode(
-        Colors.white.withAlpha(glowAlpha),
-        BlendMode.srcIn,
-      )
-      ..imageFilter = ui.ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma);
+      final sourceLayout = layout.wordLayouts[character.sourceWordIndex];
+      final sourceWord = sourceLayout.word;
+      final sourceEnd =
+          sourceWord.end ??
+          (character.sourceWordIndex + 1 < layout.wordLayouts.length
+              ? layout.wordLayouts[character.sourceWordIndex + 1].word.start
+              : sourceWord.start + const Duration(milliseconds: 350));
+      final sourceDuration = sourceEnd - sourceWord.start;
+      final wordProgress = sourceDuration <= Duration.zero
+          ? (position >= sourceWord.start ? 1.0 : 0.0)
+          : ((position - sourceWord.start).inMicroseconds /
+                    sourceDuration.inMicroseconds)
+                .clamp(0.0, 1.0);
+      final sourceElapsed = position - sourceWord.start;
+      final sourceFloatProgress =
+          (sourceElapsed.inMicroseconds /
+                  math.max(
+                    const Duration(milliseconds: 1000).inMicroseconds,
+                    sourceDuration.inMicroseconds,
+                  ))
+              .clamp(0.0, 1.0);
+      final baseFloat =
+          fontSize * .05 * Curves.easeOut.transform(sourceFloatProgress);
+      final painterOffset = Offset(0, -baseFloat);
+      final sourceBox = character.wordBox;
+      final wordRect = sourceBox.toRect().shift(painterOffset);
+      final charRect = character.box.toRect().shift(painterOffset);
+      final translation = Offset(offsetX, floatOffset);
+      final transformedRect = charRect
+          .shift(translation)
+          .inflate(fontSize * .12);
 
-    final animatedCharacters = <_AnimatedCharacterPaint>[];
-    for (var boxIndex = 0; boxIndex < character.boxes.length; boxIndex++) {
-      final charBox = character.boxes[boxIndex];
-      final charRect = charBox.toRect().shift(painterOffset);
-      final center = charRect.center;
-      final characterPaintOffset =
-          character.paintOffsets[boxIndex] + painterOffset;
-      final characterOffset = Offset(
-        horizontalOffset * fontSize,
-        verticalOffset * fontSize,
-      );
-      final transformedRect = charRect.shift(characterOffset);
-      final scaleBleed = (scale - 1) * charRect.shortestSide / 2;
-      final highlightMask = _createWordHighlightMask(
-        wordRect,
-        highlightProgress,
-        isRtl,
-      );
-      animatedCharacters.add(
-        _AnimatedCharacterPaint(
-          character: character,
+      // AMLL 的强调变换叠加在常规逐词上浮之上；先清掉原字符，再绘制变换后的字形。
+      canvas.drawRect(charRect, Paint()..blendMode = BlendMode.clear);
+      final glow = eased * blur;
+      if (glow > .01) {
+        final sigma = math.min(.3, blur * .3) * fontSize;
+        final glowPaint = Paint()
+          ..colorFilter = ColorFilter.mode(
+            Colors.white.withValues(alpha: glow.clamp(0.0, 1.0)),
+            BlendMode.srcIn,
+          )
+          ..imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma);
+        canvas.saveLayer(transformedRect.inflate(sigma * 3), glowPaint);
+        _paintEmphasisGlyph(
+          canvas,
+          painter: layout.painter,
           charRect: charRect,
-          center: center,
-          characterPaintOffset: characterPaintOffset,
-          characterOffset: characterOffset,
+          wordRect: wordRect,
+          painterOffset: painterOffset,
+          translation: translation,
           scale: scale,
-          scaleBleed: scaleBleed,
-          transformedRect: transformedRect,
-          highlightMask: highlightMask,
-        ),
-      );
-    }
-
-    // 先清除所有原字形，再绘制动画，避免后一个字符清掉前一个字符的辉光。
-    for (final item in animatedCharacters) {
-      final clearBounds = item.transformedRect.inflate(item.scaleBleed + 2);
-      canvas.saveLayer(
-        clearBounds,
-        Paint()..blendMode = BlendMode.dstOut,
-      );
-      _paintTransformedCharacter(
+          wordProgress: wordProgress,
+          isRtl: sourceBox.direction == TextDirection.rtl,
+          baseAlpha: baseAlpha,
+          highlightAlpha: highlightAlpha,
+          includeHighlight: false,
+        );
+        canvas.restore();
+      }
+      _paintEmphasisGlyph(
         canvas,
-        item,
-        (character) => character.painter.paint(
-          canvas,
-          item.characterPaintOffset,
-        ),
+        painter: layout.painter,
+        charRect: charRect,
+        wordRect: wordRect,
+        painterOffset: painterOffset,
+        translation: translation,
+        scale: scale,
+        wordProgress: wordProgress,
+        isRtl: sourceBox.direction == TextDirection.rtl,
+        baseAlpha: baseAlpha,
+        highlightAlpha: highlightAlpha,
+        includeHighlight: true,
       );
-      canvas.restore();
-    }
-
-    for (final item in animatedCharacters) {
-      final characterLayerBounds = item.transformedRect.inflate(
-        math.max(fontSize * .5, blurSigma * 4) + item.scaleBleed + 2,
-      );
-
-      // 辉光只由字符自己的强调进度控制，不再被逐字进度遮罩截断。
-      canvas.saveLayer(characterLayerBounds, glowPaint);
-      _paintTransformedCharacter(
-        canvas,
-        item,
-        (character) => _paintTextWithAlpha(
-          canvas,
-          character.painter,
-          item.characterPaintOffset,
-          item.charRect,
-          highlightAlpha,
-        ),
-      );
-      canvas.restore();
-
-      // 清晰字形保留原有的高亮羽化边缘。
-      canvas.saveLayer(characterLayerBounds, Paint());
-      _paintTransformedCharacter(
-        canvas,
-        item,
-        (character) => _paintTextWithAlpha(
-          canvas,
-          character.painter,
-          item.characterPaintOffset,
-          item.charRect,
-          highlightAlpha,
-        ),
-      );
-      canvas.drawRect(
-        item.highlightMask.rect,
-        Paint()
-          ..shader = item.highlightMask.shader
-          ..blendMode = BlendMode.dstIn,
-      );
-      canvas.restore();
     }
   }
 }
 
-class _AnimatedCharacterPaint {
-  const _AnimatedCharacterPaint({
-    required this.character,
-    required this.charRect,
-    required this.center,
-    required this.characterPaintOffset,
-    required this.characterOffset,
-    required this.scale,
-    required this.scaleBleed,
-    required this.transformedRect,
-    required this.highlightMask,
-  });
-
-  final _KaraokeCharacterLayout character;
-  final Rect charRect;
-  final Offset center;
-  final Offset characterPaintOffset;
-  final Offset characterOffset;
-  final double scale;
-  final double scaleBleed;
-  final Rect transformedRect;
-  final ({Rect rect, Shader shader, double fadeWidth}) highlightMask;
-}
-
-void _paintTransformedCharacter(
-  Canvas canvas,
-  _AnimatedCharacterPaint item,
-  void Function(_KaraokeCharacterLayout character) paintCharacter,
-) {
+void _paintEmphasisGlyph(
+  Canvas canvas, {
+  required TextPainter painter,
+  required Rect charRect,
+  required Rect wordRect,
+  required Offset painterOffset,
+  required Offset translation,
+  required double scale,
+  required double wordProgress,
+  required bool isRtl,
+  required double baseAlpha,
+  required double highlightAlpha,
+  required bool includeHighlight,
+}) {
+  final center = charRect.center;
   canvas.save();
-  canvas.translate(item.characterOffset.dx, item.characterOffset.dy);
-  canvas.translate(item.center.dx, item.center.dy);
-  canvas.scale(item.scale, item.scale);
-  canvas.translate(-item.center.dx, -item.center.dy);
-  paintCharacter(item.character);
+  canvas.translate(translation.dx, translation.dy);
+  canvas.translate(center.dx, center.dy);
+  canvas.scale(scale);
+  canvas.translate(-center.dx, -center.dy);
+  canvas.save();
+  canvas.clipRect(charRect);
+  _paintTextWithAlpha(canvas, painter, painterOffset, charRect, baseAlpha);
+  if (includeHighlight) {
+    _paintWordHighlight(
+      canvas,
+      painter,
+      wordRect,
+      wordProgress,
+      isRtl,
+      painterOffset,
+      highlightAlpha,
+    );
+  }
+  canvas.restore();
   canvas.restore();
 }
 
@@ -3574,11 +3625,10 @@ double _amllEmphasisEase(double value) {
 }
 
 bool _shouldEmphasizeWord(String text, Duration duration) {
-  if (duration < const Duration(seconds: 1)) return false;
-  final graphemeCount = text.trim().characters.length;
-  final containsCjk = RegExp(r'[\u2E80-\u9FFF\uF900-\uFAFF]').hasMatch(text);
-  return containsCjk || (graphemeCount > 1 && graphemeCount <= 7);
+  return isAmlEmphasizedLyricWord(text, duration);
 }
+
+bool _isAmlCjkWord(String text) => isAmlCjkLyricWord(text);
 
 List<(int, int)> _wordRanges(String text, List<LyricWord> words) {
   final ranges = <(int, int)>[];
