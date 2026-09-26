@@ -64,11 +64,22 @@ class LyricsSource {
 
 /// 按“可同步优先、外挂优先、结构化标签优先”的规则选择活动歌词。
 LyricsSource? selectLyricsSource(Iterable<LyricsSource> sources) {
-  final candidates = sources.where(
-    (source) => source.content.trim().isNotEmpty,
-  );
+  final candidates = sources
+      .where((source) => source.content.trim().isNotEmpty)
+      .toList(growable: false);
   if (candidates.isEmpty) return null;
-  return candidates.reduce((first, second) {
+  final hasOriginal = candidates.any(
+    (source) => source.role == LyricRole.original,
+  );
+  final hasAlternate = candidates.any(
+    (source) => source.role == LyricRole.alternate,
+  );
+  final primaryCandidates = hasOriginal
+      ? candidates.where((source) => source.role == LyricRole.original)
+      : hasAlternate
+      ? candidates.where((source) => source.role == LyricRole.alternate)
+      : candidates;
+  return primaryCandidates.reduce((first, second) {
     final firstScore = _lyricsSourceScore(first);
     final secondScore = _lyricsSourceScore(second);
     return secondScore > firstScore ? second : first;
@@ -118,23 +129,56 @@ LyricsDocument _mergeExternalTranslation(
 ) {
   if (original.lines.isNotEmpty && translation.lines.isNotEmpty) {
     final translatedLines = translation.lines;
-    final lines = [
-      for (final line in original.lines)
-        line.translation != null
-            ? line
-            : line.copyWith(
-                translation: _translationAt(
-                  translatedLines,
-                  start: line.start,
-                  end: line.end,
-                )?.text,
-                translationWords: _translationAt(
-                  translatedLines,
-                  start: line.start,
-                  end: line.end,
-                )?.words,
+    final usedTranslationIndices = <int>{};
+    final lines = <LyricLine>[];
+    for (final line in original.lines) {
+      if (line.translation != null) {
+        final matchIndex = _translationIndexFor(
+          translatedLines,
+          usedIndices: usedTranslationIndices,
+          start: line.start,
+          end: line.end,
+        );
+        if (matchIndex == null) {
+          lines.add(line);
+          continue;
+        }
+        usedTranslationIndices.add(matchIndex);
+        final translationLine = translatedLines[matchIndex];
+        lines.add(
+          line.copyWith(
+            variants: [
+              ...line.variants,
+              LyricVariant(
+                text: translationLine.text,
+                start: translationLine.start,
+                end: translationLine.end,
+                words: translationLine.words,
+                language: translationLine.language,
+                speaker: translationLine.speaker,
+                role: LyricRole.translation,
               ),
-    ];
+            ],
+          ),
+        );
+        continue;
+      }
+      final matchIndex = _translationIndexFor(
+        translatedLines,
+        usedIndices: usedTranslationIndices,
+        start: line.start,
+        end: line.end,
+      );
+      if (matchIndex == null) {
+        lines.add(line);
+        continue;
+      }
+      usedTranslationIndices.add(matchIndex);
+      final match = translatedLines[matchIndex];
+      lines.add(
+        line.copyWith(translation: match.text, translationWords: match.words),
+      );
+    }
     return LyricsDocument(
       lines: lines,
       offset: original.offset,
@@ -152,16 +196,34 @@ LyricsDocument _mergeExternalTranslation(
     );
   }
 
-  if (original.plainLines.isNotEmpty && translation.plainLines.isNotEmpty) {
+  if (original.lines.isNotEmpty && translation.plainLines.isNotEmpty) {
     final lines = [
-      for (var index = 0; index < original.plainLines.length; index++)
-        original.plainLines[index],
+      for (var index = 0; index < original.lines.length; index++)
+        index < translation.plainLines.length &&
+                original.lines[index].translation == null
+            ? original.lines[index].copyWith(
+                translation: translation.plainLines[index],
+              )
+            : original.lines[index],
     ];
+    return LyricsDocument(
+      lines: lines,
+      offset: original.offset,
+      syntax: original.syntax,
+      timing: original.timing,
+      metadata: original.metadata,
+    );
+  }
+
+  if (original.plainLines.isNotEmpty) {
+    final translatedLines = translation.lines.isNotEmpty
+        ? translation.lines.map((line) => line.text).toList(growable: false)
+        : translation.plainLines;
     final merged = <String>[];
-    for (var index = 0; index < lines.length; index++) {
-      merged.add(lines[index]);
-      if (index < translation.plainLines.length) {
-        merged.add(translation.plainLines[index]);
+    for (var index = 0; index < original.plainLines.length; index++) {
+      merged.add(original.plainLines[index]);
+      if (index < translatedLines.length) {
+        merged.add(translatedLines[index]);
       }
     }
     return LyricsDocument(
@@ -175,15 +237,31 @@ LyricsDocument _mergeExternalTranslation(
   return original;
 }
 
-LyricLine? _translationAt(
+int? _translationIndexFor(
   List<LyricLine> lines, {
+  required Set<int> usedIndices,
   required Duration start,
   required Duration? end,
 }) {
-  for (final line in lines) {
-    if (line.start == start ||
-        (end != null && line.end != null && line.end == end)) {
-      return line;
+  if (end != null) {
+    for (var index = 0; index < lines.length; index++) {
+      if (!usedIndices.contains(index) &&
+          lines[index].start == start &&
+          lines[index].end == end) {
+        return index;
+      }
+    }
+  }
+  for (var index = 0; index < lines.length; index++) {
+    if (!usedIndices.contains(index) && lines[index].start == start) {
+      return index;
+    }
+  }
+  if (end != null) {
+    for (var index = 0; index < lines.length; index++) {
+      if (!usedIndices.contains(index) && lines[index].end == end) {
+        return index;
+      }
     }
   }
   return null;

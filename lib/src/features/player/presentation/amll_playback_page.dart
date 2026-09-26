@@ -3318,6 +3318,32 @@ class _KaraokeEmphasisCharacter {
   final TextBox atomBox;
 }
 
+class _KaraokeEmphasisFrame {
+  const _KaraokeEmphasisFrame({
+    required this.charRect,
+    required this.wordRect,
+    required this.transformedRect,
+    required this.painterOffset,
+    required this.translation,
+    required this.scale,
+    required this.wordProgress,
+    required this.glow,
+    required this.sigma,
+    required this.isRtl,
+  });
+
+  final Rect charRect;
+  final Rect wordRect;
+  final Rect transformedRect;
+  final Offset painterOffset;
+  final Offset translation;
+  final double scale;
+  final double wordProgress;
+  final double glow;
+  final double sigma;
+  final bool isRtl;
+}
+
 List<_KaraokeWordLayout> _buildKaraokeWordLayouts(
   String text,
   List<LyricWord> words,
@@ -3724,6 +3750,7 @@ void _paintWordEmphasis(
     amount = math.min(1.2, amount);
     blur = math.min(.8, blur);
 
+    final frames = <_KaraokeEmphasisFrame>[];
     for (var index = 0; index < group.characters.length; index++) {
       final character = group.characters[index];
       final delay = duration / 2.5 / group.characters.length * index;
@@ -3779,50 +3806,78 @@ void _paintWordEmphasis(
       final transformedRect = charRect
           .shift(translation)
           .inflate(fontSize * .12);
-
-      // AMLL 的强调变换叠加在常规逐词上浮之上；先清掉原字符，再绘制变换后的字形。
-      canvas.drawRect(charRect, Paint()..blendMode = BlendMode.clear);
       final glow = eased * amlEmphasisGlowOpacity(blur);
-      if (glow > .01) {
-        final sigma = amlEmphasisGlowSigmaEm(blur) * fontSize;
-        final glowPaint = Paint()
-          ..colorFilter = ColorFilter.mode(
-            Colors.white.withValues(alpha: glow.clamp(0.0, 1.0)),
-            BlendMode.srcIn,
-          )
-          ..imageFilter = ui.ImageFilter.blur(sigmaX: sigma, sigmaY: sigma);
-        canvas.saveLayer(transformedRect.inflate(sigma * 3), glowPaint);
-        _paintEmphasisGlyph(
-          canvas,
-          painter: layout.painter,
-          layout: layout,
-          rasterizedImage: rasterizedImage,
+      frames.add(
+        _KaraokeEmphasisFrame(
           charRect: charRect,
           wordRect: wordRect,
+          transformedRect: transformedRect,
           painterOffset: painterOffset,
           translation: translation,
           scale: scale,
           wordProgress: wordProgress,
+          glow: glow,
+          sigma: amlEmphasisGlowSigmaEm(blur) * fontSize,
           isRtl: sourceBox.direction == TextDirection.rtl,
-          // 辉光使用完整字形遮罩，避免再乘一次正文的低透明度。
-          baseAlpha: 1,
-          highlightAlpha: highlightAlpha,
-          includeHighlight: false,
+        ),
+      );
+    }
+
+    // 先清理整组字符的原位置，避免后绘字符擦除前一个字符扩散过来的辉光。
+    for (final frame in frames) {
+      canvas.drawRect(frame.charRect, Paint()..blendMode = BlendMode.clear);
+    }
+
+    // 辉光裁剪边界按模糊半径扩张；缩放后的局部边界仍覆盖完整的扩张区域。
+    for (final frame in frames) {
+      if (frame.glow <= .01) continue;
+      final glowPaint = Paint()
+        ..colorFilter = ColorFilter.mode(
+          Colors.white.withValues(alpha: frame.glow.clamp(0.0, 1.0)),
+          BlendMode.srcIn,
+        )
+        ..imageFilter = ui.ImageFilter.blur(
+          sigmaX: frame.sigma,
+          sigmaY: frame.sigma,
         );
-        canvas.restore();
-      }
+      final glowBleed = frame.sigma * 3;
+      canvas.saveLayer(frame.transformedRect.inflate(glowBleed), glowPaint);
       _paintEmphasisGlyph(
         canvas,
         painter: layout.painter,
         layout: layout,
         rasterizedImage: rasterizedImage,
-        charRect: charRect,
-        wordRect: wordRect,
-        painterOffset: painterOffset,
-        translation: translation,
-        scale: scale,
-        wordProgress: wordProgress,
-        isRtl: sourceBox.direction == TextDirection.rtl,
+        charRect: frame.charRect,
+        clipRect: frame.charRect.inflate(glowBleed / frame.scale),
+        wordRect: frame.wordRect,
+        painterOffset: frame.painterOffset,
+        translation: frame.translation,
+        scale: frame.scale,
+        wordProgress: frame.wordProgress,
+        isRtl: frame.isRtl,
+        // 辉光使用完整字形遮罩，避免再乘一次正文的低透明度。
+        baseAlpha: 1,
+        highlightAlpha: highlightAlpha,
+        includeHighlight: false,
+      );
+      canvas.restore();
+    }
+
+    // 所有辉光完成后再覆盖清晰字形，避免相邻字符的辉光被后续绘制顺序擦除。
+    for (final frame in frames) {
+      _paintEmphasisGlyph(
+        canvas,
+        painter: layout.painter,
+        layout: layout,
+        rasterizedImage: rasterizedImage,
+        charRect: frame.charRect,
+        clipRect: frame.charRect,
+        wordRect: frame.wordRect,
+        painterOffset: frame.painterOffset,
+        translation: frame.translation,
+        scale: frame.scale,
+        wordProgress: frame.wordProgress,
+        isRtl: frame.isRtl,
         baseAlpha: baseAlpha,
         highlightAlpha: highlightAlpha,
         includeHighlight: true,
@@ -3837,6 +3892,7 @@ void _paintEmphasisGlyph(
   required _KaraokeTextLayout layout,
   required ui.Image? rasterizedImage,
   required Rect charRect,
+  required Rect clipRect,
   required Rect wordRect,
   required Offset painterOffset,
   required Offset translation,
@@ -3854,7 +3910,7 @@ void _paintEmphasisGlyph(
   canvas.scale(scale);
   canvas.translate(-center.dx, -center.dy);
   canvas.save();
-  canvas.clipRect(charRect);
+  canvas.clipRect(clipRect);
   if (rasterizedImage == null) {
     _paintTextWithAlpha(canvas, painter, painterOffset, charRect, baseAlpha);
   } else {

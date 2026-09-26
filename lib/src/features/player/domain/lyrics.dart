@@ -616,6 +616,12 @@ Iterable<String> _normalizedLyricLines(String source) => source
 
   final words = <LyricWord>[];
   final textBuffer = StringBuffer();
+  // KRC 的首个词标记之前可能有未计时的前缀，显示文本仍须保留。
+  if (markers.first.start > 0) {
+    textBuffer.write(
+      _stripLyricMarkup(source.substring(0, markers.first.start)),
+    );
+  }
   for (var index = 0; index < markers.length; index++) {
     final marker = markers[index];
     final timing = _parseRelativeTiming(marker.group(0)!);
@@ -767,22 +773,16 @@ LyricsDocument _parseTtml(String source) {
         .where((element) => element.name.local.toLowerCase() == 'p')
         .toList();
     final root = document.rootElement;
-    final rootLanguage = _xmlAttribute(root, 'lang');
+    final timingParameters = _TtmlTimingParameters.fromRoot(root);
+    final timedElements = _resolveTtmlTimings(root, timingParameters);
+    final rootLanguage = _inheritedXmlAttribute(root, 'lang');
     final lines = <LyricLine>[];
     final plainLines = <String>[];
 
     for (final paragraph in paragraphs) {
-      final paragraphBegin = _parseTtmlTime(_xmlAttribute(paragraph, 'begin'));
-      final paragraphStart = paragraphBegin?.value;
-      final paragraphEndValue = _parseTtmlTime(_xmlAttribute(paragraph, 'end'));
-      final paragraphDuration = _parseTtmlTime(_xmlAttribute(paragraph, 'dur'));
-      // p 的 begin/end 都相对父时间容器；不能把 end 再叠加到 begin 上。
-      final paragraphEnd =
-          paragraphEndValue?.value ??
-          (paragraphStart != null && paragraphDuration != null
-              ? paragraphStart + paragraphDuration.value
-              : null);
-      final paragraphLanguage = _xmlAttribute(paragraph, 'lang');
+      final paragraphTiming = timedElements[paragraph];
+      if (paragraphTiming == null) continue;
+      final paragraphLanguage = _inheritedXmlAttribute(paragraph, 'lang');
       final role = _xmlAttribute(paragraph, 'role');
       final speaker = _firstNonEmpty([
         _xmlAttribute(paragraph, 'agent'),
@@ -802,22 +802,23 @@ LyricsDocument _parseTtml(String source) {
           .toList();
       final words = <LyricWord>[];
       for (final wordElement in wordElements) {
-        final rawBegin = _parseTtmlTime(_xmlAttribute(wordElement, 'begin'));
-        if (rawBegin == null) continue;
-        final wordStart = _resolveTtmlTime(rawBegin, paragraphStart);
-        final rawEnd = _parseTtmlTime(_xmlAttribute(wordElement, 'end'));
-        final rawDuration = _parseTtmlTime(_xmlAttribute(wordElement, 'dur'));
-        final wordEnd = rawEnd != null
-            ? _resolveTtmlTime(rawEnd, paragraphStart)
-            : rawDuration != null
-            ? wordStart + rawDuration.value
-            : null;
-        final text = _cleanTtmlText(wordElement.innerText);
+        final wordTiming = timedElements[wordElement];
+        if (wordTiming == null || _xmlAttribute(wordElement, 'begin') == null) {
+          continue;
+        }
+        if (wordTiming.end != null && wordTiming.start >= wordTiming.end!) {
+          continue;
+        }
+        final text = _cleanTtmlText(
+          wordElement.innerText,
+          preserveWhitespace:
+              _inheritedXmlAttribute(wordElement, 'space') == 'preserve',
+        );
         if (text.isEmpty) continue;
         words.add(
           LyricWord(
-            start: wordStart,
-            end: wordEnd,
+            start: wordTiming.start,
+            end: wordTiming.end,
             text: text,
             speaker: _firstNonEmpty([
               _xmlAttribute(wordElement, 'agent'),
@@ -826,18 +827,27 @@ LyricsDocument _parseTtml(String source) {
           ),
         );
       }
-      final text = _cleanTtmlText(paragraph.innerText);
+      final text = _cleanTtmlText(
+        paragraph.innerText,
+        preserveWhitespace:
+            _inheritedXmlAttribute(paragraph, 'space') == 'preserve',
+      );
       if (text.isEmpty) continue;
 
-      final start = paragraphStart ?? words.firstOrNull?.start;
+      final start = paragraphTiming.hasTiming
+          ? paragraphTiming.start
+          : words.firstOrNull?.start;
       if (start == null) {
         plainLines.add(text);
+        continue;
+      }
+      if (paragraphTiming.end != null && start >= paragraphTiming.end!) {
         continue;
       }
       lines.add(
         LyricLine(
           start: start,
-          end: paragraphEnd,
+          end: paragraphTiming.end,
           text: text,
           words: words,
           speaker: speaker,
@@ -963,111 +973,156 @@ List<LyricLine> _mergeTranslations(List<LyricLine> lines) {
       continue;
     }
 
-    final preceding = merged.last;
-    if (line.role == LyricRole.alternate &&
-        _lyricIntervalsOverlap(preceding, line)) {
-      merged.removeLast();
-      merged.add(
-        preceding.copyWith(
-          start: preceding.start <= line.start ? preceding.start : line.start,
-          end: _laterEnd(preceding.end, line.end),
-          variants: [
-            ...preceding.variants,
-            LyricVariant(
-              text: line.text,
-              start: line.start,
-              end: line.end,
-              words: line.words,
-              language: line.language,
-              speaker: line.speaker,
-              role: LyricRole.alternate,
-            ),
-          ],
-        ),
+    // 显式角色优先于文档顺序：翻译段落可以先于原文出现，但不能因此
+    // 把译文错误地当成主歌词。
+    if (line.role == LyricRole.translation) {
+      final originalIndex = merged.lastIndexWhere(
+        (candidate) =>
+            candidate.role == LyricRole.original &&
+            _sameLyricTiming(candidate, line),
       );
+      if (originalIndex == -1) {
+        merged.add(line);
+        continue;
+      }
+      final original = merged[originalIndex];
+      merged[originalIndex] = original.translation == null
+          ? original.copyWith(
+              start: original.start <= line.start ? original.start : line.start,
+              end: _laterEnd(original.end, line.end),
+              translation: line.text,
+              translationWords: line.words,
+            )
+          : _appendLyricVariant(original, line);
       continue;
     }
 
-    if (line.role == LyricRole.original &&
-        preceding.role == LyricRole.alternate &&
-        _lyricIntervalsOverlap(preceding, line)) {
-      merged.removeLast();
-      merged.add(
-        line.copyWith(
-          start: line.start <= preceding.start ? line.start : preceding.start,
-          end: _laterEnd(line.end, preceding.end),
+    if (line.role == LyricRole.original) {
+      final translationIndices = [
+        for (var index = 0; index < merged.length; index++)
+          if (merged[index].role == LyricRole.translation &&
+              _sameLyricTiming(merged[index], line))
+            index,
+      ];
+      if (translationIndices.isNotEmpty) {
+        final translations = [
+          for (final index in translationIndices) merged[index],
+        ];
+        var start = line.start;
+        var end = line.end;
+        for (final translation in translations) {
+          if (translation.start < start) start = translation.start;
+          end = _laterEnd(end, translation.end);
+        }
+        final primaryTranslation = translations.first;
+        final combined = line.copyWith(
+          start: start,
+          end: end,
+          translation: primaryTranslation.text,
+          translationWords: primaryTranslation.words,
           variants: [
             ...line.variants,
-            LyricVariant(
-              text: preceding.text,
-              start: preceding.start,
-              end: preceding.end,
-              words: preceding.words,
-              language: preceding.language,
-              speaker: preceding.speaker,
-              role: LyricRole.alternate,
-            ),
+            for (final translation in translations.skip(1))
+              LyricVariant(
+                text: translation.text,
+                start: translation.start,
+                end: translation.end,
+                words: translation.words,
+                language: translation.language,
+                speaker: translation.speaker,
+                role: LyricRole.translation,
+              ),
           ],
+        );
+        final insertionIndex = translationIndices.first;
+        for (final index in translationIndices.reversed) {
+          merged.removeAt(index);
+        }
+        merged.insert(insertionIndex, combined);
+        continue;
+      }
+
+      final alternateIndex = merged.lastIndexWhere(
+        (candidate) =>
+            candidate.role == LyricRole.alternate &&
+            _lyricIntervalsOverlap(candidate, line),
+      );
+      if (alternateIndex != -1) {
+        final alternate = merged[alternateIndex];
+        merged[alternateIndex] = _appendLyricVariant(
+          line.copyWith(
+            start: line.start <= alternate.start ? line.start : alternate.start,
+            end: _laterEnd(line.end, alternate.end),
+          ),
+          alternate,
+        );
+        continue;
+      }
+    }
+
+    if (line.role == LyricRole.alternate) {
+      final originalIndex = merged.lastIndexWhere(
+        (candidate) =>
+            candidate.role == LyricRole.original &&
+            _lyricIntervalsOverlap(candidate, line),
+      );
+      if (originalIndex == -1) {
+        merged.add(line);
+        continue;
+      }
+      merged[originalIndex] = _appendLyricVariant(
+        merged[originalIndex].copyWith(
+          start: merged[originalIndex].start <= line.start
+              ? merged[originalIndex].start
+              : line.start,
         ),
+        line,
       );
       continue;
     }
 
-    if (merged.isEmpty || !_sameLyricTiming(merged.last, line)) {
+    // 未声明角色时仍使用“同起始时间或同结束时间”的兼容规则。
+    // 查找整个已合并列表，而不只比较上一行，避免中间插入其他歌词后失配。
+    final matchingIndex = merged.lastIndexWhere(
+      (candidate) =>
+          candidate.role == LyricRole.original &&
+          _sameLyricTiming(candidate, line),
+    );
+    if (matchingIndex == -1) {
       merged.add(line);
       continue;
     }
 
-    final previous = merged.removeLast();
-    if (line.role == LyricRole.alternate) {
-      merged.add(
-        previous.copyWith(
-          start: previous.start <= line.start ? previous.start : line.start,
-          end: _laterEnd(previous.end, line.end),
-          variants: [
-            ...previous.variants,
-            LyricVariant(
-              text: line.text,
-              start: line.start,
-              end: line.end,
-              words: line.words,
-              language: line.language,
-              speaker: line.speaker,
-              role: LyricRole.alternate,
-            ),
-          ],
-        ),
-      );
-    } else if (line.role == LyricRole.translation ||
-        previous.translation == null) {
-      merged.add(
-        previous.copyWith(
-          end: _laterEnd(previous.end, line.end),
-          translation: line.text,
-          translationWords: line.words,
-        ),
-      );
-    } else {
-      merged.add(
-        previous.copyWith(
-          end: _laterEnd(previous.end, line.end),
-          variants: [
-            ...previous.variants,
-            LyricVariant(
-              text: line.text,
-              start: line.start,
-              end: line.end,
-              words: line.words,
-              language: line.language,
-              speaker: line.speaker,
-              role: LyricRole.alternate,
-            ),
-          ],
-        ),
-      );
-    }
+    final previous = merged[matchingIndex];
+    merged[matchingIndex] = previous.translation == null
+        ? previous.copyWith(
+            end: _laterEnd(previous.end, line.end),
+            translation: line.text,
+            translationWords: line.words,
+          )
+        : _appendLyricVariant(previous, line);
   }
   return merged;
+}
+
+LyricLine _appendLyricVariant(LyricLine base, LyricLine variant) {
+  return base.copyWith(
+    end: _laterEnd(base.end, variant.end),
+    variants: [
+      ...base.variants,
+      LyricVariant(
+        text: variant.text,
+        start: variant.start,
+        end: variant.end,
+        words: variant.words,
+        language: variant.language,
+        speaker: variant.speaker,
+        role: variant.role == LyricRole.translation
+            ? LyricRole.translation
+            : LyricRole.alternate,
+      ),
+    ],
+  );
 }
 
 bool _lyricIntervalsOverlap(LyricLine first, LyricLine second) {
@@ -1126,10 +1181,13 @@ _LrcTiming? _parseRelativeTiming(String value) {
   );
 }
 
-({Duration value, bool relative})? _parseTtmlTime(String? value) {
+({Duration value, bool relative})? _parseTtmlTime(
+  String? value,
+  _TtmlTimingParameters parameters,
+) {
   if (value == null || value.trim().isEmpty) return null;
   final text = value.trim().toLowerCase();
-  final unitMatch = RegExp(r'^([+-]?\d+(?:\.\d+)?)(ms|s|m|h)$')
+  final unitMatch = RegExp(r'^([+-]?\d+(?:\.\d+)?)(ms|s|m|h|f|t)$')
       .firstMatch(text);
   if (unitMatch != null) {
     final number = double.parse(unitMatch.group(1)!);
@@ -1139,9 +1197,31 @@ _LrcTiming? _parseRelativeTiming(String value) {
       's' => (number * second).round(),
       'm' => (number * 60 * second).round(),
       'h' => (number * 3600 * second).round(),
+      'f' => (number * second / parameters.effectiveFrameRate).round(),
+      't' => (number * second / parameters.tickRate).round(),
       _ => 0,
     };
     return (value: Duration(microseconds: microseconds), relative: true);
+  }
+
+  final frameClock = RegExp(r'^(\d+):(\d{2}):(\d{2}):(\d+)(?:\.(\d+))?$')
+      .firstMatch(text);
+  if (frameClock != null) {
+    final hours = int.parse(frameClock.group(1)!);
+    final minutes = int.parse(frameClock.group(2)!);
+    final seconds = int.parse(frameClock.group(3)!);
+    final frames = int.parse(frameClock.group(4)!);
+    final subframes = int.tryParse(frameClock.group(5) ?? '0') ?? 0;
+    final wholeSeconds = hours * 3600 + minutes * 60 + seconds;
+    final frameFraction =
+        (frames + subframes / parameters.subFrameRate) /
+        parameters.effectiveFrameRate;
+    return (
+      value: Duration(
+        microseconds: ((wholeSeconds + frameFraction) * 1000000).round(),
+      ),
+      relative: false,
+    );
   }
 
   final parts = text.split(':');
@@ -1181,6 +1261,102 @@ Duration _resolveTtmlTime(
   if (time.relative && parentStart != null) return parentStart + time.value;
   return time.value;
 }
+
+Map<XmlElement, _TtmlElementTiming> _resolveTtmlTimings(
+  XmlElement root,
+  _TtmlTimingParameters parameters,
+) {
+  final result = <XmlElement, _TtmlElementTiming>{};
+
+  _TtmlElementTiming visit(
+    XmlElement element,
+    _TtmlElementTiming parentTiming, {
+    Duration? sequenceReference,
+  }) {
+    final reference = sequenceReference ?? parentTiming.start;
+    final rawBegin = _parseTtmlTime(
+      _xmlAttribute(element, 'begin'),
+      parameters,
+    );
+    final start = rawBegin == null
+        ? reference
+        : _resolveTtmlTime(rawBegin, reference);
+    final rawEnd = _parseTtmlTime(_xmlAttribute(element, 'end'), parameters);
+    final rawDuration = _parseTtmlTime(
+      _xmlAttribute(element, 'dur'),
+      parameters,
+    );
+    final explicitEnd = rawEnd == null
+        ? null
+        : _resolveTtmlTime(rawEnd, reference);
+    final durationEnd = rawDuration == null ? null : start + rawDuration.value;
+    var end = explicitEnd == null
+        ? durationEnd
+        : durationEnd == null || explicitEnd <= durationEnd
+        ? explicitEnd
+        : durationEnd;
+    final localTiming =
+        _xmlAttribute(element, 'begin') != null ||
+        _xmlAttribute(element, 'end') != null ||
+        _xmlAttribute(element, 'dur') != null;
+    final sequenceContainer =
+        _xmlAttribute(element, 'timeContainer')?.toLowerCase() == 'seq';
+    final parentEnd = parentTiming.end;
+    if (parentEnd != null && (end == null || end > parentEnd)) end = parentEnd;
+    final boundedStart = parentEnd != null && start > parentEnd
+        ? parentEnd
+        : start;
+    final childContext = _TtmlElementTiming(
+      start: boundedStart,
+      end: end,
+      hasTiming:
+          parentTiming.hasTiming || localTiming || sequenceReference != null,
+    );
+    final children = element.children.whereType<XmlElement>();
+    var sequenceCursor = boundedStart;
+    var latestChildEnd = end;
+    for (final child in children) {
+      final childTiming = visit(
+        child,
+        childContext,
+        sequenceReference: sequenceContainer ? sequenceCursor : null,
+      );
+      final childEnd = childTiming.end;
+      if (childEnd != null) {
+        if (latestChildEnd == null || childEnd > latestChildEnd) {
+          latestChildEnd = childEnd;
+        }
+        if (sequenceContainer) sequenceCursor = childEnd;
+      } else if (sequenceContainer) {
+        sequenceCursor = childTiming.start;
+      }
+    }
+
+    final finalTiming = _TtmlElementTiming(
+      start: boundedStart,
+      end: latestChildEnd,
+      hasTiming: childContext.hasTiming,
+    );
+    result[element] = finalTiming;
+    return finalTiming;
+  }
+
+  visit(root, const _TtmlElementTiming(start: Duration.zero, hasTiming: false));
+  return result;
+}
+
+String? _inheritedXmlAttribute(XmlElement element, String localName) {
+  final current = _xmlAttribute(element, localName);
+  if (current != null) return current;
+  for (final ancestor in element.ancestorElements) {
+    final inherited = _xmlAttribute(ancestor, localName);
+    if (inherited != null) return inherited;
+  }
+  return null;
+}
+
+String _cleanTtmlText(String value, {bool preserveWhitespace = false}) =>
+    preserveWhitespace ? value : value.replaceAll(RegExp(r'\s+'), ' ').trim();
 
 ({String text, List<LyricWord> words, Duration? firstStart}) _parseLrcWords(
   String text, {
@@ -1311,9 +1487,6 @@ bool _isBackgroundRole(String? role) {
       normalized.contains('duet');
 }
 
-String _cleanTtmlText(String value) =>
-    value.replaceAll(RegExp(r'\s+'), ' ').trim();
-
 String _stripLyricMarkup(String value) => value
     .replaceAll(RegExp(r'<[^>]+>'), '')
     .replaceAll(RegExp(r'\{[^}]*\}'), '');
@@ -1346,6 +1519,60 @@ class _LrcTiming {
 
   final Duration start;
   final Duration? end;
+}
+
+class _TtmlTimingParameters {
+  const _TtmlTimingParameters({
+    required this.effectiveFrameRate,
+    required this.subFrameRate,
+    required this.tickRate,
+  });
+
+  final double effectiveFrameRate;
+  final double subFrameRate;
+  final double tickRate;
+
+  factory _TtmlTimingParameters.fromRoot(XmlElement root) {
+    final declaredFrameRate =
+        double.tryParse(_xmlAttribute(root, 'frameRate') ?? '') ?? 30;
+    final multiplier = RegExp(r'^(\d+)\s+(\d+)$')
+        .firstMatch(_xmlAttribute(root, 'frameRateMultiplier') ?? '');
+    final multiplierNumerator =
+        double.tryParse(multiplier?.group(1) ?? '') ?? 1;
+    final multiplierDenominator =
+        double.tryParse(multiplier?.group(2) ?? '') ?? 1;
+    final effectiveFrameRate =
+        declaredFrameRate *
+        multiplierNumerator /
+        (multiplierDenominator == 0 ? 1 : multiplierDenominator);
+    final subFrameRate =
+        double.tryParse(_xmlAttribute(root, 'subFrameRate') ?? '') ?? 1;
+    final declaredTickRate = double.tryParse(
+      _xmlAttribute(root, 'tickRate') ?? '',
+    );
+    final tickRate =
+        declaredTickRate ??
+        (_xmlAttribute(root, 'frameRate') == null
+            ? 1
+            : effectiveFrameRate * subFrameRate);
+    return _TtmlTimingParameters(
+      effectiveFrameRate: effectiveFrameRate > 0 ? effectiveFrameRate : 30,
+      subFrameRate: subFrameRate > 0 ? subFrameRate : 1,
+      tickRate: tickRate > 0 ? tickRate : 1,
+    );
+  }
+}
+
+class _TtmlElementTiming {
+  const _TtmlElementTiming({
+    required this.start,
+    this.end,
+    required this.hasTiming,
+  });
+
+  final Duration start;
+  final Duration? end;
+  final bool hasTiming;
 }
 
 List<LyricWord> _completeWordEnds(List<LyricWord> words) {

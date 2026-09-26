@@ -115,6 +115,27 @@ void main() {
     expect(document.lines.single.translation, '译文');
   });
 
+  test('同结束时间的翻译可跨过不相关歌词合并', () {
+    final document = parseLyricsFile('''
+1
+00:00:01,000 --> 00:00:03,000
+原文
+
+2
+00:00:02,000 --> 00:00:04,000
+中间歌词
+
+3
+00:00:02,500 --> 00:00:03,000
+译文
+''', extension: '.srt');
+
+    expect(document.lines, hasLength(2));
+    expect(document.lines.first.text, '原文');
+    expect(document.lines.first.translation, '译文');
+    expect(document.lines.last.text, '中间歌词');
+  });
+
   test('解析 QRC 的绝对逐字时间并合并翻译', () {
     final document = parseLyricsFile('''
 [1000,2000]你(1000,500)好(1500,500)
@@ -157,6 +178,54 @@ void main() {
       document.lines.single.words.last.start,
       const Duration(milliseconds: 1500),
     );
+  });
+
+  test('等价的逐字 LRC、QRC、YRC、KRC 与 TTML 归一化结果一致', () {
+    final samples = [
+      parseLyricsFile(
+        '[00:01.00]<00:01.00>你<00:01.50>好<00:02.00>',
+        extension: '.lrc',
+      ),
+      parseLyricsFile('[1000,1000]你(1000,500)好(1500,500)', extension: '.qrc'),
+      parseLyricsFile(
+        '[1000,1000](1000,500,0)你(1500,500,0)好',
+        extension: '.yrc',
+      ),
+      parseLyricsFile('[1000,1000]<0,500,0>你<500,500,0>好', extension: '.krc'),
+      parseLyricsFile('''
+<tt xmlns="http://www.w3.org/ns/ttml"><body><div>
+  <p begin="1s" end="2s"><span begin="0s" end="0.5s">你</span><span begin="0.5s" end="1s">好</span></p>
+</div></body></tt>
+'''),
+    ];
+
+    for (final document in samples) {
+      expect(document.timing, LyricsTiming.word);
+      expect(document.lines, hasLength(1));
+      final line = document.lines.single;
+      expect(line.text, '你好');
+      expect(line.start, const Duration(seconds: 1));
+      expect(line.end, const Duration(seconds: 2));
+      expect(line.words.map((word) => word.text), ['你', '好']);
+      expect(line.words.map((word) => word.start), [
+        const Duration(seconds: 1),
+        const Duration(milliseconds: 1500),
+      ]);
+      expect(line.words.map((word) => word.end), [
+        const Duration(milliseconds: 1500),
+        const Duration(seconds: 2),
+      ]);
+    }
+  });
+
+  test('KRC 首个词时间之前的无时间前缀不会丢失', () {
+    final document = parseLyricsFile(
+      '[1000,2000]前缀<0,500,0>正文',
+      extension: '.krc',
+    );
+
+    expect(document.lines.single.text, '前缀正文');
+    expect(document.lines.single.words.single.text, '正文');
   });
 
   test('相同时间的下行歌词优先识别为翻译', () {
@@ -210,6 +279,110 @@ void main() {
     expect(document.lines.single.text, 'Hello');
     expect(document.lines.single.translation, '你好');
     expect(document.lines.single.words, hasLength(2));
+  });
+
+  test('TTML 显式翻译段落先于原文时仍保持主副行语义', () {
+    final document = parseLyricsFile('''
+<tt xmlns="http://www.w3.org/ns/ttml" xml:lang="en">
+  <body><div>
+    <p begin="1s" end="3s" xml:lang="zh" role="translation">你好</p>
+    <p begin="1s" end="3s">Hello</p>
+  </div></body>
+</tt>
+''');
+
+    expect(document.lines, hasLength(1));
+    expect(document.lines.single.text, 'Hello');
+    expect(document.lines.single.translation, '你好');
+  });
+
+  test('TTML 中原文之后的多个显式翻译保留为主译文和变体', () {
+    final document = parseLyricsFile('''
+<tt xmlns="http://www.w3.org/ns/ttml" xml:lang="en"><body><div>
+  <p begin="1s" end="3s">Hello</p>
+  <p begin="1s" end="3s" xml:lang="zh" role="translation">你好</p>
+  <p begin="1s" end="3s" xml:lang="ja" role="translation">こんにちは</p>
+</div></body></tt>
+''');
+
+    expect(document.lines, hasLength(1));
+    expect(document.lines.single.text, 'Hello');
+    expect(document.lines.single.translation, '你好');
+    expect(document.lines.single.variants, hasLength(1));
+    expect(document.lines.single.variants.single.text, 'こんにちは');
+    expect(document.lines.single.variants.single.role, LyricRole.translation);
+  });
+
+  test('TTML 逐层累计父容器偏移，并解析帧和刻度时间', () {
+    final nested = parseLyricsFile('''
+<tt xmlns="http://www.w3.org/ns/ttml">
+  <body begin="5s"><div begin="2s">
+    <p begin="1s" dur="3s"><span begin="0s" dur="1s">词</span></p>
+  </div></body>
+</tt>
+''');
+    expect(nested.lines.single.start, const Duration(seconds: 8));
+    expect(nested.lines.single.end, const Duration(seconds: 11));
+    expect(nested.lines.single.words.single.start, const Duration(seconds: 8));
+    expect(nested.lines.single.words.single.end, const Duration(seconds: 9));
+
+    final framesAndTicks = parseLyricsFile('''
+<tt xmlns="http://www.w3.org/ns/ttml"
+    xmlns:ttp="http://www.w3.org/ns/ttml#parameter"
+    ttp:frameRate="25" ttp:tickRate="50">
+  <body><div><p begin="25f" dur="50t">一秒</p></div></body>
+</tt>
+''');
+    expect(framesAndTicks.lines.single.start, const Duration(seconds: 1));
+    expect(framesAndTicks.lines.single.end, const Duration(seconds: 2));
+  });
+
+  test('TTML seq 容器中未显式定位的行接续前一行', () {
+    final document = parseLyricsFile('''
+<tt xmlns="http://www.w3.org/ns/ttml"><body>
+  <div timeContainer="seq">
+    <p dur="1s">第一句</p>
+    <p dur="1s">第二句</p>
+  </div>
+</body></tt>
+''');
+
+    expect(document.lines.map((line) => line.start), [
+      Duration.zero,
+      const Duration(seconds: 1),
+    ]);
+    expect(document.lines.map((line) => line.end), [
+      const Duration(seconds: 1),
+      const Duration(seconds: 2),
+    ]);
+  });
+
+  test('TTML seq 容器按前一行逐字结束时间继续排布', () {
+    final document = parseLyricsFile('''
+<tt xmlns="http://www.w3.org/ns/ttml"><body>
+  <div timeContainer="seq">
+    <p><span begin="0s" dur="1s">第一句</span></p>
+    <p dur="1s">第二句</p>
+  </div>
+</body></tt>
+''');
+
+    expect(document.lines.map((line) => line.start), [
+      Duration.zero,
+      const Duration(seconds: 1),
+    ]);
+    expect(document.lines.map((line) => line.end), [
+      const Duration(seconds: 1),
+      const Duration(seconds: 2),
+    ]);
+  });
+
+  test('TTML xml:space preserve 保留歌词中的原始空格', () {
+    final document = parseLyricsFile('''
+<tt xmlns="http://www.w3.org/ns/ttml" xml:space="preserve"><body><div><p begin="0s">你  好</p></div></body></tt>
+''');
+
+    expect(document.lines.single.text, '你  好');
   });
 
   test('TTML 的 dur 和逐字结束时间可以保留间奏边界', () {
@@ -314,6 +487,79 @@ void main() {
     expect(document.lines, hasLength(1));
     expect(document.lines.single.text, '原文');
     expect(document.lines.single.translation, 'Translation');
+  });
+
+  test('高优先级翻译来源不会挤掉可用的原文来源', () {
+    final document = parseLyricsSources([
+      const LyricsSource(
+        content: '[00:01.00]原文',
+        kind: LyricsSourceKind.embedded,
+        tagName: 'LRC',
+      ),
+      const LyricsSource(
+        content: '[00:01.00]译文',
+        kind: LyricsSourceKind.sidecar,
+        extension: '.lrc',
+        role: LyricRole.translation,
+        tagName: 'SYNCEDLYRICS',
+      ),
+    ]);
+
+    expect(document.lines.single.text, '原文');
+    expect(document.lines.single.translation, '译文');
+  });
+
+  test('外挂无时间翻译按行号合并到带时间原文且不会重复使用', () {
+    final document = parseLyricsSources([
+      const LyricsSource(
+        content: '''
+1
+00:00:01,000 --> 00:00:03,000
+第一句
+
+2
+00:00:02,000 --> 00:00:04,000
+第二句
+''',
+        kind: LyricsSourceKind.embedded,
+        extension: '.srt',
+      ),
+      const LyricsSource(
+        content: '第一句译文\n第二句译文',
+        kind: LyricsSourceKind.sidecar,
+        extension: '.txt',
+        role: LyricRole.translation,
+      ),
+    ]);
+
+    expect(document.lines.map((line) => line.translation), ['第一句译文', '第二句译文']);
+  });
+
+  test('外挂同步翻译的一条记录最多关联一行', () {
+    final document = parseLyricsSources([
+      const LyricsSource(
+        content: '''
+1
+00:00:01,000 --> 00:00:03,000
+原文一
+
+2
+00:00:02,000 --> 00:00:04,000
+原文二
+''',
+        kind: LyricsSourceKind.embedded,
+        extension: '.srt',
+      ),
+      const LyricsSource(
+        content: '1\n00:00:01,000 --> 00:00:04,000\n单条译文',
+        kind: LyricsSourceKind.sidecar,
+        extension: '.srt',
+        role: LyricRole.translation,
+      ),
+    ]);
+
+    expect(document.lines.first.translation, '单条译文');
+    expect(document.lines.last.translation, isNull);
   });
 
   test('Track 对旧数据也能提供统一歌词文档', () {
