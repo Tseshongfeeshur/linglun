@@ -2707,81 +2707,86 @@ class _AnimatedLyricRow extends StatelessWidget {
           alignment: isDuet ? Alignment.centerRight : Alignment.centerLeft,
           duration: const Duration(milliseconds: 400),
           curve: Curves.easeOutCubic,
-          child: _LyricHoverBackground(
-            key: ValueKey('lyric-hover-${line.start.inMicroseconds}'),
-            borderRadius: fontSize * .25,
-            child: InkWell(
-              onTap: onTap,
-              hoverColor: Colors.transparent,
-              focusColor: Colors.transparent,
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              borderRadius: BorderRadius.circular(fontSize * .25),
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                  horizontalPadding,
-                  verticalPadding,
-                  horizontalPadding,
-                  verticalPadding,
-                ),
-                child: Align(
-                  alignment: isDuet
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: isDuet
-                        ? CrossAxisAlignment.end
-                        : CrossAxisAlignment.start,
-                    children: [
-                      TweenAnimationBuilder<double>(
-                        tween: Tween(end: active ? 1 : 0),
-                        duration: Duration(milliseconds: active ? 300 : 450),
-                        curve: Curves.easeOut,
-                        builder: (context, maskProgress, _) => _LyricText(
-                          text: line.text,
-                          words: line.words,
-                          position: position,
-                          color: Colors.white,
-                          baseAlpha: .2 + .2 * maskProgress,
-                          highlightAlpha: .2 + .8 * maskProgress,
-                          fontSize: fontSize,
-                          weight: _lyricMainFontWeight,
-                          textAlign: isDuet ? TextAlign.end : TextAlign.start,
-                          animateWords: active && line.words.isNotEmpty,
-                          enableCharacterEmphasis:
-                              active && line.words.isNotEmpty,
-                          active: active,
+          // 先把整行栅格化，再由 AnimatedScale 只对合成层做缩放。
+          // 否则普通 Text 子树会在缩放过程中重新参与字形像素量化。
+          child: RepaintBoundary(
+            key: ValueKey('lyric-scale-layer-${line.start.inMicroseconds}'),
+            child: _LyricHoverBackground(
+              key: ValueKey('lyric-hover-${line.start.inMicroseconds}'),
+              borderRadius: fontSize * .25,
+              child: InkWell(
+                onTap: onTap,
+                hoverColor: Colors.transparent,
+                focusColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                borderRadius: BorderRadius.circular(fontSize * .25),
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    verticalPadding,
+                    horizontalPadding,
+                    verticalPadding,
+                  ),
+                  child: Align(
+                    alignment: isDuet
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: isDuet
+                          ? CrossAxisAlignment.end
+                          : CrossAxisAlignment.start,
+                      children: [
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(end: active ? 1 : 0),
+                          duration: Duration(milliseconds: active ? 300 : 450),
+                          curve: Curves.easeOut,
+                          builder: (context, maskProgress, _) => _LyricText(
+                            text: line.text,
+                            words: line.words,
+                            position: position,
+                            color: Colors.white,
+                            baseAlpha: .2 + .2 * maskProgress,
+                            highlightAlpha: .2 + .8 * maskProgress,
+                            fontSize: fontSize,
+                            weight: _lyricMainFontWeight,
+                            textAlign: isDuet ? TextAlign.end : TextAlign.start,
+                            animateWords: active && line.words.isNotEmpty,
+                            enableCharacterEmphasis:
+                                active && line.words.isNotEmpty,
+                            active: active,
+                          ),
                         ),
-                      ),
-                      if (line.translation != null &&
-                          line.translation!.trim().isNotEmpty) ...[
-                        SizedBox(height: subLineGap),
-                        _LyricText(
-                          text: line.translation!,
-                          words: const [],
-                          position: position,
-                          color: Colors.white.withAlpha(77),
-                          fontSize: _translationFontSize(fontSize),
-                          weight: _lyricTranslationFontWeight,
-                          textAlign: isDuet ? TextAlign.end : TextAlign.start,
-                          lineHeight: 1.5,
-                          animateWords: false,
-                        ),
+                        if (line.translation != null &&
+                            line.translation!.trim().isNotEmpty) ...[
+                          SizedBox(height: subLineGap),
+                          _LyricText(
+                            text: line.translation!,
+                            words: const [],
+                            position: position,
+                            color: Colors.white.withAlpha(77),
+                            fontSize: _translationFontSize(fontSize),
+                            weight: _lyricTranslationFontWeight,
+                            textAlign: isDuet ? TextAlign.end : TextAlign.start,
+                            lineHeight: 1.5,
+                            animateWords: false,
+                          ),
+                        ],
+                        for (final variant in line.variants) ...[
+                          SizedBox(height: subLineGap),
+                          _AnimatedBackgroundLyric(
+                            variant: variant,
+                            line: line,
+                            position: position,
+                            active: _variantIsActive(variant, line, position),
+                            isPlaying: isPlaying,
+                            speakerOrder: speakerOrder,
+                            fontSize: fontSize,
+                          ),
+                        ],
                       ],
-                      for (final variant in line.variants) ...[
-                        SizedBox(height: subLineGap),
-                        _AnimatedBackgroundLyric(
-                          variant: variant,
-                          line: line,
-                          position: position,
-                          active: _variantIsActive(variant, line, position),
-                          isPlaying: isPlaying,
-                          speakerOrder: speakerOrder,
-                          fontSize: fontSize,
-                        ),
-                      ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -3015,6 +3020,7 @@ class _LyricText extends StatelessWidget {
       locale: locale,
       textAlign: textAlign,
       textScaler: MediaQuery.textScalerOf(context),
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
       textHeightBehavior: textHeightBehavior,
       textWidthBasis: defaultTextStyle.textWidthBasis,
       active: active,
@@ -3037,6 +3043,7 @@ class _KaraokeLyricView extends StatefulWidget {
     required this.locale,
     required this.textAlign,
     required this.textScaler,
+    required this.devicePixelRatio,
     required this.textHeightBehavior,
     required this.textWidthBasis,
     required this.active,
@@ -3055,6 +3062,7 @@ class _KaraokeLyricView extends StatefulWidget {
   final Locale? locale;
   final TextAlign textAlign;
   final TextScaler textScaler;
+  final double devicePixelRatio;
   final TextHeightBehavior? textHeightBehavior;
   final TextWidthBasis textWidthBasis;
   final bool active;
@@ -3083,10 +3091,16 @@ class _KaraokeLyricViewState extends State<_KaraokeLyricView> {
           locale: widget.locale,
           textAlign: widget.textAlign,
           textScaler: widget.textScaler,
+          devicePixelRatio: widget.devicePixelRatio,
           textHeightBehavior: widget.textHeightBehavior,
           textWidthBasis: widget.textWidthBasis,
           width: width,
         )) {
+      if (widget.active &&
+          widget.animateWords &&
+          widget.enableCharacterEmphasis) {
+        cached.rasterizeGlyphs(widget.devicePixelRatio);
+      }
       return cached;
     }
 
@@ -3099,10 +3113,16 @@ class _KaraokeLyricViewState extends State<_KaraokeLyricView> {
       locale: widget.locale,
       textAlign: widget.textAlign,
       textScaler: widget.textScaler,
+      devicePixelRatio: widget.devicePixelRatio,
       textHeightBehavior: widget.textHeightBehavior,
       textWidthBasis: widget.textWidthBasis,
       width: width,
     );
+    if (widget.active &&
+        widget.animateWords &&
+        widget.enableCharacterEmphasis) {
+      replacement.rasterizeGlyphs(widget.devicePixelRatio);
+    }
     cached?.dispose();
     return _layout = replacement;
   }
@@ -3166,6 +3186,7 @@ class _KaraokeTextLayout {
     required this.locale,
     required this.textAlign,
     required this.textScaler,
+    required this.devicePixelRatio,
     required this.textHeightBehavior,
     required this.textWidthBasis,
     required this.width,
@@ -3192,12 +3213,15 @@ class _KaraokeTextLayout {
   final Locale? locale;
   final TextAlign textAlign;
   final TextScaler textScaler;
+  final double devicePixelRatio;
   final TextHeightBehavior? textHeightBehavior;
   final TextWidthBasis textWidthBasis;
   final double width;
   late final TextPainter painter;
   late final List<_KaraokeWordLayout> wordLayouts;
   late final List<_KaraokeEmphasisGroup> emphasisGroups;
+  ui.Image? rasterizedImage;
+  double rasterizedPixelRatio = 0;
 
   bool matches({
     required String text,
@@ -3207,6 +3231,7 @@ class _KaraokeTextLayout {
     required Locale? locale,
     required TextAlign textAlign,
     required TextScaler textScaler,
+    required double devicePixelRatio,
     required TextHeightBehavior? textHeightBehavior,
     required TextWidthBasis textWidthBasis,
     required double width,
@@ -3218,11 +3243,44 @@ class _KaraokeTextLayout {
       this.locale == locale &&
       this.textAlign == textAlign &&
       this.textScaler == textScaler &&
+      this.devicePixelRatio == devicePixelRatio &&
       this.textHeightBehavior == textHeightBehavior &&
       this.textWidthBasis == textWidthBasis &&
       this.width == width;
 
+  /// 将整行文字预先栅格化，动画帧只采样图像，不再重复触发字形 hinting。
+  void rasterizeGlyphs(double devicePixelRatio) {
+    final screenRatio = devicePixelRatio.isFinite && devicePixelRatio > 0
+        ? devicePixelRatio
+        : 1.0;
+    final ratio = math.min(3.0, screenRatio * 1.5);
+    if (rasterizedImage != null && rasterizedPixelRatio == ratio) return;
+
+    rasterizedImage?.dispose();
+    rasterizedImage = null;
+    rasterizedPixelRatio = 0;
+
+    final pixelWidth = math.max(1, (width * ratio).ceil());
+    final pixelHeight = math.max(1, (painter.height * ratio).ceil());
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.scale(ratio, ratio);
+    painter.paint(canvas, Offset.zero);
+    final picture = recorder.endRecording();
+    try {
+      rasterizedImage = picture.toImageSync(pixelWidth, pixelHeight);
+      rasterizedPixelRatio = ratio;
+    } catch (_) {
+      // 软件渲染或测试环境无法同步转图时，绘制层会回退到 TextPainter。
+      rasterizedImage = null;
+      rasterizedPixelRatio = 0;
+    } finally {
+      picture.dispose();
+    }
+  }
+
   void dispose() {
+    rasterizedImage?.dispose();
     painter.dispose();
   }
 }
@@ -3517,13 +3575,26 @@ void _paintWordHighlight(
   double progress,
   bool isRtl,
   Offset painterOffset,
-  double alpha,
-) {
+  double alpha, {
+  _KaraokeTextLayout? layout,
+  ui.Image? rasterizedImage,
+}) {
   if (progress <= 0) return;
   if (progress >= 1) {
     canvas.save();
     canvas.clipRect(wordRect);
-    _paintTextWithAlpha(canvas, painter, painterOffset, wordRect, alpha);
+    if (layout == null || rasterizedImage == null) {
+      _paintTextWithAlpha(canvas, painter, painterOffset, wordRect, alpha);
+    } else {
+      _paintRasterizedTextWithAlpha(
+        canvas,
+        layout,
+        rasterizedImage,
+        painterOffset,
+        wordRect,
+        alpha,
+      );
+    }
     canvas.restore();
     return;
   }
@@ -3556,7 +3627,11 @@ void _paintWordHighlight(
     Paint()..color = Colors.white.withValues(alpha: alpha.clamp(0.0, 1.0)),
   );
   canvas.clipRect(wordRect);
-  painter.paint(canvas, painterOffset);
+  if (layout == null || rasterizedImage == null) {
+    painter.paint(canvas, painterOffset);
+  } else {
+    _drawRasterizedText(canvas, layout, rasterizedImage, painterOffset);
+  }
   canvas.drawRect(
     wordRect,
     Paint()
@@ -3564,6 +3639,40 @@ void _paintWordHighlight(
       ..blendMode = BlendMode.dstIn,
   );
   canvas.restore();
+}
+
+void _paintRasterizedTextWithAlpha(
+  Canvas canvas,
+  _KaraokeTextLayout layout,
+  ui.Image image,
+  Offset offset,
+  Rect bounds,
+  double alpha,
+) {
+  final boundedAlpha = alpha.clamp(0.0, 1.0);
+  if (boundedAlpha <= 0) return;
+  if (boundedAlpha < 1) {
+    canvas.saveLayer(
+      bounds,
+      Paint()..color = Colors.white.withValues(alpha: boundedAlpha),
+    );
+  }
+  _drawRasterizedText(canvas, layout, image, offset);
+  if (boundedAlpha < 1) canvas.restore();
+}
+
+void _drawRasterizedText(
+  Canvas canvas,
+  _KaraokeTextLayout layout,
+  ui.Image image,
+  Offset offset,
+) {
+  canvas.drawImageRect(
+    image,
+    Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+    Rect.fromLTWH(offset.dx, offset.dy, layout.width, layout.painter.height),
+    Paint()..filterQuality = FilterQuality.high,
+  );
 }
 
 void _paintTextWithAlpha(
@@ -3597,6 +3706,7 @@ void _paintWordEmphasis(
   required bool isBackground,
 }) {
   final elapsedAt = position.inMicroseconds;
+  final rasterizedImage = layout.rasterizedImage;
   for (final group in layout.emphasisGroups) {
     if (group.characters.isEmpty) continue;
     final baseDuration = math.max(
@@ -3685,6 +3795,8 @@ void _paintWordEmphasis(
         _paintEmphasisGlyph(
           canvas,
           painter: layout.painter,
+          layout: layout,
+          rasterizedImage: rasterizedImage,
           charRect: charRect,
           wordRect: wordRect,
           painterOffset: painterOffset,
@@ -3702,6 +3814,8 @@ void _paintWordEmphasis(
       _paintEmphasisGlyph(
         canvas,
         painter: layout.painter,
+        layout: layout,
+        rasterizedImage: rasterizedImage,
         charRect: charRect,
         wordRect: wordRect,
         painterOffset: painterOffset,
@@ -3720,6 +3834,8 @@ void _paintWordEmphasis(
 void _paintEmphasisGlyph(
   Canvas canvas, {
   required TextPainter painter,
+  required _KaraokeTextLayout layout,
+  required ui.Image? rasterizedImage,
   required Rect charRect,
   required Rect wordRect,
   required Offset painterOffset,
@@ -3739,7 +3855,18 @@ void _paintEmphasisGlyph(
   canvas.translate(-center.dx, -center.dy);
   canvas.save();
   canvas.clipRect(charRect);
-  _paintTextWithAlpha(canvas, painter, painterOffset, charRect, baseAlpha);
+  if (rasterizedImage == null) {
+    _paintTextWithAlpha(canvas, painter, painterOffset, charRect, baseAlpha);
+  } else {
+    _paintRasterizedTextWithAlpha(
+      canvas,
+      layout,
+      rasterizedImage,
+      painterOffset,
+      charRect,
+      baseAlpha,
+    );
+  }
   if (includeHighlight) {
     _paintWordHighlight(
       canvas,
@@ -3749,6 +3876,8 @@ void _paintEmphasisGlyph(
       isRtl,
       painterOffset,
       highlightAlpha,
+      layout: rasterizedImage == null ? null : layout,
+      rasterizedImage: rasterizedImage,
     );
   }
   canvas.restore();

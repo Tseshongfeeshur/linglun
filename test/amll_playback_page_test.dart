@@ -1192,6 +1192,19 @@ void main() {
     expect(painter, isNotEmpty);
     expect(find.text('长词辉光'), findsOneWidget);
     final lyricText = find.text('长词辉光');
+    final scaleLayerKey = ValueKey(
+      'lyric-scale-layer-${Duration.zero.inMicroseconds}',
+    );
+    expect(find.byKey(scaleLayerKey), findsOneWidget);
+    final lyricScale = tester.widget<AnimatedScale>(
+      find
+          .ancestor(
+            of: find.byKey(scaleLayerKey),
+            matching: find.byType(AnimatedScale),
+          )
+          .first,
+    );
+    expect(lyricScale.child, isA<RepaintBoundary>());
     final initialTextRect = tester.getRect(lyricText);
     expect(
       find.ancestor(of: lyricText, matching: find.byType(RepaintBoundary)),
