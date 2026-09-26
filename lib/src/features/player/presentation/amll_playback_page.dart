@@ -23,12 +23,12 @@ const _lyricBackgroundFontWeight = FontWeight.w600;
 const _lyricVerticalPaddingEm = .4;
 const _lyricFocusPosition = 1 / 3;
 const _lyricLineMotionDuration = Duration(milliseconds: 1400);
-const _lyricLineStaggerBaseDelay = Duration(milliseconds: 28);
+const _lyricLineStaggerBaseDelay = Duration(milliseconds: 26);
 const _lyricLineStaggerCompression = 1.05;
 const _lyricLineUpperLead = Duration(milliseconds: 36);
 const _lyricSpringMass = 1.4;
 // 欠阻尼使动画从零初速自然加速，并以小幅过冲逐步衰减到目标位置。
-const _lyricSpringDampingRatio = .8;
+const _lyricSpringDampingRatio = .78;
 const _synchronizedLyricScrollDuration = Duration(milliseconds: 480);
 const _minimumInterludeGap = Duration(seconds: 7);
 const _lyricAutoFollowDelay = Duration(seconds: 3);
@@ -3649,7 +3649,13 @@ void _paintWordHighlight(
   }
 
   final featherRatio = math.min(.5, wordRect.height * .5 / wordRect.width);
-  final boundary = isRtl ? 1 - progress : progress;
+  // 让羽化中心随进度逐渐越过词尾一个完整羽化长度。这样在进度接近
+  // 完成时，羽化带会自然离开字符区域，而不是停留在最后一个字的边缘。
+  // LTR 向右扩展，RTL 对称向左扩展。
+  final featherAdvance = progress * featherRatio;
+  final boundary = isRtl
+      ? 1 - progress - featherAdvance
+      : progress + featherAdvance;
   final leadingStop = (boundary - featherRatio / 2).clamp(0.0, 1.0);
   final trailingStop = (boundary + featherRatio / 2).clamp(0.0, 1.0);
   final colors = isRtl
