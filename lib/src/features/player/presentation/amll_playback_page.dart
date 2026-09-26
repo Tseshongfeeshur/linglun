@@ -3148,12 +3148,7 @@ class _KaraokeLyricViewState extends State<_KaraokeLyricView> {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final layout = _layoutFor(width);
-        // TextPainter 的行高是排版高度，不一定覆盖所有字体的下伸字形。
-        // 画布额外保留少量底部空间，避免 g、p、y 等字符在自绘路径中被裁切。
-        final textSize = Size(
-          width,
-          layout.painter.height + _lyricDescenderSafety(widget.style.fontSize!),
-        );
+        final textSize = Size(width, layout.painter.height);
         return RepaintBoundary(
           child: CustomPaint(
             key: const ValueKey('karaoke-glow-paint'),
@@ -3568,7 +3563,6 @@ class _KaraokeLyricPainter extends CustomPainter {
           box.direction == TextDirection.rtl,
           painterOffset,
           highlightAlpha,
-          fontSize: fontSize,
           layout: rasterizedImage == null ? null : layout,
           rasterizedImage: rasterizedImage,
         );
@@ -3631,26 +3625,22 @@ void _paintWordHighlight(
   bool isRtl,
   Offset painterOffset,
   double alpha, {
-  required double fontSize,
   _KaraokeTextLayout? layout,
   ui.Image? rasterizedImage,
 }) {
-  // 选区框主要服务于排版选择，不保证覆盖每个字体的实际下伸像素。
-  // 只向下扩展，不改变横向高亮进度和文字基线。
-  final paintRect = _lyricPaintRect(wordRect, fontSize);
   if (progress <= 0) return;
   if (progress >= 1) {
     canvas.save();
-    canvas.clipRect(paintRect);
+    canvas.clipRect(wordRect);
     if (layout == null || rasterizedImage == null) {
-      _paintTextWithAlpha(canvas, painter, painterOffset, paintRect, alpha);
+      _paintTextWithAlpha(canvas, painter, painterOffset, wordRect, alpha);
     } else {
       _paintRasterizedTextWithAlpha(
         canvas,
         layout,
         rasterizedImage,
         painterOffset,
-        paintRect,
+        wordRect,
         alpha,
       );
     }
@@ -3686,34 +3676,25 @@ void _paintWordHighlight(
     end: Alignment.centerRight,
     colors: colors,
     stops: [0, leadingStop, trailingStop, 1],
-  ).createShader(paintRect);
+  ).createShader(wordRect);
   canvas.saveLayer(
-    paintRect,
+    wordRect,
     Paint()..color = Colors.white.withValues(alpha: alpha.clamp(0.0, 1.0)),
   );
-  canvas.clipRect(paintRect);
+  canvas.clipRect(wordRect);
   if (layout == null || rasterizedImage == null) {
     painter.paint(canvas, painterOffset);
   } else {
     _drawRasterizedText(canvas, layout, rasterizedImage, painterOffset);
   }
   canvas.drawRect(
-    paintRect,
+    wordRect,
     Paint()
       ..shader = shader
       ..blendMode = BlendMode.dstIn,
   );
   canvas.restore();
 }
-
-double _lyricDescenderSafety(double fontSize) => math.max(2.0, fontSize * .1);
-
-Rect _lyricPaintRect(Rect rect, double fontSize) => Rect.fromLTRB(
-  rect.left,
-  rect.top,
-  rect.right,
-  rect.bottom + _lyricDescenderSafety(fontSize),
-);
 
 void _paintRasterizedTextWithAlpha(
   Canvas canvas,
@@ -3952,14 +3933,13 @@ void _paintEmphasisGlyph(
   required bool includeHighlight,
 }) {
   final center = charRect.center;
-  final glyphClipRect = _lyricPaintRect(clipRect, layout.style.fontSize!);
   canvas.save();
   canvas.translate(translation.dx, translation.dy);
   canvas.translate(center.dx, center.dy);
   canvas.scale(scale);
   canvas.translate(-center.dx, -center.dy);
   canvas.save();
-  canvas.clipRect(glyphClipRect);
+  canvas.clipRect(clipRect);
   if (rasterizedImage == null) {
     _paintTextWithAlpha(canvas, painter, painterOffset, charRect, baseAlpha);
   } else {
@@ -3981,7 +3961,6 @@ void _paintEmphasisGlyph(
       isRtl,
       painterOffset,
       highlightAlpha,
-      fontSize: layout.style.fontSize!,
       layout: rasterizedImage == null ? null : layout,
       rasterizedImage: rasterizedImage,
     );
