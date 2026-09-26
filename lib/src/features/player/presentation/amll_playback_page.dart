@@ -22,7 +22,13 @@ const _lyricTranslationFontWeight = FontWeight.w500;
 const _lyricBackgroundFontWeight = FontWeight.w600;
 const _lyricVerticalPaddingEm = .4;
 const _lyricFocusPosition = 1 / 3;
-const _lyricLineMotionDuration = Duration(milliseconds: 1500);
+const _lyricLineMotionDuration = Duration(milliseconds: 1400);
+const _lyricLineStaggerBaseDelay = Duration(milliseconds: 28);
+const _lyricLineStaggerCompression = 1.05;
+const _lyricLineUpperLead = Duration(milliseconds: 36);
+const _lyricSpringMass = 1.4;
+// 欠阻尼使动画从零初速自然加速，并以小幅过冲逐步衰减到目标位置。
+const _lyricSpringDampingRatio = .8;
 const _synchronizedLyricScrollDuration = Duration(milliseconds: 480);
 const _minimumInterludeGap = Duration(seconds: 7);
 const _lyricAutoFollowDelay = Duration(seconds: 3);
@@ -2589,13 +2595,14 @@ List<Duration> _calculateLyricLineDelays(
   final first = math.max(0, focus - 6);
   final last = math.min(lines.length, focus + 9);
   var delay = Duration.zero;
-  var baseDelay = const Duration(milliseconds: 45);
+  var baseDelay = _lyricLineStaggerBaseDelay;
   for (var index = first; index < last; index++) {
     delays[index] = delay;
     delay += baseDelay;
     if (index >= focus) {
       baseDelay = Duration(
-        microseconds: (baseDelay.inMicroseconds / 1.05).round(),
+        microseconds: (baseDelay.inMicroseconds / _lyricLineStaggerCompression)
+            .round(),
       );
     }
   }
@@ -2604,17 +2611,25 @@ List<Duration> _calculateLyricLineDelays(
   // 位移，若仍以窗口顶部为零点，活动行会在高亮切换后才开始移动。因此把
   // 活动行归零，并让上方行带少量负延迟，使它们从第一帧就处于预滚动状态。
   final focusDelay = delays[focus];
-  const upperLead = Duration(milliseconds: 36);
   for (var index = first; index < last; index++) {
     delays[index] = delays[index] - focusDelay;
-    if (index < focus) delays[index] -= upperLead;
+    if (index < focus) delays[index] -= _lyricLineUpperLead;
   }
   return delays;
 }
 
 SpringDescription _lyricPositionSpring(List<LyricLine> lines, int activeIndex) {
+  const defaultStiffness = 90.0;
   if (activeIndex <= 0 || activeIndex >= lines.length) {
-    return const SpringDescription(mass: .9, stiffness: 90, damping: 15);
+    return SpringDescription(
+      mass: _lyricSpringMass,
+      stiffness: defaultStiffness,
+      damping: _lyricSpringDamping(
+        defaultStiffness,
+        _lyricSpringMass,
+        _lyricSpringDampingRatio,
+      ),
+    );
   }
 
   final interval = lines[activeIndex].start - lines[activeIndex - 1].start;
@@ -2623,22 +2638,18 @@ SpringDescription _lyricPositionSpring(List<LyricLine> lines, int activeIndex) {
   ratio = math.pow(ratio, .2).toDouble();
   final stiffness = 170 + ratio * 50;
   return SpringDescription(
-    mass: .9,
+    mass: _lyricSpringMass,
     stiffness: stiffness,
-    damping: math.sqrt(stiffness) * 2.2,
+    damping: _lyricSpringDamping(
+      stiffness,
+      _lyricSpringMass,
+      _lyricSpringDampingRatio,
+    ),
   );
 }
 
-double _shapeLyricSpringEntrance(double progress) {
-  const entranceWindow = .2;
-  if (progress <= 0 || progress >= entranceWindow) return progress;
-
-  // 只放慢弹簧最开始的一小段，并让窗口末端的一阶速度与原弹簧连续，
-  // 因此中后段的回弹、阻尼和最终落点都保持原有行为。
-  final normalized = progress / entranceWindow;
-  final eased = normalized * normalized * (2 - normalized);
-  return entranceWindow * eased;
-}
+double _lyricSpringDamping(double stiffness, double mass, double ratio) =>
+    2 * ratio * math.sqrt(stiffness * mass);
 
 class _AnimatedLyricRow extends StatelessWidget {
   const _AnimatedLyricRow({
@@ -2804,18 +2815,17 @@ class _AnimatedLyricRow extends StatelessWidget {
       builder: (context, child) {
         // AMLL 为每个可见行累加约 45ms 的延迟，并在焦点行之后逐步缩短延迟。
         // 这里使用同一时钟计算每行自己的时间段，避免整列表同帧跳动。
+        final animationDurationSeconds =
+            _lyricLineMotionDuration.inMicroseconds / 1000000;
+        final lineDelaySeconds = lineDelay.inMicroseconds / 1000000;
         final elapsed =
-            lineMotion.value *
-                _lyricLineMotionDuration.inMicroseconds /
-                1000000 -
-            lineDelay.inMicroseconds / 1000000;
-        final springProgress = elapsed <= 0
+            lineMotion.value * animationDurationSeconds - lineDelaySeconds;
+        final progress = elapsed <= 0
             ? 0.0
-            : SpringSimulation(lineSpring, 0, 1, 0).x(elapsed).clamp(0.0, 1.05);
-        final eased = _shapeLyricSpringEntrance(springProgress);
+            : SpringSimulation(lineSpring, 0, 1, 0).x(elapsed);
         // 列表先跳到新的焦点位置，再用 FLIP 偏移从旧画面归位。
         // 每一行拥有独立延迟，因此不会出现所有行同帧同步抖动。
-        final offset = (1 - eased) * (lineScrollDelta - lineLayoutDelta);
+        final offset = (1 - progress) * (lineScrollDelta - lineLayoutDelta);
         final row = Transform.translate(
           key: ValueKey('lyric-row-motion-${line.start.inMicroseconds}'),
           offset: Offset(0, offset),
@@ -3514,7 +3524,7 @@ class _KaraokeLyricPainter extends CustomPainter {
       );
       final floatOffset =
           fontSize *
-          .05 *
+          .08 *
           Curves.easeOut.transform(baseFloatProgress) *
           (isBackground ? 2 : 1);
       if (elapsed < Duration.zero && floatOffset <= 0) continue;
@@ -3784,7 +3794,7 @@ void _paintWordEmphasis(
               .clamp(0.0, 1.0);
       final floatOffset =
           -sampleAmlEmphasisFloat(emphasisFloatProgress) *
-          .05 *
+          .08 *
           fontSize *
           (isBackground ? 2 : 1);
 

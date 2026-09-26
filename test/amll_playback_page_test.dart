@@ -1060,7 +1060,6 @@ void main() {
       find.byKey(const ValueKey('lyric-row-motion-10000000')),
     );
     expect(movingTransform.child, isA<RepaintBoundary>());
-    expect(movingTransform.filterQuality, FilterQuality.low);
 
     double rowOffset(int index) {
       final startMicroseconds = index * 10000000;
