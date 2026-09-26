@@ -22,13 +22,13 @@ const _lyricTranslationFontWeight = FontWeight.w500;
 const _lyricBackgroundFontWeight = FontWeight.w600;
 const _lyricVerticalPaddingEm = .4;
 const _lyricFocusPosition = 1 / 3;
-const _lyricLineMotionDuration = Duration(milliseconds: 1400);
+const _lyricLineMotionDuration = Duration(milliseconds: 1300);
 const _lyricLineStaggerBaseDelay = Duration(milliseconds: 26);
 const _lyricLineStaggerCompression = 1.05;
 const _lyricLineUpperLead = Duration(milliseconds: 36);
 const _lyricSpringMass = 1.4;
 // 欠阻尼使动画从零初速自然加速，并以小幅过冲逐步衰减到目标位置。
-const _lyricSpringDampingRatio = .78;
+const _lyricSpringDampingRatio = .75;
 const _synchronizedLyricScrollDuration = Duration(milliseconds: 480);
 const _minimumInterludeGap = Duration(seconds: 7);
 const _lyricAutoFollowDelay = Duration(seconds: 3);
@@ -3148,7 +3148,12 @@ class _KaraokeLyricViewState extends State<_KaraokeLyricView> {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final layout = _layoutFor(width);
-        final textSize = Size(width, layout.painter.height);
+        // TextPainter 的行高是排版高度，不一定覆盖所有字体的下伸字形。
+        // 画布额外保留少量底部空间，避免 g、p、y 等字符在自绘路径中被裁切。
+        final textSize = Size(
+          width,
+          layout.painter.height + _lyricDescenderSafety(widget.style.fontSize!),
+        );
         return RepaintBoundary(
           child: CustomPaint(
             key: const ValueKey('karaoke-glow-paint'),
@@ -3563,6 +3568,7 @@ class _KaraokeLyricPainter extends CustomPainter {
           box.direction == TextDirection.rtl,
           painterOffset,
           highlightAlpha,
+          fontSize: fontSize,
           layout: rasterizedImage == null ? null : layout,
           rasterizedImage: rasterizedImage,
         );
@@ -3625,22 +3631,26 @@ void _paintWordHighlight(
   bool isRtl,
   Offset painterOffset,
   double alpha, {
+  required double fontSize,
   _KaraokeTextLayout? layout,
   ui.Image? rasterizedImage,
 }) {
+  // 选区框主要服务于排版选择，不保证覆盖每个字体的实际下伸像素。
+  // 只向下扩展，不改变横向高亮进度和文字基线。
+  final paintRect = _lyricPaintRect(wordRect, fontSize);
   if (progress <= 0) return;
   if (progress >= 1) {
     canvas.save();
-    canvas.clipRect(wordRect);
+    canvas.clipRect(paintRect);
     if (layout == null || rasterizedImage == null) {
-      _paintTextWithAlpha(canvas, painter, painterOffset, wordRect, alpha);
+      _paintTextWithAlpha(canvas, painter, painterOffset, paintRect, alpha);
     } else {
       _paintRasterizedTextWithAlpha(
         canvas,
         layout,
         rasterizedImage,
         painterOffset,
-        wordRect,
+        paintRect,
         alpha,
       );
     }
@@ -3676,25 +3686,34 @@ void _paintWordHighlight(
     end: Alignment.centerRight,
     colors: colors,
     stops: [0, leadingStop, trailingStop, 1],
-  ).createShader(wordRect);
+  ).createShader(paintRect);
   canvas.saveLayer(
-    wordRect,
+    paintRect,
     Paint()..color = Colors.white.withValues(alpha: alpha.clamp(0.0, 1.0)),
   );
-  canvas.clipRect(wordRect);
+  canvas.clipRect(paintRect);
   if (layout == null || rasterizedImage == null) {
     painter.paint(canvas, painterOffset);
   } else {
     _drawRasterizedText(canvas, layout, rasterizedImage, painterOffset);
   }
   canvas.drawRect(
-    wordRect,
+    paintRect,
     Paint()
       ..shader = shader
       ..blendMode = BlendMode.dstIn,
   );
   canvas.restore();
 }
+
+double _lyricDescenderSafety(double fontSize) => math.max(2.0, fontSize * .1);
+
+Rect _lyricPaintRect(Rect rect, double fontSize) => Rect.fromLTRB(
+  rect.left,
+  rect.top,
+  rect.right,
+  rect.bottom + _lyricDescenderSafety(fontSize),
+);
 
 void _paintRasterizedTextWithAlpha(
   Canvas canvas,
@@ -3933,13 +3952,14 @@ void _paintEmphasisGlyph(
   required bool includeHighlight,
 }) {
   final center = charRect.center;
+  final glyphClipRect = _lyricPaintRect(clipRect, layout.style.fontSize!);
   canvas.save();
   canvas.translate(translation.dx, translation.dy);
   canvas.translate(center.dx, center.dy);
   canvas.scale(scale);
   canvas.translate(-center.dx, -center.dy);
   canvas.save();
-  canvas.clipRect(clipRect);
+  canvas.clipRect(glyphClipRect);
   if (rasterizedImage == null) {
     _paintTextWithAlpha(canvas, painter, painterOffset, charRect, baseAlpha);
   } else {
@@ -3961,6 +3981,7 @@ void _paintEmphasisGlyph(
       isRtl,
       painterOffset,
       highlightAlpha,
+      fontSize: layout.style.fontSize!,
       layout: rasterizedImage == null ? null : layout,
       rasterizedImage: rasterizedImage,
     );
