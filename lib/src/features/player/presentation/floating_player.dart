@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/database/app_database.dart';
@@ -16,7 +17,6 @@ const _circleSize = 72.0;
 const _ringSize = 104.0;
 const _ringInset = (_ringSize - _circleSize) / 2;
 const _panelGap = 12.0;
-const _infoPanelMaxWidth = 286.0;
 const _floatingPositionSettingKey = 'player.floating.position.v1';
 
 /// 桌面端悬浮播放器：圆形封面是入口，控制和歌词信息按边界弹出。
@@ -38,6 +38,7 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
   bool _dragging = false;
   bool _seeking = false;
   bool _expanded = false;
+  bool _openingExpanded = false;
   Timer? _hoverExitTimer;
   late final AnimationController _expandController;
 
@@ -99,6 +100,7 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
                 hovered: _hovered,
                 dragging: _dragging,
                 expanded: _expanded,
+                openingExpanded: _openingExpanded,
                 seekPreviewProgress: _seekPreviewProgress,
                 showAbove: showAbove,
                 showLeft: showLeft,
@@ -177,6 +179,7 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
                 child: _ExpandedPlayer(
                   track: track,
                   state: state,
+                  hovered: _hovered,
                   animation: _expandController,
                   sourceCenter: center + const Offset(36, 36),
                   viewport: size,
@@ -207,12 +210,29 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
   }
 
   void _openExpanded() {
-    setState(() => _expanded = true);
+    _hoverExitTimer?.cancel();
+    setState(() {
+      _expanded = true;
+      _openingExpanded = true;
+    });
     _expandController.forward(from: 0);
+    // 先让展开层继承点击瞬间的悬停状态，再在下一帧切换到非悬停状态，
+    // 使原有的 AnimatedScale 和阴影动画能够真正收到状态变化。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _expanded) setState(() => _hovered = false);
+    });
+    unawaited(
+      Future<void>.delayed(const Duration(milliseconds: 280), () {
+        if (mounted && _expanded) {
+          setState(() => _openingExpanded = false);
+        }
+      }),
+    );
   }
 
   void _setHovered(bool value) {
     _hoverExitTimer?.cancel();
+    if (_expanded) return;
     if (value) {
       if (!_hovered) setState(() => _hovered = true);
       return;
@@ -225,7 +245,12 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
 
   void _closeExpanded() {
     _expandController.reverse().whenComplete(() {
-      if (mounted) setState(() => _expanded = false);
+      if (mounted) {
+        setState(() {
+          _expanded = false;
+          _openingExpanded = false;
+        });
+      }
     });
   }
 
@@ -335,6 +360,7 @@ class _FloatingCluster extends ConsumerWidget {
     required this.hovered,
     required this.dragging,
     required this.expanded,
+    required this.openingExpanded,
     required this.seekPreviewProgress,
     required this.showAbove,
     required this.showLeft,
@@ -352,6 +378,7 @@ class _FloatingCluster extends ConsumerWidget {
   final bool hovered;
   final bool dragging;
   final bool expanded;
+  final bool openingExpanded;
   final double? seekPreviewProgress;
   final bool showAbove;
   final bool showLeft;
@@ -368,7 +395,7 @@ class _FloatingCluster extends ConsumerWidget {
     final currentLine = _currentLyric(lyrics, state.position);
     final lyricPosition = state.position - lyrics.offset;
     final controller = ref.read(playerControllerProvider.notifier);
-    final panelsExpanded = !expanded && (hovered || dragging);
+    final panelsExpanded = hovered || dragging;
     final bubble = _MorphingGlassBubble(
       expanded: panelsExpanded,
       instant: dragging,
@@ -394,26 +421,24 @@ class _FloatingCluster extends ConsumerWidget {
       ),
     );
     final info = _MorphingGlassBubble(
-      maxWidth: _infoPanelMaxWidth,
+      maxWidth: MediaQuery.sizeOf(context).width * .4,
       expanded: panelsExpanded,
       instant: dragging,
+      collapseToHeight: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: showLeft
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            '${track.title} - ${track.artist}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white60),
-          ),
           if (currentLine == null)
             Text(
               track.lyrics == null || track.lyrics!.trim().isEmpty
                   ? '暂无歌词'
                   : lyrics.timing == LyricsTiming.none
                   ? '歌词没有时间信息'
-                  : '',
+                  : '暂无歌词',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -445,7 +470,7 @@ class _FloatingCluster extends ConsumerWidget {
         onEnter: (_) => onHover(true),
         onExit: (_) => onHover(false),
         child: IgnorePointer(
-          ignoring: !hovered || dragging || expanded,
+          ignoring: !hovered || dragging || expanded || openingExpanded,
           child: child,
         ),
       );
@@ -459,6 +484,26 @@ class _FloatingCluster extends ConsumerWidget {
     final infoLeftAnchor = position.dx + _circleSize + _panelGap;
     final controlTopAnchor = position.dy - _panelGap;
     final controlBottomAnchor = position.dy + _circleSize + _panelGap;
+    final infoOuterPadding = showLeft
+        ? const EdgeInsets.only(right: 14)
+        : const EdgeInsets.only(left: 14);
+    final controlOuterPadding = showAbove
+        ? const EdgeInsets.only(bottom: 14)
+        : const EdgeInsets.only(top: 14);
+    final collapsedInfoAnchor = Offset(
+      circleCenterX +
+          (showLeft
+              ? infoOuterPadding.right / 2
+              : -infoOuterPadding.left / 2),
+      circleCenterY,
+    );
+    final collapsedControlAnchor = Offset(
+      circleCenterX,
+      circleCenterY +
+          (showAbove
+              ? controlOuterPadding.bottom / 2
+              : -controlOuterPadding.top / 2),
+    );
 
     // 菜单的外层锚点只负责从圆心移动到目标边缘，尺寸由内容自身决定。
     // 这样窗口大小或拖动位置变化时可以立即重定位，而悬停状态变化仍有
@@ -466,21 +511,26 @@ class _FloatingCluster extends ConsumerWidget {
     final infoMenu = _MenuMotion(
       expanded: panelsExpanded,
       instant: dragging,
-      collapsedAnchor: Offset(circleCenterX, circleCenterY),
+      collapsedAnchor: collapsedInfoAnchor,
       expandedAnchor: Offset(
         showLeft ? infoRightAnchor : infoLeftAnchor,
         circleCenterY,
       ),
       collapsedTranslation: const Offset(-.5, -.5),
-      expandedTranslation: showLeft
+        expandedTranslation: showLeft
           ? const Offset(-1, -.5)
           : const Offset(0, -.5),
-      child: panel(info),
+      child: panel(
+        Padding(
+          padding: infoOuterPadding,
+          child: info,
+        ),
+      ),
     );
     final controlMenu = _MenuMotion(
       expanded: panelsExpanded,
       instant: dragging,
-      collapsedAnchor: Offset(circleCenterX, circleCenterY),
+      collapsedAnchor: collapsedControlAnchor,
       expandedAnchor: Offset(
         circleCenterX,
         showAbove ? controlTopAnchor : controlBottomAnchor,
@@ -489,7 +539,12 @@ class _FloatingCluster extends ConsumerWidget {
       expandedTranslation: showAbove
           ? const Offset(-.5, -1)
           : const Offset(-.5, 0),
-      child: panel(bubble),
+      child: panel(
+        Padding(
+          padding: controlOuterPadding,
+          child: bubble,
+        ),
+      ),
     );
 
     return Stack(
@@ -525,8 +580,8 @@ class _FloatingCluster extends ConsumerWidget {
               child: const SizedBox.expand(),
             ),
           ),
-        if (!expanded) infoMenu,
-        if (!expanded) controlMenu,
+        if (!expanded || openingExpanded) infoMenu,
+        if (!expanded || openingExpanded) controlMenu,
         Positioned(
           left: circleLeft,
           top: circleTop,
@@ -609,7 +664,7 @@ class _MenuMotionState extends State<_MenuMotion>
       _controller.animateTo(
         widget.expanded ? 1 : 0,
         duration: const Duration(milliseconds: 240),
-        curve: Curves.easeOutCubic,
+        curve: Curves.easeInOutCubic,
       );
     }
   }
@@ -626,7 +681,7 @@ class _MenuMotionState extends State<_MenuMotion>
       animation: _controller,
       child: widget.child,
       builder: (context, child) {
-        final progress = Curves.easeOutCubic.transform(_controller.value);
+        final progress = Curves.easeInOutCubic.transform(_controller.value);
         final anchor = Offset.lerp(
           widget.collapsedAnchor,
           widget.expandedAnchor,
@@ -647,58 +702,134 @@ class _MenuMotionState extends State<_MenuMotion>
   }
 }
 
-class _MorphingGlassBubble extends StatelessWidget {
+class _MorphingGlassBubble extends StatefulWidget {
   const _MorphingGlassBubble({
     required this.child,
     required this.expanded,
     required this.instant,
+    this.contentPadding = const EdgeInsets.all(8),
+    this.collapseToHeight = false,
     this.maxWidth,
   });
 
   final Widget child;
   final bool expanded;
   final bool instant;
+  final EdgeInsets contentPadding;
+  final bool collapseToHeight;
   final double? maxWidth;
 
   @override
+  State<_MorphingGlassBubble> createState() => _MorphingGlassBubbleState();
+}
+
+class _MorphingGlassBubbleState extends State<_MorphingGlassBubble> {
+  Size? _measuredContentSize;
+
+  void _onContentSizeChanged(Size size) {
+    if (!mounted || size == _measuredContentSize) return;
+    setState(() => _measuredContentSize = size);
+  }
+
+  Size _expandedSize(BuildContext context) {
+    final viewportWidth = MediaQuery.sizeOf(context).width;
+    final maxWidth = widget.maxWidth ?? viewportWidth;
+    final content =
+        _measuredContentSize ?? const Size(_circleSize, _circleSize);
+    final padding = widget.contentPadding;
+    final width = (content.width + padding.horizontal)
+        .clamp(1.0, maxWidth)
+        .toDouble();
+    final height = content.height + padding.vertical;
+    return Size(width, height);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final duration = instant
+    final duration = widget.instant
         ? Duration.zero
         : const Duration(milliseconds: 240);
-    final constraints = maxWidth == null
-        ? const BoxConstraints()
-        : BoxConstraints(maxWidth: maxWidth!);
-    return AnimatedSize(
+    final expandedSize = _expandedSize(context);
+    final collapsedSize = widget.collapseToHeight
+        ? expandedSize.height
+        : expandedSize.width;
+    final size = widget.expanded ? expandedSize : Size.square(collapsedSize);
+    final maxContentWidth = math.max(
+      1.0,
+      (widget.maxWidth ?? expandedSize.width) -
+          widget.contentPadding.horizontal,
+    );
+
+    return AnimatedContainer(
       duration: duration,
-      curve: Curves.easeOutCubic,
+      curve: Curves.easeInOutCubic,
+      width: size.width,
+      height: size.height,
       alignment: Alignment.center,
-      child: AnimatedContainer(
-        duration: duration,
-        curve: Curves.easeOutCubic,
-        constraints: constraints,
-        clipBehavior: Clip.hardEdge,
-        decoration: BoxDecoration(
-          color: Colors.white.withAlpha(22),
-          border: Border.all(color: Colors.white.withAlpha(28)),
-          borderRadius: BorderRadius.circular(expanded ? 34 : 99),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(expanded ? 34 : 99),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: expanded
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    child: child,
-                  )
-                : const SizedBox.square(dimension: _circleSize),
+      clipBehavior: Clip.hardEdge,
+      decoration: BoxDecoration(
+        color: Colors.white.withAlpha(22),
+        border: Border.all(color: Colors.white.withAlpha(28)),
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(99),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Padding(
+            padding: widget.expanded ? widget.contentPadding : EdgeInsets.zero,
+            child: OverflowBox(
+              alignment: Alignment.center,
+              maxWidth: maxContentWidth,
+              maxHeight: MediaQuery.sizeOf(context).height,
+              child: _BubbleSizeReporter(
+                onSizeChanged: _onContentSizeChanged,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxContentWidth),
+                  child: IntrinsicWidth(child: widget.child),
+                ),
+              ),
+            ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _BubbleSizeReporter extends SingleChildRenderObjectWidget {
+  const _BubbleSizeReporter({required this.onSizeChanged, super.child});
+
+  final ValueChanged<Size> onSizeChanged;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return _BubbleSizeReporterRenderObject(onSizeChanged);
+  }
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    covariant _BubbleSizeReporterRenderObject renderObject,
+  ) {
+    renderObject.onSizeChanged = onSizeChanged;
+  }
+}
+
+class _BubbleSizeReporterRenderObject extends RenderProxyBox {
+  _BubbleSizeReporterRenderObject(this.onSizeChanged);
+
+  ValueChanged<Size> onSizeChanged;
+  Size? _lastReportedSize;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    if (size == _lastReportedSize) return;
+    _lastReportedSize = size;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (attached) onSizeChanged(size);
+    });
   }
 }
 
@@ -718,6 +849,7 @@ class _LyricPreviewLine extends StatelessWidget {
         style: TextStyle(
           color: Theme.of(context).colorScheme.primary,
           fontSize: 15,
+          height: 1,
           fontWeight: FontWeight.w600,
           wordSpacing: 1,
         ),
@@ -737,6 +869,7 @@ class _LyricPreviewLine extends StatelessWidget {
                     ? Theme.of(context).colorScheme.onSurface
                     : Colors.white54,
                 fontSize: 15,
+                height: 1,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1,
               ),
@@ -911,6 +1044,7 @@ class _ExpandedPlayer extends StatelessWidget {
   const _ExpandedPlayer({
     required this.track,
     required this.state,
+    required this.hovered,
     required this.animation,
     required this.sourceCenter,
     required this.viewport,
@@ -926,6 +1060,7 @@ class _ExpandedPlayer extends StatelessWidget {
 
   final Track track;
   final PlayerState state;
+  final bool hovered;
   final Animation<double> animation;
   final Offset sourceCenter;
   final Size viewport;
@@ -945,7 +1080,6 @@ class _ExpandedPlayer extends StatelessWidget {
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     );
-    final pageCenter = Offset(viewport.width / 2, viewport.height / 2);
     final maxRadius =
         math.sqrt(
           viewport.width * viewport.width + viewport.height * viewport.height,
@@ -956,7 +1090,6 @@ class _ExpandedPlayer extends StatelessWidget {
       animation: curved,
       builder: (context, child) {
         final value = curved.value;
-        final coverCenter = Offset.lerp(sourceCenter, pageCenter, value)!;
         return ClipPath(
           clipper: _ExpandingCircleClipper(
             center: sourceCenter,
@@ -981,15 +1114,16 @@ class _ExpandedPlayer extends StatelessWidget {
                 ),
               ),
               Positioned(
-                left: coverCenter.dx - 52,
-                top: coverCenter.dy - 52,
+                // 展开期间封面保持在原悬浮圆心，只参与渐隐，不再移动到播放页中心。
+                left: sourceCenter.dx - 52,
+                top: sourceCenter.dy - 52,
                 child: IgnorePointer(
                   child: Opacity(
                     opacity: (1 - value).clamp(0, 1),
                     child: _ProgressCircle(
                       track: track,
                       progress: _progress(state),
-                      hovered: false,
+                      hovered: hovered,
                       dragging: false,
                     ),
                   ),
