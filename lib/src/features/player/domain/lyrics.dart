@@ -392,6 +392,7 @@ LyricsDocument _parseLrc(String source) {
         timedLines.add(
           LyricLine(
             start: wordResult.firstStart!,
+            end: wordResult.words.lastOrNull?.end,
             text: cleanText,
             words: wordResult.words,
             speaker: speakerInfo.speaker,
@@ -408,6 +409,7 @@ LyricsDocument _parseLrc(String source) {
       timedLines.add(
         LyricLine(
           start: timestamp,
+          end: wordResult.words.lastOrNull?.end,
           text: cleanText,
           words: wordResult.words,
           speaker: speakerInfo.speaker,
@@ -773,8 +775,13 @@ LyricsDocument _parseTtml(String source) {
       final paragraphBegin = _parseTtmlTime(_xmlAttribute(paragraph, 'begin'));
       final paragraphStart = paragraphBegin?.value;
       final paragraphEndValue = _parseTtmlTime(_xmlAttribute(paragraph, 'end'));
+      final paragraphDuration = _parseTtmlTime(_xmlAttribute(paragraph, 'dur'));
       // p 的 begin/end 都相对父时间容器；不能把 end 再叠加到 begin 上。
-      final paragraphEnd = paragraphEndValue?.value;
+      final paragraphEnd =
+          paragraphEndValue?.value ??
+          (paragraphStart != null && paragraphDuration != null
+              ? paragraphStart + paragraphDuration.value
+              : null);
       final paragraphLanguage = _xmlAttribute(paragraph, 'lang');
       final role = _xmlAttribute(paragraph, 'role');
       final speaker = _firstNonEmpty([
@@ -799,9 +806,12 @@ LyricsDocument _parseTtml(String source) {
         if (rawBegin == null) continue;
         final wordStart = _resolveTtmlTime(rawBegin, paragraphStart);
         final rawEnd = _parseTtmlTime(_xmlAttribute(wordElement, 'end'));
-        final wordEnd = rawEnd == null
-            ? null
-            : _resolveTtmlTime(rawEnd, paragraphStart);
+        final rawDuration = _parseTtmlTime(_xmlAttribute(wordElement, 'dur'));
+        final wordEnd = rawEnd != null
+            ? _resolveTtmlTime(rawEnd, paragraphStart)
+            : rawDuration != null
+            ? wordStart + rawDuration.value
+            : null;
         final text = _cleanTtmlText(wordElement.innerText);
         if (text.isEmpty) continue;
         words.add(
@@ -909,12 +919,38 @@ LyricsDocument _timedDocument(
 List<LyricLine> _inferLineEnds(List<LyricLine> lines) {
   return [
     for (var index = 0; index < lines.length; index++)
-      lines[index].end == null &&
-              index + 1 < lines.length &&
-              lines[index + 1].start > lines[index].start
-          ? lines[index].copyWith(end: lines[index + 1].start)
+      lines[index].end == null
+          ? lines[index].copyWith(end: _inferredLyricEnd(lines, index))
           : lines[index],
   ];
+}
+
+Duration? _inferredLyricEnd(List<LyricLine> lines, int index) {
+  final line = lines[index];
+  final knownEnd = _latestKnownLyricEnd(line);
+  if (knownEnd != null && knownEnd > line.start) return knownEnd;
+  if (index + 1 < lines.length && lines[index + 1].start > line.start) {
+    // 同起始时间的下行仍需保留到翻译合并阶段，不能提前把它们拆成不同区间。
+    if (index > 0 && lines[index - 1].start == line.start) return null;
+    return lines[index + 1].start;
+  }
+  return null;
+}
+
+Duration? _latestKnownLyricEnd(LyricLine line) {
+  Duration? latest;
+
+  void add(Duration? value) {
+    if (value != null && (latest == null || value > latest!)) latest = value;
+  }
+
+  add(line.words.lastOrNull?.end);
+  add(line.translationWords.lastOrNull?.end);
+  for (final variant in line.variants) {
+    add(variant.end);
+    add(variant.words.lastOrNull?.end);
+  }
+  return latest;
 }
 
 /// 按歌词规范合并翻译：下行与上行的起始时间相同，或两行结束时间相同，

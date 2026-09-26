@@ -87,6 +87,18 @@ void main() {
     expect(document.lines.single.translationWords, hasLength(2));
   });
 
+  test('同起始时间翻译不会覆盖原文显式结束时间', () {
+    final document = parseLyrics('''
+[00:00.00]原文[00:01.00]
+[00:00.00]译文
+[00:10.00]下一句[00:11.00]
+''');
+
+    expect(document.lines, hasLength(2));
+    expect(document.lines.first.translation, '译文');
+    expect(document.lines.first.end, const Duration(seconds: 1));
+  });
+
   test('相同结束时间的下行合并为翻译', () {
     final document = parseLyricsFile('''
 1
@@ -198,6 +210,32 @@ void main() {
     expect(document.lines.single.text, 'Hello');
     expect(document.lines.single.translation, '你好');
     expect(document.lines.single.words, hasLength(2));
+  });
+
+  test('TTML 的 dur 和逐字结束时间可以保留间奏边界', () {
+    final document = parseLyricsFile('''
+<tt xmlns="http://www.w3.org/ns/ttml"><body><div>
+  <p begin="0s" dur="1s">前一句</p>
+  <p begin="10s" dur="1s">后一句</p>
+</div></body></tt>
+''');
+
+    expect(document.lines, hasLength(2));
+    expect(document.lines.first.end, const Duration(seconds: 1));
+    expect(document.lines.last.end, const Duration(seconds: 11));
+  });
+
+  test('TTML 逐字结束时间可以保留后续间奏', () {
+    final document = parseLyricsFile('''
+<tt xmlns="http://www.w3.org/ns/ttml"><body><div>
+  <p begin="0s"><span begin="0s" end="1s">前一句</span></p>
+  <p begin="10s" end="11s">后一句</p>
+</div></body></tt>
+''');
+
+    expect(document.lines, hasLength(2));
+    expect(document.lines.first.end, const Duration(seconds: 1));
+    expect(document.lines.first.words.single.end, const Duration(seconds: 1));
   });
 
   test('TTML 对唱背景行独立计时并合并到主唱歌词组', () {

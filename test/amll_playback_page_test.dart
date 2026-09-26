@@ -646,6 +646,7 @@ void main() {
     expect(scrollable.position.pixels, closeTo(manuallySelectedOffset, .1));
 
     await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 500));
     expect(
       scrollable.position.pixels,
       isNot(closeTo(manuallySelectedOffset, .1)),
@@ -672,6 +673,240 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('点击歌词定位时列表同步移动，不使用错峰延迟', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final track = Track(
+      id: 'lyrics-seek-sync',
+      title: '定位同步',
+      artist: '测试歌手',
+      album: '测试专辑',
+      duration: const Duration(minutes: 1),
+      lyrics: List.generate(
+        18,
+        (index) => '[00:${index.toString().padLeft(2, '0')}.00]第$index句歌词',
+      ).join('\n'),
+      lyricsFormat: 'lrc',
+    );
+    var state = PlayerState(
+      queue: [track],
+      currentIndex: 0,
+      isPlaying: false,
+      position: Duration.zero,
+      audioSettings: AudioProcessingSettings(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => AmllPlaybackPage(
+              track: track,
+              state: state,
+              onClose: () {},
+              onPrevious: () {},
+              onTogglePlay: () {},
+              onNext: () {},
+              onSeek: (position) =>
+                  setState(() => state = state.copyWith(position: position)),
+              onToggleShuffle: () {},
+              onCycleRepeat: () {},
+              onPlayTrack: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+
+    await tester.tap(find.byKey(const ValueKey('lyric-row-4000000-4')));
+    await tester.pump(const Duration(milliseconds: 120));
+
+    final rowOffsets = <double>[];
+    for (var index = 0; index < 18; index++) {
+      final rowFinder = find.byKey(
+        ValueKey('lyric-row-${index * 1000000}-$index'),
+      );
+      if (rowFinder.evaluate().isEmpty) continue;
+      final transformFinder = find.descendant(
+        of: rowFinder,
+        matching: find.byType(Transform),
+      );
+      if (transformFinder.evaluate().isEmpty) continue;
+      rowOffsets.add(
+        tester
+            .widget<Transform>(transformFinder.first)
+            .transform
+            .getTranslation()
+            .y,
+      );
+    }
+
+    expect(rowOffsets.length, greaterThan(1));
+    final minimumOffset = rowOffsets.reduce((a, b) => a < b ? a : b);
+    final maximumOffset = rowOffsets.reduce((a, b) => a > b ? a : b);
+    expect(maximumOffset - minimumOffset, lessThan(.1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('长距离歌词定位期间中间行随真实滚动进入视口', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final track = Track(
+      id: 'lyrics-long-seek',
+      title: '长距离定位',
+      artist: '测试歌手',
+      album: '测试专辑',
+      duration: const Duration(seconds: 20),
+      lyrics: List.generate(
+        18,
+        (index) => '[00:${index.toString().padLeft(2, '0')}.00]第$index句歌词',
+      ).join('\n'),
+      lyricsFormat: 'lrc',
+    );
+    var state = PlayerState(
+      queue: [track],
+      currentIndex: 0,
+      isPlaying: false,
+      position: Duration.zero,
+      audioSettings: AudioProcessingSettings(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => AmllPlaybackPage(
+              track: track,
+              state: state,
+              onClose: () {},
+              onPrevious: () {},
+              onTogglePlay: () {},
+              onNext: () {},
+              onSeek: (position) =>
+                  setState(() => state = state.copyWith(position: position)),
+              onToggleShuffle: () {},
+              onCycleRepeat: () {},
+              onPlayTrack: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 120));
+
+    final list = find.byKey(const ValueKey('timed-lyrics-list'));
+    final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
+    final initialOffset = scrollable.position.pixels;
+    final slider = find.byType(Slider).first;
+    final sliderRect = tester.getRect(slider);
+    await tester.tapAt(
+      Offset(sliderRect.left + sliderRect.width * .6, sliderRect.center.dy),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 480));
+    var sawIntermediateRow = false;
+    var sawMovement = false;
+    for (var frame = 0; frame < 30; frame++) {
+      await tester.pump(const Duration(milliseconds: 40));
+      sawMovement |= scrollable.position.pixels > initialOffset;
+      for (var index = 3; index < 12; index++) {
+        sawIntermediateRow |= find
+            .byKey(ValueKey('lyric-row-${index * 1000000}-$index'))
+            .evaluate()
+            .isNotEmpty;
+      }
+    }
+    expect(sawMovement, isTrue);
+    expect(sawIntermediateRow, isTrue);
+    expect(tester.getRect(list).height, greaterThan(0));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const ValueKey('lyric-row-12000000-12')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('播放中点击歌词后旧位置回报不会将定位覆盖到上一句', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final track = Track(
+      id: 'lyrics-adjacent-seek',
+      title: '相邻句定位',
+      artist: '测试歌手',
+      album: '测试专辑',
+      duration: const Duration(minutes: 1),
+      lyrics: '[00:00.00]上一句歌词\n[00:01.00]目标歌词',
+      lyricsFormat: 'lrc',
+    );
+    var state = PlayerState(
+      queue: [track],
+      currentIndex: 0,
+      isPlaying: true,
+      position: const Duration(milliseconds: 900),
+      audioSettings: AudioProcessingSettings(),
+    );
+    late void Function(VoidCallback) updateState;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              updateState = setState;
+              return AmllPlaybackPage(
+                track: track,
+                state: state,
+                onClose: () {},
+                onPrevious: () {},
+                onTogglePlay: () {},
+                onNext: () {},
+                onSeek: (position) => updateState(
+                  () => state = state.copyWith(position: position),
+                ),
+                onToggleShuffle: () {},
+                onCycleRepeat: () {},
+                onPlayTrack: (_) {},
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.tap(find.byKey(const ValueKey('lyric-row-1000000-1')));
+    await tester.pump(const Duration(milliseconds: 80));
+    expect(state.position, const Duration(seconds: 1));
+
+    updateState(
+      () => state = state.copyWith(position: const Duration(milliseconds: 900)),
+    );
+    await tester.pump(const Duration(milliseconds: 80));
+
+    AnimatedOpacity lineOpacity(String key) {
+      final row = find.byKey(ValueKey(key));
+      return tester.widget<AnimatedOpacity>(
+        find.descendant(of: row, matching: find.byType(AnimatedOpacity)).first,
+      );
+    }
+
+    expect(lineOpacity('lyric-row-1000000-1').opacity, closeTo(.85, .01));
+    expect(lineOpacity('lyric-row-0-0').opacity, closeTo(.2, .01));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('七秒以上的歌词间奏显示三点等待动画', (tester) async {
     tester.view.physicalSize = const Size(1280, 800);
     tester.view.devicePixelRatio = 1;
@@ -686,38 +921,50 @@ void main() {
       duration: const Duration(minutes: 1),
       lyrics: '''
 <tt xmlns="http://www.w3.org/ns/ttml"><body><div>
-  <p begin="0s" end="1s">前一句</p>
-  <p begin="10s" end="11s">后一句</p>
+  <p begin="0s" dur="1s">前一句</p>
+  <p begin="10s" dur="1s">后一句</p>
 </div></body></tt>
 ''',
       lyricsFormat: 'ttml',
     );
-    final state = PlayerState(
+    var state = PlayerState(
       queue: [track],
       currentIndex: 0,
       isPlaying: false,
-      position: const Duration(seconds: 5),
+      position: Duration.zero,
       audioSettings: AudioProcessingSettings(),
     );
+    late void Function(VoidCallback) updateState;
 
     await tester.pumpWidget(
       MaterialApp(
         theme: ThemeData.dark(),
         home: Scaffold(
-          body: AmllPlaybackPage(
-            track: track,
-            state: state,
-            onClose: () {},
-            onPrevious: () {},
-            onTogglePlay: () {},
-            onNext: () {},
-            onSeek: (_) {},
-            onToggleShuffle: () {},
-            onCycleRepeat: () {},
-            onPlayTrack: (_) {},
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              updateState = setState;
+              return AmllPlaybackPage(
+                track: track,
+                state: state,
+                onClose: () {},
+                onPrevious: () {},
+                onTogglePlay: () {},
+                onNext: () {},
+                onSeek: (_) {},
+                onToggleShuffle: () {},
+                onCycleRepeat: () {},
+                onPlayTrack: (_) {},
+              );
+            },
           ),
         ),
       ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byKey(const ValueKey('interlude-dots')), findsNothing);
+
+    updateState(
+      () => state = state.copyWith(position: const Duration(seconds: 5)),
     );
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -732,6 +979,104 @@ void main() {
     );
     final dots = tester.getRect(find.byKey(const ValueKey('interlude-dots')));
     expect(dots.top, closeTo(previousLine.bottom, 2));
+    expect(
+      tester.getRect(find.byKey(const ValueKey('interlude-dot-first'))).left,
+      closeTo(tester.getRect(find.text('前一句')).left, .5),
+    );
+    expect(tester.takeException(), isNull);
+
+    updateState(
+      () => state = state.copyWith(position: const Duration(seconds: 10)),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byKey(const ValueKey('interlude-dots')), findsNothing);
+  });
+
+  testWidgets('间奏占位插入和移除时后续歌词行错峰移动', (tester) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final track = Track(
+      id: 'lyrics-interlude-motion',
+      title: '间奏位移动画',
+      artist: '测试歌手',
+      album: '测试专辑',
+      duration: const Duration(seconds: 15),
+      lyrics: '''
+<tt xmlns="http://www.w3.org/ns/ttml"><body><div>
+  <p begin="0s" end="1s">前一句</p>
+  <p begin="10s" end="11s">后一句</p>
+  <p begin="20s" end="21s">末一句</p>
+</div></body></tt>
+''',
+      lyricsFormat: 'ttml',
+    );
+    var state = PlayerState(
+      queue: [track],
+      currentIndex: 0,
+      isPlaying: false,
+      position: const Duration(milliseconds: 500),
+      audioSettings: AudioProcessingSettings(),
+    );
+    late void Function(VoidCallback) updateState;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              updateState = setState;
+              return AmllPlaybackPage(
+                track: track,
+                state: state,
+                onClose: () {},
+                onPrevious: () {},
+                onTogglePlay: () {},
+                onNext: () {},
+                onSeek: (_) {},
+                onToggleShuffle: () {},
+                onCycleRepeat: () {},
+                onPlayTrack: (_) {},
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    updateState(
+      () => state = state.copyWith(position: const Duration(seconds: 5)),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byKey(const ValueKey('interlude-dots')), findsOneWidget);
+    double rowOffset(int index) {
+      final startMicroseconds = index * 10000000;
+      final transform = tester.widget<Transform>(
+        find.byKey(ValueKey('lyric-row-motion-$startMicroseconds')),
+      );
+      return transform.transform.getTranslation().y;
+    }
+
+    expect(rowOffset(1), lessThan(0));
+    expect(rowOffset(2).abs(), greaterThan(rowOffset(1).abs()));
+
+    updateState(
+      () => state = state.copyWith(position: const Duration(seconds: 10)),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byKey(const ValueKey('interlude-dots')), findsNothing);
+    expect(rowOffset(1), greaterThan(0));
+    expect(rowOffset(2).abs(), greaterThan(rowOffset(1).abs()));
     expect(tester.takeException(), isNull);
   });
 
@@ -792,6 +1137,10 @@ void main() {
           .first,
     );
     expect(dots.opacity, greaterThan(.5));
+    expect(
+      tester.getRect(find.byKey(const ValueKey('interlude-dot-first'))).left,
+      closeTo(tester.getRect(find.text('第一句')).left, .5),
+    );
     expect(tester.takeException(), isNull);
   });
 
