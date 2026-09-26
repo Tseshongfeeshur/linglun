@@ -1056,6 +1056,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.byKey(const ValueKey('interlude-dots')), findsOneWidget);
+    final movingTransform = tester.widget<Transform>(
+      find.byKey(const ValueKey('lyric-row-motion-10000000')),
+    );
+    expect(movingTransform.child, isA<RepaintBoundary>());
+    expect(movingTransform.filterQuality, FilterQuality.low);
+
     double rowOffset(int index) {
       final startMicroseconds = index * 10000000;
       final transform = tester.widget<Transform>(
@@ -1077,6 +1083,15 @@ void main() {
     expect(find.byKey(const ValueKey('interlude-dots')), findsNothing);
     expect(rowOffset(1), greaterThan(0));
     expect(rowOffset(2).abs(), greaterThan(rowOffset(1).abs()));
+    await tester.pump(const Duration(milliseconds: 1600));
+    expect(
+      tester
+          .widget<Transform>(
+            find.byKey(const ValueKey('lyric-row-motion-10000000')),
+          )
+          .filterQuality,
+      isNull,
+    );
     expect(tester.takeException(), isNull);
   });
 

@@ -2797,7 +2797,10 @@ class _AnimatedLyricRow extends StatelessWidget {
     );
     return AnimatedBuilder(
       animation: lineMotion,
-      child: RepaintBoundary(child: content),
+      child: RepaintBoundary(
+        key: ValueKey('lyric-scroll-layer-${line.start.inMicroseconds}'),
+        child: content,
+      ),
       builder: (context, child) {
         // AMLL 为每个可见行累加约 45ms 的延迟，并在焦点行之后逐步缩短延迟。
         // 这里使用同一时钟计算每行自己的时间段，避免整列表同帧跳动。
@@ -3096,9 +3099,7 @@ class _KaraokeLyricViewState extends State<_KaraokeLyricView> {
           textWidthBasis: widget.textWidthBasis,
           width: width,
         )) {
-      if (widget.active &&
-          widget.animateWords &&
-          widget.enableCharacterEmphasis) {
+      if (widget.active && widget.animateWords) {
         cached.rasterizeGlyphs(widget.devicePixelRatio);
       }
       return cached;
@@ -3118,9 +3119,7 @@ class _KaraokeLyricViewState extends State<_KaraokeLyricView> {
       textWidthBasis: widget.textWidthBasis,
       width: width,
     );
-    if (widget.active &&
-        widget.animateWords &&
-        widget.enableCharacterEmphasis) {
+    if (widget.active && widget.animateWords) {
       replacement.rasterizeGlyphs(widget.devicePixelRatio);
     }
     cached?.dispose();
@@ -3477,6 +3476,7 @@ class _KaraokeLyricPainter extends CustomPainter {
     // 这是旧版稳定的绘制顺序，可避免原字形与浮动字形同时残留。
     // 为最大三倍标准差模糊及字符变换留足隔离层边界，避免辉光贴边裁切。
     final glowBleed = fontSize * 1.05;
+    final rasterizedImage = layout.rasterizedImage;
     canvas.saveLayer(
       Rect.fromLTWH(
         0,
@@ -3527,13 +3527,24 @@ class _KaraokeLyricPainter extends CustomPainter {
         canvas.drawRect(rect, Paint()..blendMode = BlendMode.clear);
         canvas.save();
         canvas.clipRect(floatingRect);
-        _paintTextWithAlpha(
-          canvas,
-          painter,
-          painterOffset,
-          floatingRect,
-          baseAlpha,
-        );
+        if (rasterizedImage == null) {
+          _paintTextWithAlpha(
+            canvas,
+            painter,
+            painterOffset,
+            floatingRect,
+            baseAlpha,
+          );
+        } else {
+          _paintRasterizedTextWithAlpha(
+            canvas,
+            layout,
+            rasterizedImage,
+            painterOffset,
+            floatingRect,
+            baseAlpha,
+          );
+        }
         _paintWordHighlight(
           canvas,
           painter,
@@ -3542,6 +3553,8 @@ class _KaraokeLyricPainter extends CustomPainter {
           box.direction == TextDirection.rtl,
           painterOffset,
           highlightAlpha,
+          layout: rasterizedImage == null ? null : layout,
+          rasterizedImage: rasterizedImage,
         );
         canvas.restore();
       }
