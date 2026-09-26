@@ -2151,6 +2151,9 @@ class _TimedLyricsList extends StatelessWidget {
     final lines = document.lines;
     final adjustedPosition = position - document.offset;
     final compact = MediaQuery.sizeOf(context).width <= 768;
+    // 滚动焦点和视觉高亮并不总是相同：一行结束后仍可作为滚动焦点，
+    // 但应立即恢复为未高亮的字号和样式。
+    final highlightedIndex = _highlightedLineIndex(lines, adjustedPosition);
     final activeInterlude = _activeLyricInterlude(lines, adjustedPosition);
     final resetCandidate = interludeResetPosition;
     final resetPosition =
@@ -2255,7 +2258,7 @@ class _TimedLyricsList extends StatelessWidget {
                   position: adjustedPosition,
                   distance: distance,
                   blurDistance: blurDistance,
-                  active: distance == 0,
+                  active: index == highlightedIndex,
                   isNonDynamic: !document.hasWordTimestamps,
                   isPlaying: isPlaying,
                   isHovered: isHovered,
@@ -4311,6 +4314,30 @@ int _activeLineIndex(List<LyricLine> lines, Duration position) {
     if (groupStart <= position) activeIndex = index;
   }
   return activeIndex < 0 ? 0 : activeIndex;
+}
+
+/// 返回当前仍处于有效时间区间内、需要使用高亮样式的歌词行。
+///
+/// `_activeLineIndex` 只负责确定滚动焦点，即使歌词行已经结束，仍需要
+/// 保留它来计算列表位置。因此视觉高亮必须单独检查行的结束时间。
+int _highlightedLineIndex(List<LyricLine> lines, Duration position) {
+  final index = _activeLineIndex(lines, position);
+  if (index < 0 || index >= lines.length) return -1;
+
+  final line = lines[index];
+  var groupStart = line.start;
+  for (final variant in line.variants) {
+    if (variant.role != LyricRole.alternate) continue;
+    final start = variant.start ?? variant.words.firstOrNull?.start;
+    if (start != null && start < groupStart) groupStart = start;
+  }
+  if (position < groupStart) return -1;
+
+  final knownEnd = _latestKnownLyricEnd(line);
+  final nextStart = index + 1 < lines.length ? lines[index + 1].start : null;
+  final end = knownEnd ?? nextStart;
+  if (end != null && position >= end) return -1;
+  return index;
 }
 
 ({Duration start, Duration end, int anchor})? _activeLyricInterlude(
