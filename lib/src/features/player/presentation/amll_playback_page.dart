@@ -28,7 +28,7 @@ const _lyricLineStaggerCompression = 1.05;
 const _lyricLineUpperLead = Duration(milliseconds: 36);
 const _lyricSpringMass = 1.4;
 // 欠阻尼使动画从零初速自然加速，并以小幅过冲逐步衰减到目标位置。
-const _lyricSpringDampingRatio = .75;
+const _lyricSpringDampingRatio = .74;
 const _synchronizedLyricScrollDuration = Duration(milliseconds: 480);
 const _minimumInterludeGap = Duration(seconds: 7);
 const _lyricAutoFollowDelay = Duration(seconds: 3);
@@ -3297,6 +3297,7 @@ class _KaraokeTextLayout {
 
     final pixelWidth = math.max(1, (width * ratio).ceil());
     final pixelHeight = math.max(1, (painter.height * ratio).ceil());
+    _rasterizeGlowMasks(ratio);
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     canvas.scale(ratio, ratio);
@@ -3314,7 +3315,31 @@ class _KaraokeTextLayout {
     }
   }
 
+  void _rasterizeGlowMasks(double pixelRatio) {
+    for (final group in emphasisGroups) {
+      for (final character in group.characters) {
+        character.rasterizeGlowMask(
+          text: text,
+          style: style,
+          textDirection: textDirection,
+          locale: locale,
+          textAlign: textAlign,
+          textScaler: textScaler,
+          textHeightBehavior: textHeightBehavior,
+          textWidthBasis: textWidthBasis,
+          width: width,
+          pixelRatio: pixelRatio,
+        );
+      }
+    }
+  }
+
   void dispose() {
+    for (final group in emphasisGroups) {
+      for (final character in group.characters) {
+        character.dispose();
+      }
+    }
     rasterizedImage?.dispose();
     painter.dispose();
   }
@@ -3342,15 +3367,81 @@ class _KaraokeEmphasisGroup {
 }
 
 class _KaraokeEmphasisCharacter {
-  const _KaraokeEmphasisCharacter({
+  _KaraokeEmphasisCharacter({
+    required this.start,
+    required this.end,
     required this.box,
     required this.sourceAtomIndex,
     required this.atomBox,
   });
 
+  final int start;
+  final int end;
   final TextBox box;
   final int sourceAtomIndex;
   final TextBox atomBox;
+  ui.Image? glowMask;
+  double _glowMaskPixelRatio = 0;
+
+  void rasterizeGlowMask({
+    required String text,
+    required TextStyle style,
+    required TextDirection textDirection,
+    required Locale? locale,
+    required TextAlign textAlign,
+    required TextScaler textScaler,
+    required TextHeightBehavior? textHeightBehavior,
+    required TextWidthBasis textWidthBasis,
+    required double width,
+    required double pixelRatio,
+  }) {
+    if (glowMask != null && _glowMaskPixelRatio == pixelRatio) return;
+    glowMask?.dispose();
+    glowMask = null;
+    _glowMaskPixelRatio = 0;
+
+    final bounds = box.toRect();
+    if (bounds.isEmpty || start < 0 || end <= start || end > text.length) {
+      return;
+    }
+    final maskPainter = _createLyricGlyphMaskPainter(
+      text: text,
+      start: start,
+      end: end,
+      style: style,
+      textDirection: textDirection,
+      locale: locale,
+      textAlign: textAlign,
+      textScaler: textScaler,
+      textHeightBehavior: textHeightBehavior,
+      textWidthBasis: textWidthBasis,
+      width: width,
+    );
+    final pixelWidth = math.max(1, (bounds.width * pixelRatio).ceil());
+    final pixelHeight = math.max(1, (bounds.height * pixelRatio).ceil());
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.scale(pixelRatio, pixelRatio);
+    canvas.clipRect(Rect.fromLTWH(0, 0, bounds.width, bounds.height));
+    maskPainter.paint(canvas, Offset(-bounds.left, -bounds.top));
+    final picture = recorder.endRecording();
+    try {
+      glowMask = picture.toImageSync(pixelWidth, pixelHeight);
+      _glowMaskPixelRatio = pixelRatio;
+    } catch (_) {
+      // 无法生成字符遮罩时，绘制层会回退到字符框裁切。
+      glowMask = null;
+    } finally {
+      picture.dispose();
+      maskPainter.dispose();
+    }
+  }
+
+  void dispose() {
+    glowMask?.dispose();
+    glowMask = null;
+    _glowMaskPixelRatio = 0;
+  }
 }
 
 class _KaraokeEmphasisFrame {
@@ -3365,6 +3456,7 @@ class _KaraokeEmphasisFrame {
     required this.glow,
     required this.sigma,
     required this.isRtl,
+    required this.glowMask,
   });
 
   final Rect charRect;
@@ -3377,6 +3469,7 @@ class _KaraokeEmphasisFrame {
   final double glow;
   final double sigma;
   final bool isRtl;
+  final ui.Image? glowMask;
 }
 
 List<_KaraokeWordLayout> _buildKaraokeWordLayouts(
@@ -3419,6 +3512,8 @@ List<_KaraokeEmphasisGroup> _buildKaraokeEmphasisGroups(
             if (atomBox == null) continue;
             characters.add(
               _KaraokeEmphasisCharacter(
+                start: character.start,
+                end: character.end,
                 box: charBox,
                 sourceAtomIndex: character.sourceAtomIndex,
                 atomBox: atomBox,
@@ -3642,6 +3737,44 @@ TextPainter _createLyricPainter({
   textHeightBehavior: textHeightBehavior,
   textWidthBasis: textWidthBasis,
 )..layout(minWidth: width, maxWidth: width);
+
+TextPainter _createLyricGlyphMaskPainter({
+  required String text,
+  required int start,
+  required int end,
+  required TextStyle style,
+  required TextDirection textDirection,
+  required Locale? locale,
+  required TextAlign textAlign,
+  required TextScaler textScaler,
+  required TextHeightBehavior? textHeightBehavior,
+  required TextWidthBasis textWidthBasis,
+  required double width,
+}) {
+  final before = text.substring(0, start);
+  final glyph = text.substring(start, end);
+  final after = text.substring(end);
+  final transparentStyle = style.copyWith(color: Colors.transparent);
+  final painter = TextPainter(
+    text: TextSpan(
+      children: [
+        if (before.isNotEmpty) TextSpan(text: before, style: transparentStyle),
+        TextSpan(
+          text: glyph,
+          style: style.copyWith(color: Colors.white),
+        ),
+        if (after.isNotEmpty) TextSpan(text: after, style: transparentStyle),
+      ],
+    ),
+    textDirection: textDirection,
+    locale: locale,
+    textAlign: textAlign,
+    textScaler: textScaler,
+    textHeightBehavior: textHeightBehavior,
+    textWidthBasis: textWidthBasis,
+  )..layout(minWidth: width, maxWidth: width);
+  return painter;
+}
 
 void _paintWordHighlight(
   Canvas canvas,
@@ -3874,6 +4007,7 @@ void _paintWordEmphasis(
           glow: glow,
           sigma: amlEmphasisGlowSigmaEm(blur) * fontSize,
           isRtl: sourceBox.direction == TextDirection.rtl,
+          glowMask: character.glowMask,
         ),
       );
     }
@@ -3902,8 +4036,14 @@ void _paintWordEmphasis(
         painter: layout.painter,
         layout: layout,
         rasterizedImage: rasterizedImage,
+        glowMask: frame.glowMask,
         charRect: frame.charRect,
-        clipRect: frame.charRect.inflate(glowBleed / frame.scale),
+        // 外层图层负责承载辉光扩散，源裁剪必须保持在当前字符框内。
+        // 这里不能为了防止辉光截断而扩大源裁剪，否则整行 TextPainter
+        // 会把目标字两侧的邻字一同绘入模糊层。
+        clipRect: frame.glowMask == null
+            ? frame.charRect
+            : frame.charRect.inflate(glowBleed / frame.scale),
         wordRect: frame.wordRect,
         painterOffset: frame.painterOffset,
         translation: frame.translation,
@@ -3925,6 +4065,7 @@ void _paintWordEmphasis(
         painter: layout.painter,
         layout: layout,
         rasterizedImage: rasterizedImage,
+        glowMask: null,
         charRect: frame.charRect,
         clipRect: frame.charRect,
         wordRect: frame.wordRect,
@@ -3946,6 +4087,7 @@ void _paintEmphasisGlyph(
   required TextPainter painter,
   required _KaraokeTextLayout layout,
   required ui.Image? rasterizedImage,
+  required ui.Image? glowMask,
   required Rect charRect,
   required Rect clipRect,
   required Rect wordRect,
@@ -3966,7 +4108,19 @@ void _paintEmphasisGlyph(
   canvas.translate(-center.dx, -center.dy);
   canvas.save();
   canvas.clipRect(clipRect);
-  if (rasterizedImage == null) {
+  if (!includeHighlight && glowMask != null) {
+    canvas.drawImageRect(
+      glowMask,
+      Rect.fromLTWH(
+        0,
+        0,
+        glowMask.width.toDouble(),
+        glowMask.height.toDouble(),
+      ),
+      charRect,
+      Paint()..filterQuality = FilterQuality.high,
+    );
+  } else if (rasterizedImage == null) {
     _paintTextWithAlpha(canvas, painter, painterOffset, charRect, baseAlpha);
   } else {
     _paintRasterizedTextWithAlpha(
