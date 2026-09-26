@@ -154,4 +154,12 @@ void main() {
     expect(sampleAmlEmphasisFloat(1), closeTo(0, 1e-12));
     expect(sampleAmlEmphasisFloat(.5), closeTo(1, .003));
   });
+
+  test('短强调词的辉光映射到可见但受限的强度与半径', () {
+    const shortWordBlur = .0185;
+    expect(amlEmphasisGlowOpacity(shortWordBlur), greaterThan(.18));
+    expect(amlEmphasisGlowOpacity(.8), lessThanOrEqualTo(.8));
+    expect(amlEmphasisGlowSigmaEm(shortWordBlur), greaterThan(.045));
+    expect(amlEmphasisGlowSigmaEm(.8), lessThanOrEqualTo(.3));
+  });
 }

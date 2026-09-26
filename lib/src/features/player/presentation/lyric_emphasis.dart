@@ -285,6 +285,18 @@ double sampleAmlEmphasisCurve(double progress) =>
 double sampleAmlEmphasisFloat(double progress) =>
     _sampleAmlFrames(progress, (value) => math.sin(math.pi * value));
 
+/// 将 AMLL 的归一化辉光强度映射到 Flutter 可见的透明度范围。
+double amlEmphasisGlowOpacity(double blurStrength) {
+  final strength = blurStrength.clamp(0.0, 0.8).toDouble();
+  return math.min(0.8, 0.18 + strength * 0.75);
+}
+
+/// Flutter 的高斯模糊半径较小时不易形成可见光晕，因此保留轻微基线。
+double amlEmphasisGlowSigmaEm(double blurStrength) {
+  final strength = blurStrength.clamp(0.0, 0.8).toDouble();
+  return math.min(0.3, 0.045 + strength * 0.3);
+}
+
 double _sampleAmlFrames(double progress, double Function(double) sample) {
   const frameCount = 32;
   final framePosition = progress.clamp(0.0, 1.0) * frameCount;

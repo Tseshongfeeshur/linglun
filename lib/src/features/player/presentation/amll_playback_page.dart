@@ -3391,7 +3391,8 @@ class _KaraokeLyricPainter extends CustomPainter {
 
     // 先绘制整句底图，再在同一隔离层中清除词的原位置并绘制浮动词。
     // 这是旧版稳定的绘制顺序，可避免原字形与浮动字形同时残留。
-    final glowBleed = fontSize * .75;
+    // 为最大三倍标准差模糊及字符变换留足隔离层边界，避免辉光贴边裁切。
+    final glowBleed = fontSize * 1.05;
     canvas.saveLayer(
       Rect.fromLTWH(
         0,
@@ -3671,9 +3672,9 @@ void _paintWordEmphasis(
 
       // AMLL 的强调变换叠加在常规逐词上浮之上；先清掉原字符，再绘制变换后的字形。
       canvas.drawRect(charRect, Paint()..blendMode = BlendMode.clear);
-      final glow = eased * blur;
+      final glow = eased * amlEmphasisGlowOpacity(blur);
       if (glow > .01) {
-        final sigma = math.min(.3, blur * .3) * fontSize;
+        final sigma = amlEmphasisGlowSigmaEm(blur) * fontSize;
         final glowPaint = Paint()
           ..colorFilter = ColorFilter.mode(
             Colors.white.withValues(alpha: glow.clamp(0.0, 1.0)),
@@ -3691,7 +3692,8 @@ void _paintWordEmphasis(
           scale: scale,
           wordProgress: wordProgress,
           isRtl: sourceBox.direction == TextDirection.rtl,
-          baseAlpha: baseAlpha,
+          // 辉光使用完整字形遮罩，避免再乘一次正文的低透明度。
+          baseAlpha: 1,
           highlightAlpha: highlightAlpha,
           includeHighlight: false,
         );
