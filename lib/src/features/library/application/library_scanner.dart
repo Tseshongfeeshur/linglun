@@ -32,6 +32,23 @@ const supportedAudioExtensions = {
   '.webm',
 };
 
+const _oggExtensions = {'.ogg', '.oga', '.opus'};
+const _opusGranuleRate = 48000;
+
+class _OggPage {
+  const _OggPage({
+    required this.headerType,
+    required this.granule,
+    required this.serial,
+    required this.payload,
+  });
+
+  final int headerType;
+  final int granule;
+  final int serial;
+  final Uint8List payload;
+}
+
 /// 递归扫描目录并将音频文件转换成应用层的曲目模型。
 class LibraryScanner {
   Future<List<Track>> scan(Iterable<String> rootPaths) async {
@@ -78,6 +95,13 @@ class LibraryScanner {
       final modifiedAt = (await file.stat()).modified;
       final detailed = readAllMetadata(file, getImage: true);
       final metadata = _summaryMetadata(file, detailed);
+      final preciseDuration = _readOpusOggDuration(file);
+      if (preciseDuration != null) {
+        // Opus 的 Ogg 粒度位置使用固定的 48 kHz 时钟，不能使用
+        // OpusHead 中记录的输入采样率替代。第三方元数据解析器在此处
+        // 会把 44.1 kHz 当成时钟，导致同一文件的时长被放大。
+        metadata.duration = preciseDuration;
+      }
       final fallbackTitle = _fileNameWithoutExtension(file.path);
       final sidecarLyrics = await _readSidecarLyrics(file);
       final sources = <LyricsSource>[
@@ -115,6 +139,109 @@ class LibraryScanner {
       // 损坏或暂不支持的文件不应中断整个曲库扫描。
       return null;
     }
+  }
+
+  /// 从 Ogg 页尾粒度位置读取 Opus 的精确时长。
+  ///
+  /// Opus 在 Ogg 容器中的 granule position 始终以 48 kHz 为单位；输入
+  /// 采样率只描述编码前的音频，不能用于换算容器时长。这里只处理首个
+  /// 逻辑流为 Opus 的 Ogg 文件，其他格式继续使用元数据读取器的结果。
+  Duration? _readOpusOggDuration(File file) {
+    if (!_oggExtensions.contains(_extension(file.path))) return null;
+
+    RandomAccessFile? reader;
+    try {
+      reader = file.openSync();
+      final firstPage = _readOggPage(reader, readPayload: true);
+      if (firstPage == null || !_isOpusHead(firstPage.payload)) return null;
+
+      final streamSerial = firstPage.serial;
+      var lastGranule = _validOggGranule(firstPage.granule);
+      while (true) {
+        final page = _readOggPage(reader, readPayload: false);
+        if (page == null) break;
+        if (page.serial == streamSerial) {
+          final granule = _validOggGranule(page.granule);
+          if (granule != null) lastGranule = granule;
+          if (page.headerType & 0x04 != 0) break;
+        }
+      }
+
+      if (lastGranule == null) return null;
+      return Duration(
+        microseconds:
+            (lastGranule * Duration.microsecondsPerSecond / _opusGranuleRate)
+                .round(),
+      );
+    } on Object {
+      // 个别损坏的 Ogg 文件仍应保留第三方解析器给出的时长。
+      return null;
+    } finally {
+      reader?.closeSync();
+    }
+  }
+
+  _OggPage? _readOggPage(RandomAccessFile reader, {required bool readPayload}) {
+    final header = reader.readSync(27);
+    if (header.length != 27 || !_hasBytes(header, [0x4F, 0x67, 0x67, 0x53])) {
+      return null;
+    }
+    if (header[4] != 0) return null;
+
+    final segmentCount = header[26];
+    final segmentTable = reader.readSync(segmentCount);
+    if (segmentTable.length != segmentCount) return null;
+    var payloadLength = 0;
+    for (final segmentLength in segmentTable) {
+      payloadLength += segmentLength;
+    }
+
+    final payload = readPayload ? reader.readSync(payloadLength) : Uint8List(0);
+    if (readPayload && payload.length != payloadLength) return null;
+    if (!readPayload && payloadLength > 0) {
+      reader.setPositionSync(reader.positionSync() + payloadLength);
+    }
+
+    return _OggPage(
+      headerType: header[5],
+      granule: _readLittleEndianUint64(header, 6),
+      serial: _readLittleEndianUint32(header, 14),
+      payload: payload,
+    );
+  }
+
+  bool _isOpusHead(Uint8List payload) {
+    const signature = [0x4F, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64];
+    return payload.length >= signature.length && _hasBytes(payload, signature);
+  }
+
+  bool _hasBytes(List<int> value, List<int> expected) {
+    if (value.length < expected.length) return false;
+    for (var index = 0; index < expected.length; index++) {
+      if (value[index] != expected[index]) return false;
+    }
+    return true;
+  }
+
+  int _readLittleEndianUint32(List<int> bytes, int offset) {
+    var value = 0;
+    for (var index = 0; index < 4; index++) {
+      value |= bytes[offset + index] << (index * 8);
+    }
+    return value;
+  }
+
+  int _readLittleEndianUint64(List<int> bytes, int offset) {
+    var value = 0;
+    for (var index = 0; index < 8; index++) {
+      value |= bytes[offset + index] << (index * 8);
+    }
+    return value;
+  }
+
+  int? _validOggGranule(int value) {
+    // UINT64_MAX 表示当前页没有可用的 granule position。
+    return value == 0xFFFFFFFFFFFFFFFF ? null : value;
   }
 
   AudioMetadata _summaryMetadata(File file, ParserTag detailed) {

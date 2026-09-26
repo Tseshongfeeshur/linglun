@@ -33,6 +33,7 @@ const _synchronizedLyricScrollDuration = Duration(milliseconds: 480);
 const _minimumInterludeGap = Duration(seconds: 7);
 const _lyricAutoFollowDelay = Duration(seconds: 3);
 const _lyricWheelScrollFactor = 4.0;
+const _lyricReloadFadeDuration = Duration(milliseconds: 200);
 
 typedef _LyricSeekRequest = ({int generation, Duration position});
 
@@ -1373,6 +1374,8 @@ class _LyricsViewportState extends State<_LyricsViewport>
   double _interludeMotionOffset = 0;
   int _scrollAnimationGeneration = 0;
   late final VoidCallback _seekGenerationListener;
+  Timer? _lyricsReloadTimer;
+  double _lyricsReloadOpacity = 1;
 
   @override
   void initState() {
@@ -1410,8 +1413,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
     final trackChanged = oldWidget.track.id != widget.track.id;
     final playbackChanged = oldWidget.state.isPlaying != widget.state.isPlaying;
     if (trackChanged) {
-      _document = widget.track.lyricsDocument;
-      _speakerOrder = _buildSpeakerOrder(_document);
+      _beginLyricsReload(widget.track.lyricsDocument);
       _interludeResetPosition = null;
       _activeIndex = -1;
       _scrollFocusIndex = -1;
@@ -1423,7 +1425,6 @@ class _LyricsViewportState extends State<_LyricsViewport>
       _lineScrollDelta = 0;
       _synchronizeLineMotion = false;
       _autoFollowTimer?.cancel();
-      _userScrollSuppressed = false;
       _userDragActive = false;
       _synchronizeNextLineMotion = false;
       _explicitSeekPending = false;
@@ -1435,11 +1436,6 @@ class _LyricsViewportState extends State<_LyricsViewport>
       _interludeMotionAnchor = -2;
       _interludeMotionOffset = 0;
       _scrollAnimationGeneration++;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _scrollController.hasClients) {
-          _scrollController.jumpTo(0);
-        }
-      });
     }
     if (trackChanged || playbackChanged) {
       final currentPosition = trackChanged
@@ -1453,7 +1449,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
         ..reset();
       if (widget.state.isPlaying) _clock.start();
       _playhead.value = currentPosition;
-      _syncActiveLine(currentPosition);
+      if (!trackChanged) _syncActiveLine(currentPosition);
     } else if (oldWidget.state.position != widget.state.position) {
       final reported = widget.state.position;
       final estimated = _estimatedPlayhead;
@@ -1513,9 +1509,34 @@ class _LyricsViewportState extends State<_LyricsViewport>
       ? _anchorPosition + _clock.elapsed
       : _playhead.value;
 
+  void _beginLyricsReload(LyricsDocument nextDocument) {
+    _lyricsReloadTimer?.cancel();
+    // 保留旧文档，先让用户看到旧歌词快速淡出，避免新旧歌词重叠。
+    _lyricsReloadOpacity = 0;
+    _userScrollSuppressed = true;
+    _userDragActive = false;
+    _autoFollowTimer?.cancel();
+    _autoFollowTimer = null;
+    _scrollAnimationGeneration++;
+    _lineMotion.stop();
+    _lyricsReloadTimer = Timer(_lyricReloadFadeDuration, () {
+      if (!mounted) return;
+      _lyricsReloadTimer = null;
+      _document = nextDocument;
+      _speakerOrder = _buildSpeakerOrder(_document);
+      _lyricsReloadOpacity = 1;
+      if (_scrollController.hasClients) _scrollController.jumpTo(0);
+      _userScrollSuppressed = false;
+      _hasSyncedInitialFocus = false;
+      _syncActiveLine(_playhead.value);
+      setState(() {});
+    });
+  }
+
   @override
   void dispose() {
     _autoFollowTimer?.cancel();
+    _lyricsReloadTimer?.cancel();
     _seekReconciliationTimer?.cancel();
     widget.seekRequest.removeListener(_seekGenerationListener);
     _ticker.dispose();
@@ -2061,9 +2082,14 @@ class _LyricsViewportState extends State<_LyricsViewport>
                                     onSeek: _seekToLyric,
                                   )
                                 : _UntimedLyricsList(document: _document);
-                            return NotificationListener<ScrollNotification>(
-                              onNotification: _handleLyricsScrollNotification,
-                              child: lyrics,
+                            return AnimatedOpacity(
+                              opacity: _lyricsReloadOpacity,
+                              duration: _lyricReloadFadeDuration,
+                              curve: Curves.easeOutCubic,
+                              child: NotificationListener<ScrollNotification>(
+                                onNotification: _handleLyricsScrollNotification,
+                                child: lyrics,
+                              ),
                             );
                           },
                         ),
