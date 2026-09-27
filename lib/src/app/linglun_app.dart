@@ -33,7 +33,7 @@ class LinglunApp extends ConsumerWidget {
         fontFamily: linglunFontFamily,
         brightness: Brightness.dark,
         scaffoldBackgroundColor: background,
-        colorScheme: scheme.copyWith(secondary: const Color(0xFFFFB86C)),
+        colorScheme: scheme,
         cardTheme: CardThemeData(
           color: scheme.surface,
           margin: EdgeInsets.zero,
