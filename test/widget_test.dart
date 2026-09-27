@@ -1,5 +1,5 @@
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
-import 'package:flutter/material.dart' show MaterialApp;
+import 'package:flutter/material.dart' show MaterialApp, Size;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linglun/main.dart';
@@ -10,15 +10,28 @@ import 'package:linglun/src/features/player/presentation/amll_playback_page.dart
 import 'package:linglun/src/features/player/presentation/floating_player.dart';
 
 void main() {
-  testWidgets('曲库首页显示应用名称和示例曲目', (WidgetTester tester) async {
+  testWidgets('曲库首页显示导航提示和示例曲目', (WidgetTester tester) async {
     await tester.pumpWidget(const ProviderScope(child: LinglunApp()));
 
     final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
     expect(app.theme?.textTheme.bodyMedium?.fontFamily, linglunFontFamily);
-    expect(find.text('伶伦'), findsOneWidget);
-    expect(find.text('曲库'), findsNWidgets(2));
+    expect(find.byTooltip('曲库'), findsOneWidget);
+    expect(find.byTooltip('年度总结'), findsNothing);
+    expect(find.text('曲库'), findsOneWidget);
     expect(find.text('雾中回声'), findsOneWidget);
     expect(find.byType(FloatingPlayer), findsOneWidget);
+  });
+
+  testWidgets('曲库在窄窗口下不产生横向溢出', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const ProviderScope(child: LinglunApp()));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('悬停封面后歌词菜单能够展开', (WidgetTester tester) async {
@@ -102,7 +115,7 @@ void main() {
 
     expect(find.byType(AmllPlaybackPage), findsOneWidget);
 
-    await tester.tap(find.text('设置').first, warnIfMissed: false);
+    await tester.tap(find.byTooltip('设置'), warnIfMissed: false);
     await tester.pump();
     expect(find.byType(AmllPlaybackPage), findsOneWidget);
 

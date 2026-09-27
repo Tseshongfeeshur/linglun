@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../library/presentation/annual_summary_page.dart';
 import '../../player/presentation/audio_settings_page.dart';
 import '../../player/presentation/playback_background_settings_page.dart';
 
@@ -19,6 +20,8 @@ class SettingsPage extends StatelessWidget {
         AudioSettingsPage(embedded: true),
         SizedBox(height: 24),
         PlaybackBackgroundSettingsPage(),
+        SizedBox(height: 24),
+        AnnualSummaryPage(embedded: true),
       ],
     );
   }

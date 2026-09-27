@@ -35,8 +35,66 @@ const _minimumInterludeGap = Duration(seconds: 7);
 const _lyricAutoFollowDelay = Duration(seconds: 3);
 const _lyricWheelScrollFactor = 4.0;
 const _lyricReloadFadeDuration = Duration(milliseconds: 200);
+const _compactMetadataTitleFontSize = 24.0;
+const _compactMetadataSecondaryFontSize = 15.0;
 
 typedef _LyricSeekRequest = ({int generation, Duration position});
+
+/// 合并同一帧内重复提交的布局后处理，避免窗口调整时回调不断累积。
+class _PostFrameScheduler {
+  final Map<Object, VoidCallback> _callbacks = <Object, VoidCallback>{};
+
+  void schedule(Object key, VoidCallback callback) {
+    final alreadyScheduled = _callbacks.containsKey(key);
+    _callbacks[key] = callback;
+    if (alreadyScheduled) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final scheduled = _callbacks.remove(key);
+      scheduled?.call();
+    });
+  }
+
+  void dispose() => _callbacks.clear();
+}
+
+class _LyricAutoFollow {
+  _LyricAutoFollow(this.onResume);
+
+  final VoidCallback onResume;
+  Timer? _timer;
+  bool suppressed = false;
+  bool dragging = false;
+
+  void noteScroll() {
+    suppressed = true;
+    _timer?.cancel();
+    _timer = Timer(_lyricAutoFollowDelay, _resume);
+  }
+
+  void pause() {
+    cancel();
+    suppressed = true;
+  }
+
+  void cancel({bool clearSuppression = false}) {
+    _timer?.cancel();
+    _timer = null;
+    dragging = false;
+    if (clearSuppression) suppressed = false;
+  }
+
+  void _resume() {
+    _timer = null;
+    if (dragging) {
+      _timer = Timer(_lyricAutoFollowDelay, _resume);
+      return;
+    }
+    suppressed = false;
+    onResume();
+  }
+
+  void dispose() => cancel();
+}
 
 /// 让歌词滚轮采用短时缓动，避免 Linux 鼠标滚轮每个离散事件都瞬移一段距离。
 class _SmoothLyricsScrollController extends ScrollController {
@@ -158,6 +216,30 @@ class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
     widget.onSeek(position);
   }
 
+  void _showLyricsDetails(BuildContext context) {
+    final document = widget.track.lyricsDocument;
+    final details = [
+      '语法格式：${document.syntaxLabel}',
+      '时间戳：${document.timingLabel}',
+      if (widget.track.lyricsSources.isNotEmpty)
+        '来源：${widget.track.lyricsSources.map((source) => source.label).join('、')}',
+      '歌词行数：${document.lines.isNotEmpty ? document.lines.length : document.plainLines.length}',
+    ].join('\n');
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('歌词详情'),
+        content: Text(details),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -170,92 +252,102 @@ class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
           position: widget.state.position,
         ),
         SafeArea(
-          child: Column(
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              _PageHeader(onClose: widget.onClose),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final wide = constraints.maxWidth >= constraints.maxHeight;
-                    return wide
-                        ? _WidePlaybackLayout(
-                            track: widget.track,
-                            state: widget.state,
-                            seekRequest: _seekRequest,
-                            onSeek: _handleSeek,
-                            showRemainingTime: _showRemainingTime,
-                            onRemainingTimeChanged: (value) =>
-                                setState(() => _showRemainingTime = value),
-                            onPrevious: widget.onPrevious,
-                            onTogglePlay: widget.onTogglePlay,
-                            onNext: widget.onNext,
-                            onToggleShuffle: widget.onToggleShuffle,
-                            onCycleRepeat: widget.onCycleRepeat,
-                          )
-                        : _NarrowPlaybackLayout(
-                            track: widget.track,
-                            state: widget.state,
-                            seekRequest: _seekRequest,
-                            onSeek: _handleSeek,
-                            showLyrics: _portraitLyricsVisible,
-                            onToggleLyrics: () => setState(
-                              () => _portraitLyricsVisible =
-                                  !_portraitLyricsVisible,
-                            ),
-                            showRemainingTime: _showRemainingTime,
-                            onRemainingTimeChanged: (value) =>
-                                setState(() => _showRemainingTime = value),
-                            onPrevious: widget.onPrevious,
-                            onTogglePlay: widget.onTogglePlay,
-                            onNext: widget.onNext,
-                            onToggleShuffle: widget.onToggleShuffle,
-                            onCycleRepeat: widget.onCycleRepeat,
-                          );
-                  },
+              Column(
+                children: [
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final wide =
+                            constraints.maxWidth >= constraints.maxHeight;
+                        return wide
+                            ? _WidePlaybackLayout(
+                                track: widget.track,
+                                state: widget.state,
+                                seekRequest: _seekRequest,
+                                onSeek: _handleSeek,
+                                showRemainingTime: _showRemainingTime,
+                                onRemainingTimeChanged: (value) =>
+                                    setState(() => _showRemainingTime = value),
+                                onPrevious: widget.onPrevious,
+                                onTogglePlay: widget.onTogglePlay,
+                                onNext: widget.onNext,
+                                onToggleShuffle: widget.onToggleShuffle,
+                                onCycleRepeat: widget.onCycleRepeat,
+                              )
+                            : _NarrowPlaybackLayout(
+                                track: widget.track,
+                                state: widget.state,
+                                seekRequest: _seekRequest,
+                                onSeek: _handleSeek,
+                                showLyrics: _portraitLyricsVisible,
+                                onToggleLyrics: () => setState(
+                                  () => _portraitLyricsVisible =
+                                      !_portraitLyricsVisible,
+                                ),
+                                showRemainingTime: _showRemainingTime,
+                                onRemainingTimeChanged: (value) =>
+                                    setState(() => _showRemainingTime = value),
+                                onPrevious: widget.onPrevious,
+                                onTogglePlay: widget.onTogglePlay,
+                                onNext: widget.onNext,
+                                onToggleShuffle: widget.onToggleShuffle,
+                                onCycleRepeat: widget.onCycleRepeat,
+                              );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  onPressed: widget.onClose,
+                  tooltip: '收起播放页',
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                  color: Colors.white,
                 ),
               ),
-              _PageFooter(
-                showQueue: _showQueue,
-                onToggleQueue: () => setState(() => _showQueue = !_showQueue),
+              Positioned(
+                left: 8,
+                bottom: 8,
+                child: IconButton(
+                  onPressed: () => setState(() => _showQueue = !_showQueue),
+                  tooltip: _showQueue ? '关闭播放队列' : '打开播放队列',
+                  color: _showQueue
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white.withAlpha(185),
+                  icon: const Icon(Icons.queue_music_rounded),
+                  iconSize: 20,
+                ),
               ),
+              Positioned(
+                right: 8,
+                bottom: 8,
+                child: IconButton(
+                  onPressed: () => _showLyricsDetails(context),
+                  tooltip: '显示歌词详情',
+                  color: Colors.white.withAlpha(185),
+                  icon: const Icon(Icons.info_outline_rounded),
+                  iconSize: 20,
+                ),
+              ),
+              if (_showQueue)
+                _QueueOverlay(
+                  state: widget.state,
+                  onClose: () => setState(() => _showQueue = false),
+                  onSelectTrack: (track) {
+                    widget.onPlayTrack(track);
+                    setState(() => _showQueue = false);
+                  },
+                ),
             ],
           ),
         ),
-        if (_showQueue)
-          _QueueOverlay(
-            state: widget.state,
-            onClose: () => setState(() => _showQueue = false),
-            onSelectTrack: (track) {
-              widget.onPlayTrack(track);
-              setState(() => _showQueue = false);
-            },
-          ),
       ],
-    );
-  }
-}
-
-class _PageHeader extends StatelessWidget {
-  const _PageHeader({required this.onClose});
-
-  final VoidCallback onClose;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 58,
-      child: Row(
-        children: [
-          const Spacer(),
-          IconButton(
-            onPressed: onClose,
-            tooltip: '收起播放页',
-            icon: const Icon(Icons.keyboard_arrow_down_rounded),
-            color: Colors.white,
-          ),
-          const SizedBox(width: 18),
-        ],
-      ),
     );
   }
 }
@@ -384,12 +476,7 @@ class _WideTrackColumn extends StatelessWidget {
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _TrackMetadata(
-                      track: track,
-                      compact: false,
-                      alignStart: true,
-                      horizontalArtistsAlbum: true,
-                    ),
+                    _TrackMetadata(track: track, compact: false),
                     const SizedBox(height: 18),
                     SizedBox(
                       key: const ValueKey('seek-control-container'),
@@ -463,79 +550,103 @@ class _NarrowPlaybackLayout extends StatefulWidget {
 
 class _NarrowPlaybackLayoutState extends State<_NarrowPlaybackLayout> {
   final _coverKey = GlobalKey();
-  double? _renderedCoverWidth;
+  Timer? _lyricsTransitionTimer;
+  bool _animateLyricsTransition = false;
+  Size? _viewportSize;
 
-  void _measureCoverAfterLayout() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || widget.showLyrics) return;
-      final renderObject = _coverKey.currentContext?.findRenderObject();
-      if (renderObject is! RenderBox || !renderObject.hasSize) return;
-      final width = renderObject.size.width;
-      if (_renderedCoverWidth == null ||
-          (width - _renderedCoverWidth!).abs() > .01) {
-        setState(() => _renderedCoverWidth = width);
-      }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final size = MediaQuery.sizeOf(context);
+    if (_viewportSize != null && _viewportSize != size) {
+      _lyricsTransitionTimer?.cancel();
+      _lyricsTransitionTimer = null;
+      _animateLyricsTransition = false;
+    }
+    _viewportSize = size;
+  }
+
+  @override
+  void didUpdateWidget(covariant _NarrowPlaybackLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.showLyrics == widget.showLyrics) return;
+
+    _lyricsTransitionTimer?.cancel();
+    _animateLyricsTransition = true;
+    _lyricsTransitionTimer = Timer(const Duration(milliseconds: 560), () {
+      if (!mounted) return;
+      _lyricsTransitionTimer = null;
+      setState(() => _animateLyricsTransition = false);
     });
   }
 
   @override
+  void dispose() {
+    _lyricsTransitionTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    _measureCoverAfterLayout();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
           final height = constraints.maxHeight;
-          final controlCoverSize = math
-              .min(width * .76, height * .58)
+          final contentWidth = math
+              .min(width, MediaQuery.sizeOf(context).width * .84)
               .toDouble();
-          final seekWidth = widget.showLyrics
-              ? controlCoverSize
-              : (_renderedCoverWidth ?? controlCoverSize);
-          return Column(
-            children: [
-              Expanded(
-                child: _PortraitMainArea(
-                  track: widget.track,
-                  state: widget.state,
-                  showLyrics: widget.showLyrics,
-                  onToggleLyrics: widget.onToggleLyrics,
-                  onSeek: widget.onSeek,
-                  seekRequest: widget.seekRequest,
-                  controlCoverSize: controlCoverSize,
-                  coverKey: _coverKey,
-                ),
+          return Center(
+            child: SizedBox(
+              width: contentWidth,
+              height: height,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: _PortraitMainArea(
+                      track: widget.track,
+                      state: widget.state,
+                      showLyrics: widget.showLyrics,
+                      onToggleLyrics: widget.onToggleLyrics,
+                      onSeek: widget.onSeek,
+                      seekRequest: widget.seekRequest,
+                      contentWidth: contentWidth,
+                      coverKey: _coverKey,
+                      animateTransition: _animateLyricsTransition,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    key: const ValueKey('seek-control-container'),
+                    width: double.infinity,
+                    child: _SeekControl(
+                      width: contentWidth,
+                      track: widget.track,
+                      position: widget.state.position,
+                      showRemainingTime: widget.showRemainingTime,
+                      onRemainingTimeChanged: widget.onRemainingTimeChanged,
+                      onSeek: widget.onSeek,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    key: const ValueKey('playback-controls-container'),
+                    width: double.infinity,
+                    child: _PlaybackControls(
+                      state: widget.state,
+                      onPrevious: widget.onPrevious,
+                      onTogglePlay: widget.onTogglePlay,
+                      onNext: widget.onNext,
+                      onToggleShuffle: widget.onToggleShuffle,
+                      onCycleRepeat: widget.onCycleRepeat,
+                      compact: true,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                ],
               ),
-              const SizedBox(height: 8),
-              SizedBox(
-                key: const ValueKey('seek-control-container'),
-                width: seekWidth,
-                child: _SeekControl(
-                  width: seekWidth,
-                  track: widget.track,
-                  position: widget.state.position,
-                  showRemainingTime: widget.showRemainingTime,
-                  onRemainingTimeChanged: widget.onRemainingTimeChanged,
-                  onSeek: widget.onSeek,
-                ),
-              ),
-              const SizedBox(height: 6),
-              SizedBox(
-                key: const ValueKey('playback-controls-container'),
-                width: seekWidth,
-                child: _PlaybackControls(
-                  state: widget.state,
-                  onPrevious: widget.onPrevious,
-                  onTogglePlay: widget.onTogglePlay,
-                  onNext: widget.onNext,
-                  onToggleShuffle: widget.onToggleShuffle,
-                  onCycleRepeat: widget.onCycleRepeat,
-                  compact: true,
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
+            ),
           );
         },
       ),
@@ -543,7 +654,7 @@ class _NarrowPlaybackLayoutState extends State<_NarrowPlaybackLayout> {
   }
 }
 
-class _PortraitMainArea extends StatelessWidget {
+class _PortraitMainArea extends StatefulWidget {
   const _PortraitMainArea({
     required this.track,
     required this.state,
@@ -551,8 +662,9 @@ class _PortraitMainArea extends StatelessWidget {
     required this.onToggleLyrics,
     required this.onSeek,
     required this.seekRequest,
-    required this.controlCoverSize,
+    required this.contentWidth,
     required this.coverKey,
+    required this.animateTransition,
   });
 
   final Track track;
@@ -561,8 +673,64 @@ class _PortraitMainArea extends StatelessWidget {
   final VoidCallback onToggleLyrics;
   final ValueChanged<Duration> onSeek;
   final ValueListenable<_LyricSeekRequest> seekRequest;
-  final double controlCoverSize;
+  final double contentWidth;
   final GlobalKey coverKey;
+  final bool animateTransition;
+
+  @override
+  State<_PortraitMainArea> createState() => _PortraitMainAreaState();
+}
+
+class _PortraitMainAreaState extends State<_PortraitMainArea>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _transition;
+
+  @override
+  void initState() {
+    super.initState();
+    _transition = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 560),
+      value: widget.showLyrics ? 1 : 0,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _PortraitMainArea oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.showLyrics == widget.showLyrics) return;
+
+    final target = widget.showLyrics ? 1.0 : 0.0;
+    if (widget.animateTransition) {
+      _transition.animateTo(target, curve: Curves.easeOutCubic);
+    } else {
+      _transition.value = target;
+    }
+  }
+
+  @override
+  void dispose() {
+    _transition.dispose();
+    super.dispose();
+  }
+
+  Widget _buildCover() {
+    return KeyedSubtree(
+      key: widget.coverKey,
+      child: GestureDetector(
+        key: const ValueKey('portrait-cover-shared-element'),
+        onTap: widget.onToggleLyrics,
+        child: _AlbumCoverArtwork(
+          key: const ValueKey('amll-album-cover'),
+          track: widget.track,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetadata() {
+    return _TrackMetadata(track: widget.track, compact: true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -572,23 +740,29 @@ class _PortraitMainArea extends StatelessWidget {
         final height = constraints.maxHeight;
         final infoHeight = 66.0;
         final coverSize = math
-            .min(controlCoverSize, math.max(0.0, height - infoHeight - 26))
+            .min(widget.contentWidth, math.max(0.0, height - infoHeight - 26))
             .toDouble();
         final initialTop = math
             .max(0.0, (height - coverSize - infoHeight - 18) / 2)
             .toDouble();
+        const compactMetadataHeight =
+            _compactMetadataTitleFontSize +
+            8 +
+            _compactMetadataSecondaryFontSize;
         final compactCoverSize = math
-            .min(112.0, math.min(width * .27, height * .18))
+            .min(compactMetadataHeight + 4, width * .27)
             .toDouble();
         const infoGap = 16.0;
-        final h = compactCoverSize + infoGap;
-        final infoWidth = math.max(0.0, width - h).toDouble();
-        final headerHeight = math.max(compactCoverSize, 86.0).toDouble();
+        final metadataWidth = math.max(0.0, width - compactCoverSize - infoGap);
+        final lyricsTop = 36.0;
+        final lyricsMetadataTop =
+            lyricsTop + (compactCoverSize - compactMetadataHeight) / 2;
+        final headerHeight = compactCoverSize;
 
         return Stack(
           clipBehavior: Clip.hardEdge,
           children: [
-            if (showLyrics)
+            if (widget.showLyrics)
               Positioned(
                 left: 0,
                 right: 0,
@@ -600,52 +774,99 @@ class _PortraitMainArea extends StatelessWidget {
                   curve: _pageAnimationCurve,
                   child: _LyricsViewport(
                     key: const ValueKey('portrait-lyrics'),
-                    track: track,
-                    state: state,
-                    onSeek: onSeek,
-                    seekRequest: seekRequest,
+                    track: widget.track,
+                    state: widget.state,
+                    onSeek: widget.onSeek,
+                    seekRequest: widget.seekRequest,
                     compact: true,
                   ),
                 ),
               ),
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 560),
-              curve: Curves.easeInOutCubic,
-              left: showLyrics ? 0.0 : (width - coverSize) / 2,
-              top: showLyrics ? 8.0 : initialTop,
-              width: showLyrics ? compactCoverSize : coverSize,
-              height: showLyrics ? compactCoverSize : coverSize,
-              child: KeyedSubtree(
-                key: coverKey,
-                child: GestureDetector(
-                  key: const ValueKey('portrait-cover-shared-element'),
-                  onTap: onToggleLyrics,
-                  child: _AlbumCoverArtwork(
-                    key: const ValueKey('amll-album-cover'),
-                    track: track,
-                  ),
-                ),
-              ),
-            ),
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 560),
-              curve: Curves.easeInOutCubic,
-              left: showLyrics ? h : (width - infoWidth) / 2,
-              top: showLyrics ? 8.0 : initialTop + coverSize + 16,
-              // 两种状态始终使用同一个最大宽度，避免标题测量结果在过渡中反复变化。
-              width: infoWidth,
-              height: showLyrics ? headerHeight : infoHeight,
-              child: Align(
-                alignment: showLyrics
-                    ? Alignment.centerLeft
-                    : Alignment.topLeft,
-                child: _TrackMetadata(
-                  track: track,
-                  compact: true,
-                  alignStart: showLyrics,
-                  horizontalArtistsAlbum: true,
-                ),
-              ),
+            AnimatedBuilder(
+              animation: _transition,
+              builder: (context, child) {
+                final transitionValue = _transition.value;
+                final lyricsLayout =
+                    widget.showLyrics &&
+                    transitionValue >= 1 - precisionErrorTolerance;
+                if (lyricsLayout) {
+                  return Positioned(
+                    left: 0,
+                    right: 0,
+                    top: lyricsTop,
+                    height: compactCoverSize,
+                    child: Padding(
+                      padding: const EdgeInsets.all(0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          SizedBox.square(
+                            dimension: compactCoverSize,
+                            child: _buildCover(),
+                          ),
+                          const SizedBox(width: infoGap),
+                          Expanded(child: _buildMetadata()),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                final coverLeft = ui.lerpDouble(
+                  (width - coverSize) / 2,
+                  0,
+                  transitionValue,
+                )!;
+                final coverTop = ui.lerpDouble(
+                  initialTop,
+                  lyricsTop,
+                  transitionValue,
+                )!;
+                final animatedCoverSize = ui.lerpDouble(
+                  coverSize,
+                  compactCoverSize,
+                  transitionValue,
+                )!;
+                final metadataLeft = ui.lerpDouble(
+                  0,
+                  compactCoverSize + infoGap,
+                  transitionValue,
+                )!;
+                final metadataTop = ui.lerpDouble(
+                  initialTop + coverSize + 16,
+                  lyricsMetadataTop,
+                  transitionValue,
+                )!;
+                final animatedMetadataWidth = ui.lerpDouble(
+                  width,
+                  metadataWidth,
+                  transitionValue,
+                )!;
+                final animatedMetadataHeight = ui.lerpDouble(
+                  infoHeight,
+                  compactMetadataHeight,
+                  transitionValue,
+                )!;
+
+                return Stack(
+                  children: [
+                    Positioned(
+                      left: coverLeft,
+                      top: coverTop,
+                      width: animatedCoverSize,
+                      height: animatedCoverSize,
+                      child: _buildCover(),
+                    ),
+                    Positioned(
+                      left: metadataLeft,
+                      top: metadataTop,
+                      width: animatedMetadataWidth,
+                      height: animatedMetadataHeight,
+                      child: _buildMetadata(),
+                    ),
+                  ],
+                );
+              },
             ),
           ],
         );
@@ -706,16 +927,16 @@ class _AlbumCoverArtwork extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = math.min(constraints.maxWidth, constraints.maxHeight);
-        final radius = math.max(10.0, size * .025);
+        final radius = math.max(6.0, size * .025);
         return SizedBox.expand(
           child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(radius),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(95),
+                  color: Colors.black.withAlpha(10),
                   blurRadius: size * .09,
-                  spreadRadius: 2,
+                  spreadRadius: 8,
                   offset: Offset(0, size * .025),
                 ),
               ],
@@ -732,74 +953,41 @@ class _AlbumCoverArtwork extends StatelessWidget {
 }
 
 class _TrackMetadata extends StatelessWidget {
-  const _TrackMetadata({
-    required this.track,
-    required this.compact,
-    this.alignStart = false,
-    this.horizontalArtistsAlbum = false,
-  });
+  const _TrackMetadata({required this.track, required this.compact});
 
   final Track track;
   final bool compact;
-  final bool alignStart;
-  final bool horizontalArtistsAlbum;
 
   @override
   Widget build(BuildContext context) {
     final titleStyle = TextStyle(
       color: Colors.white,
-      fontSize: compact ? 21 : 24,
-      fontWeight: FontWeight.w600,
+      fontSize: _compactMetadataTitleFontSize * (compact ? 0.9 : 1),
+      fontWeight: FontWeight(480),
+      height: 1,
     );
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: alignStart
-          ? CrossAxisAlignment.start
-          : CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _ScrollingTrackTitle(
           text: track.title,
           style: titleStyle,
-          textAlign: alignStart ? TextAlign.start : TextAlign.center,
+          textAlign: TextAlign.start,
         ),
-        const SizedBox(height: 4),
-        if (horizontalArtistsAlbum)
-          Text(
-            _artistAlbumLabel(track.artist, track.album),
-            maxLines: 1,
-            softWrap: false,
-            overflow: TextOverflow.ellipsis,
-            textAlign: alignStart ? TextAlign.start : TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withAlpha(190),
-              fontSize: compact ? 14 : 15,
-            ),
-          )
-        else ...[
-          Text(
-            track.artist,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: alignStart ? TextAlign.start : TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withAlpha(210),
-              fontSize: compact ? 15 : 16,
-            ),
+        const SizedBox(height: 8),
+        Text(
+          _artistAlbumLabel(track.artist, track.album),
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.start,
+          style: TextStyle(
+            color: Colors.white.withAlpha(190),
+            fontSize: _compactMetadataSecondaryFontSize,
+            height: 1,
           ),
-          if (track.album.trim().isNotEmpty) ...[
-            const SizedBox(height: 3),
-            Text(
-              track.album,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: alignStart ? TextAlign.start : TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withAlpha(135),
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ],
+        ),
       ],
     );
   }
@@ -1223,36 +1411,6 @@ class _PlaybackControls extends StatelessWidget {
   }
 }
 
-class _PageFooter extends StatelessWidget {
-  const _PageFooter({required this.showQueue, required this.onToggleQueue});
-
-  final bool showQueue;
-  final VoidCallback onToggleQueue;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Row(
-        children: [
-          const SizedBox(width: 24),
-          IconButton(
-            onPressed: onToggleQueue,
-            tooltip: showQueue ? '关闭播放队列' : '打开播放队列',
-            color: showQueue
-                ? Theme.of(context).colorScheme.primary
-                : Colors.white.withAlpha(185),
-            icon: const Icon(Icons.queue_music_rounded),
-            iconSize: 20,
-          ),
-          const Spacer(),
-          const SizedBox(width: 28),
-        ],
-      ),
-    );
-  }
-}
-
 class _LyricsViewport extends StatefulWidget {
   const _LyricsViewport({
     required this.track,
@@ -1300,9 +1458,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
   bool _hasSyncedInitialFocus = false;
   Size? _previousLyricsSize;
   late final _SmoothLyricsScrollController _scrollController;
-  Timer? _autoFollowTimer;
-  bool _userScrollSuppressed = false;
-  bool _userDragActive = false;
+  late final _autoFollow = _LyricAutoFollow(_resumeAutoFollow);
   bool _synchronizeNextLineMotion = false;
   bool _explicitSeekPending = false;
   Duration? _pendingSeekPosition;
@@ -1315,6 +1471,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
   late final VoidCallback _seekGenerationListener;
   Timer? _lyricsReloadTimer;
   double _lyricsReloadOpacity = 1;
+  final _frameScheduler = _PostFrameScheduler();
 
   @override
   void initState() {
@@ -1337,7 +1494,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
     _ticker = createTicker(_tick);
     if (widget.state.isPlaying) _clock.start();
     _setPlaying(widget.state.isPlaying);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _frameScheduler.schedule('initial-sync', () {
       if (mounted) _syncActiveLine(initialPosition);
     });
   }
@@ -1363,8 +1520,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
       _lineMotion.value = 1;
       _lineScrollDelta = 0;
       _synchronizeLineMotion = false;
-      _autoFollowTimer?.cancel();
-      _userDragActive = false;
+      _autoFollow.cancel();
       _synchronizeNextLineMotion = false;
       _explicitSeekPending = false;
       _pendingSeekPosition = null;
@@ -1421,12 +1577,9 @@ class _LyricsViewportState extends State<_LyricsViewport>
       } else if (!widget.state.isPlaying ||
           correction.abs() >= const Duration(milliseconds: 450)) {
         // 大幅偏差通常表示用户跳转；常规播放器进度上报只做小幅校正。
-        if (!_userScrollSuppressed) {
+        if (!_autoFollow.suppressed) {
           _synchronizeNextLineMotion = true;
-          _userScrollSuppressed = false;
-          _userDragActive = false;
-          _autoFollowTimer?.cancel();
-          _autoFollowTimer = null;
+          _autoFollow.cancel(clearSuppression: true);
         }
         _anchorPosition = reported;
         _clock
@@ -1452,10 +1605,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
     _lyricsReloadTimer?.cancel();
     // 保留旧文档，先让用户看到旧歌词快速淡出，避免新旧歌词重叠。
     _lyricsReloadOpacity = 0;
-    _userScrollSuppressed = true;
-    _userDragActive = false;
-    _autoFollowTimer?.cancel();
-    _autoFollowTimer = null;
+    _autoFollow.pause();
     _scrollAnimationGeneration++;
     _lineMotion.stop();
     _lyricsReloadTimer = Timer(_lyricReloadFadeDuration, () {
@@ -1465,7 +1615,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
       _speakerOrder = _buildSpeakerOrder(_document);
       _lyricsReloadOpacity = 1;
       if (_scrollController.hasClients) _scrollController.jumpTo(0);
-      _userScrollSuppressed = false;
+      _autoFollow.cancel(clearSuppression: true);
       _hasSyncedInitialFocus = false;
       _syncActiveLine(_playhead.value);
       setState(() {});
@@ -1474,9 +1624,10 @@ class _LyricsViewportState extends State<_LyricsViewport>
 
   @override
   void dispose() {
-    _autoFollowTimer?.cancel();
+    _autoFollow.dispose();
     _lyricsReloadTimer?.cancel();
     _seekReconciliationTimer?.cancel();
+    _frameScheduler.dispose();
     widget.seekRequest.removeListener(_seekGenerationListener);
     _ticker.dispose();
     _lineMotion.dispose();
@@ -1511,10 +1662,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
     if (widget.state.isPlaying) _clock.start();
     _playhead.value = request.position;
     _synchronizeNextLineMotion = true;
-    _userScrollSuppressed = false;
-    _userDragActive = false;
-    _autoFollowTimer?.cancel();
-    _autoFollowTimer = null;
+    _autoFollow.cancel(clearSuppression: true);
     _syncActiveLine(request.position);
     _seekReconciliationTimer = Timer(const Duration(milliseconds: 900), () {
       _explicitSeekPending = false;
@@ -1539,9 +1687,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
     _pendingActiveIndex = null;
     _pendingScrollFocusIndex = null;
     _scrollAnimationGeneration++;
-    _userScrollSuppressed = true;
-    _autoFollowTimer?.cancel();
-    _autoFollowTimer = Timer(_lyricAutoFollowDelay, _resumeAutoFollow);
+    _autoFollow.noteScroll();
   }
 
   bool _handleLyricsScrollNotification(ScrollNotification notification) {
@@ -1549,28 +1695,21 @@ class _LyricsViewportState extends State<_LyricsViewport>
 
     if (notification is ScrollStartNotification &&
         notification.dragDetails != null) {
-      _userDragActive = true;
+      _autoFollow.dragging = true;
       _noteUserScroll();
     } else if (notification is ScrollUpdateNotification &&
         notification.dragDetails != null) {
-      _userDragActive = true;
+      _autoFollow.dragging = true;
       _noteUserScroll();
-    } else if (notification is ScrollEndNotification && _userDragActive) {
-      _userDragActive = false;
+    } else if (notification is ScrollEndNotification && _autoFollow.dragging) {
+      _autoFollow.dragging = false;
       _noteUserScroll();
     }
     return false;
   }
 
   void _resumeAutoFollow() {
-    _autoFollowTimer = null;
-    if (!mounted || _userDragActive) {
-      if (_userDragActive) {
-        _autoFollowTimer = Timer(_lyricAutoFollowDelay, _resumeAutoFollow);
-      }
-      return;
-    }
-    _userScrollSuppressed = false;
+    if (!mounted) return;
     if (!_hasSyncedInitialFocus ||
         !_scrollController.hasClients ||
         _lyricsWidth <= 0) {
@@ -1635,7 +1774,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
     final animateInterludeStructure =
         interludeChanged &&
         animateLayout &&
-        !_userScrollSuppressed &&
+        !_autoFollow.suppressed &&
         ((previousInterlude == null) != (nextInterlude == null));
     if (animateInterludeStructure) {
       final spacer = _interludeSpacerExtent(
@@ -1662,13 +1801,13 @@ class _LyricsViewportState extends State<_LyricsViewport>
     _pendingActiveIndex = nextIndex;
     _pendingScrollFocusIndex = nextScrollFocusIndex;
     _hasSyncedInitialFocus = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _frameScheduler.schedule('active-sync', () {
       if (!mounted || generation != _activeSyncGeneration) return;
       _activeIndex = nextIndex;
       _scrollFocusIndex = nextScrollFocusIndex;
       _pendingActiveIndex = null;
       _pendingScrollFocusIndex = null;
-      if (_userScrollSuppressed) {
+      if (_autoFollow.suppressed) {
         // 用户正在浏览歌词时只更新高亮，不抢回用户已经滚到的位置。
         _lineScrollDelta = 0;
         _synchronizeLineMotion = false;
@@ -1683,7 +1822,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
       // 先提交新的列表结构，再在下一帧读取新的 maxScrollExtent 并定位。
       // 这样间奏占位的加入/移除不会使用旧列表几何量计算目标位置。
       setState(() {});
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      _frameScheduler.schedule('active-scroll', () {
         if (!mounted ||
             generation != _activeSyncGeneration ||
             !_scrollController.hasClients) {
@@ -1875,33 +2014,15 @@ class _LyricsViewportState extends State<_LyricsViewport>
     final hasLyrics =
         _document.lines.isNotEmpty ||
         _document.plainLines.any((line) => line.trim().isNotEmpty);
-    final details = [
-      '语法格式：${_document.syntaxLabel}',
-      '时间戳：${_document.timingLabel}',
-      if (widget.track.lyricsSources.isNotEmpty)
-        '来源：${widget.track.lyricsSources.map((source) => source.label).join('、')}',
-      '歌词行数：${_document.lines.isNotEmpty ? _document.lines.length : _document.plainLines.length}',
-    ].join('\n');
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 18, 8),
+      padding: EdgeInsets.fromLTRB(
+        widget.compact ? 0 : 16,
+        12,
+        widget.compact ? 0 : 18,
+        8,
+      ),
       child: Column(
         children: [
-          Row(
-            children: [
-              const Spacer(),
-              Tooltip(
-                message: details,
-                waitDuration: const Duration(milliseconds: 250),
-                child: Icon(
-                  Icons.info_outline_rounded,
-                  key: const ValueKey('lyrics-info'),
-                  size: 18,
-                  color: Colors.white.withAlpha(145),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -1917,7 +2038,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
                 _previousLyricsSize = lyricsSize;
                 final viewportSize = MediaQuery.sizeOf(context);
                 _lyricFontSize = widget.compact
-                    ? math.max(12, viewportSize.width * .08)
+                    ? math.max(12, viewportSize.width * .075)
                     : math.max(
                         12,
                         math.max(
@@ -1963,10 +2084,13 @@ class _LyricsViewportState extends State<_LyricsViewport>
                 }
                 if (resized &&
                     _scrollFocusIndex >= 0 &&
-                    !_userScrollSuppressed &&
-                    !_userDragActive) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted && _scrollController.hasClients) {
+                    !_autoFollow.suppressed &&
+                    !_autoFollow.dragging) {
+                  final generation = _activeSyncGeneration;
+                  _frameScheduler.schedule('resize-scroll', () {
+                    if (mounted &&
+                        generation == _activeSyncGeneration &&
+                        _scrollController.hasClients) {
                       _scrollToLine(
                         _scrollFocusIndex,
                         _scrollController.position.maxScrollExtent,

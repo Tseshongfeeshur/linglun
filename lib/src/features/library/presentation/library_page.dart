@@ -41,10 +41,12 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(28, 0, 28, 28),
           sliver: SliverToBoxAdapter(
-            child: Row(
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text('所有歌曲', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(width: 10),
                 Text(
                   '${sourceTracks.length} 首',
                   style: Theme.of(context).textTheme.bodyMedium
@@ -82,58 +84,79 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
   Widget _buildHeader(BuildContext context, LibraryState libraryState) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(28, 26, 28, 22),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('曲库', style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 6),
-                Text(
-                  '你的本地音乐，从这里开始。',
-                  style: Theme.of(context).textTheme.bodyMedium
-                      ?.copyWith(color: Colors.white60),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: 270,
-            child: TextField(
-              onChanged: (value) => setState(() => _query = value),
-              decoration: const InputDecoration(
-                hintText: '搜索歌曲、艺术家或专辑',
-                prefixIcon: Icon(Icons.search),
-                isDense: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final title = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('曲库', style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 6),
+              Text(
+                '你的本地音乐，从这里开始。',
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: Colors.white60),
               ),
+            ],
+          );
+          final search = TextField(
+            onChanged: (value) => setState(() => _query = value),
+            decoration: const InputDecoration(
+              hintText: '搜索歌曲、艺术家或专辑',
+              prefixIcon: Icon(Icons.search),
+              isDense: true,
             ),
-          ),
-          const SizedBox(width: 10),
-          IconButton(
-            onPressed: libraryState.isScanning
-                ? null
-                : () => ref.read(libraryControllerProvider.notifier).scan(),
-            tooltip: '刷新曲库',
-            icon: libraryState.isScanning
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh),
-          ),
-          const SizedBox(width: 4),
-          FilledButton.icon(
-            onPressed: libraryState.isScanning
-                ? null
-                : () => ref
-                      .read(libraryControllerProvider.notifier)
-                      .pickDirectoryAndScan(),
-            icon: const Icon(Icons.folder_open, size: 18),
-            label: const Text('添加目录'),
-          ),
-        ],
+          );
+          final actions = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: libraryState.isScanning
+                    ? null
+                    : () => ref.read(libraryControllerProvider.notifier).scan(),
+                tooltip: '刷新曲库',
+                icon: libraryState.isScanning
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+              ),
+              const SizedBox(width: 4),
+              FilledButton.icon(
+                onPressed: libraryState.isScanning
+                    ? null
+                    : () => ref
+                          .read(libraryControllerProvider.notifier)
+                          .pickDirectoryAndScan(),
+                icon: const Icon(Icons.folder_open, size: 18),
+                label: const Text('添加目录'),
+              ),
+            ],
+          );
+
+          if (constraints.maxWidth < 600) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                title,
+                const SizedBox(height: 16),
+                search,
+                const SizedBox(height: 8),
+                Align(alignment: Alignment.centerRight, child: actions),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              Expanded(child: title),
+              SizedBox(width: 270, child: search),
+              const SizedBox(width: 10),
+              actions,
+            ],
+          );
+        },
       ),
     );
   }
@@ -252,10 +275,12 @@ class _SortBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Wrap(
+      spacing: 8,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         const Text('排序'),
-        const SizedBox(width: 8),
         DropdownButton<LibrarySortField>(
           value: field,
           onChanged: (value) {
@@ -266,7 +291,6 @@ class _SortBar extends StatelessWidget {
               DropdownMenuItem(value: value, child: Text(value.label)),
           ],
         ),
-        const SizedBox(width: 8),
         IconButton(
           onPressed: onDirectionChanged,
           tooltip: descending ? '切换为升序' : '切换为降序',

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/database/app_database.dart';
 
 class AnnualSummaryPage extends StatelessWidget {
-  const AnnualSummaryPage({super.key});
+  const AnnualSummaryPage({this.embedded = false, super.key});
+
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -23,51 +25,57 @@ class AnnualSummaryPage extends StatelessWidget {
         final total = counts.values.fold<int>(0, (sum, count) => sum + count);
         final years = counts.keys.toList()..sort((a, b) => b.compareTo(a));
 
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(28, 26, 28, 40),
-          children: [
-            Text('年度总结', style: Theme.of(context).textTheme.headlineMedium),
-            const SizedBox(height: 8),
-            Text(
-              '记录每一次播放，让音乐留下可以回看的轨迹。',
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: Colors.white60),
-            ),
-            const SizedBox(height: 26),
-            Row(
-              children: [
-                Expanded(
-                  child: _SummaryCard(
-                    label: '$currentYear 年播放',
-                    value: '$currentCount',
-                  ),
+        final content = [
+          Text('年度总结', style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 8),
+          Text(
+            '记录每一次播放，让音乐留下可以回看的轨迹。',
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: Colors.white60),
+          ),
+          const SizedBox(height: 26),
+          Row(
+            children: [
+              Expanded(
+                child: _SummaryCard(
+                  label: '$currentYear 年播放',
+                  value: '$currentCount',
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _SummaryCard(label: '累计播放', value: '$total'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
-            Text('年度记录', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
-            if (years.isEmpty)
-              const Card(
-                child: Padding(
-                  padding: EdgeInsets.all(18),
-                  child: Text('播放真实本地歌曲后，这里会显示年度记录。'),
-                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _SummaryCard(label: '累计播放', value: '$total'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          Text('年度记录', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 12),
+          if (years.isEmpty)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(18),
+                child: Text('播放真实本地歌曲后，这里会显示年度记录。'),
+              ),
+            )
+          else
+            for (final year in years)
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                leading: const Icon(Icons.calendar_month_outlined),
+                title: Text('$year 年'),
+                trailing: Text('${counts[year]} 次'),
+              ),
+        ];
+        return embedded
+            ? Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Column(children: content),
               )
-            else
-              for (final year in years)
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                  leading: const Icon(Icons.calendar_month_outlined),
-                  title: Text('$year 年'),
-                  trailing: Text('${counts[year]} 次'),
-                ),
-          ],
-        );
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(28, 26, 28, 40),
+                children: content,
+              );
       },
     );
   }

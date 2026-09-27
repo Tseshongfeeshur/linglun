@@ -63,7 +63,7 @@ void main() {
     expect(find.byTooltip('播放'), findsOneWidget);
     expect(find.byKey(const ValueKey('amll-album-cover')), findsOneWidget);
     expect(find.byKey(const ValueKey('amll-album-cover-scale')), findsNothing);
-    expect(find.byKey(const ValueKey('lyrics-info')), findsOneWidget);
+    expect(find.byTooltip('显示歌词详情'), findsOneWidget);
     expect(find.text('歌词'), findsNothing);
     expect(find.text('正在播放'), findsNothing);
     expect(find.byIcon(Icons.graphic_eq), findsNothing);
@@ -83,14 +83,7 @@ void main() {
       find.byKey(const ValueKey('wide-cover-details-gap')),
     );
 
-    final tooltipFinder = find.ancestor(
-      of: find.byKey(const ValueKey('lyrics-info')),
-      matching: find.byType(Tooltip),
-    );
-    expect(
-      tester.widget<Tooltip>(tooltipFinder.first).message,
-      contains('语法格式：'),
-    );
+    expect(find.byTooltip('显示歌词详情'), findsOneWidget);
 
     final coverSize = tester.getSize(
       find.byKey(const ValueKey('amll-album-cover')),
@@ -120,11 +113,11 @@ void main() {
         tester.widget<SliderTheme>(sliderThemeFinder).data.thumbShape!
             as RoundSliderThumbShape;
     expect(idleThumb.enabledThumbRadius, 5);
-    expect(idleThumb.elevation, 0);
-    expect(idleThumb.pressedElevation, 0);
+    expect(idleThumb.elevation, 1);
+    expect(idleThumb.pressedElevation, 6);
     expect(
       tester.widget<SliderTheme>(sliderThemeFinder).data.thumbColor,
-      Colors.transparent,
+      Colors.white,
     );
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     final sliderCenter = tester.getCenter(sliderFinder);
@@ -307,14 +300,39 @@ void main() {
       find.byKey(const ValueKey('amll-album-cover')),
     );
     expect(
-      tester.getRect(find.text('测试歌手 · 竖屏专辑')).center.dx,
-      closeTo(portraitCover.center.dx, 1),
+      tester.getRect(find.text('测试歌手 · 竖屏专辑')).left,
+      closeTo(portraitCover.left, 1),
     );
     expect(find.text('竖屏歌词'), findsNothing);
     expect(find.byTooltip('下一曲'), findsOneWidget);
+    final queueButton = tester.getRect(
+      find.ancestor(
+        of: find.byTooltip('打开播放队列'),
+        matching: find.byType(IconButton),
+      ),
+    );
+    final infoButton = tester.getRect(
+      find.ancestor(
+        of: find.byTooltip('显示歌词详情'),
+        matching: find.byType(IconButton),
+      ),
+    );
+    final collapseButton = tester.getRect(
+      find.ancestor(
+        of: find.byTooltip('收起播放页'),
+        matching: find.byType(IconButton),
+      ),
+    );
+    expect(queueButton.left, closeTo(8, 1));
+    expect(queueButton.bottom, closeTo(900 - 8, 1));
+    expect(infoButton.right, closeTo(420 - 8, 1));
+    expect(infoButton.bottom, closeTo(900 - 8, 1));
+    expect(collapseButton.right, closeTo(420 - 8, 1));
+    expect(collapseButton.top, closeTo(8, 1));
     final portraitSeekWidth = tester
         .getSize(find.byKey(const ValueKey('seek-control-container')))
         .width;
+    expect(portraitSeekWidth, closeTo(420 * .84, .01));
     final portraitTimeRowWidth = tester
         .getSize(find.byKey(const ValueKey('seek-time-row')))
         .width;
@@ -324,18 +342,58 @@ void main() {
     expect(portraitSeekWidth, closeTo(portraitCover.width, .01));
     expect(portraitTimeRowWidth, closeTo(portraitCover.width, .01));
     expect(portraitChipRowWidth, closeTo(portraitCover.width, .01));
+
+    tester.view.physicalSize = const Size(400, 900);
+    await tester.pump();
+    final resizedCover = tester.getRect(
+      find.byKey(const ValueKey('amll-album-cover')),
+    );
+    final resizedSeekWidth = tester
+        .getSize(find.byKey(const ValueKey('seek-control-container')))
+        .width;
+    expect(resizedSeekWidth, closeTo(resizedCover.width, .01));
+    expect(tester.takeException(), isNull);
+
     await tester.tap(
       find.byKey(const ValueKey('portrait-cover-shared-element')),
     );
     await tester.pump();
+    final switchingSeekWidth = tester
+        .getSize(find.byKey(const ValueKey('seek-control-container')))
+        .width;
+    final switchingCoverWidth = tester
+        .getSize(find.byKey(const ValueKey('amll-album-cover')))
+        .width;
+    expect(switchingSeekWidth, closeTo(resizedSeekWidth, .01));
+    expect(switchingCoverWidth, closeTo(resizedSeekWidth, .01));
+    await tester.pump(const Duration(milliseconds: 559));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('竖屏歌词'), findsOneWidget);
+    final portraitLyrics = tester.getRect(
+      find.byKey(const ValueKey('portrait-lyrics')),
+    );
+    expect(portraitLyrics.left, closeTo(resizedCover.left, .01));
+    expect(portraitLyrics.right, closeTo(resizedCover.right, .01));
+    expect(
+      tester.getRect(find.byKey(const ValueKey('amll-album-cover'))).height,
+      closeTo(24 + 8 + 15 + 4, .01),
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('amll-album-cover'))).width,
+      lessThan(resizedSeekWidth),
+    );
     expect(
       tester.getRect(find.text('测试歌手 · 竖屏专辑')).left,
       greaterThanOrEqualTo(
         tester.getRect(find.byKey(const ValueKey('amll-album-cover'))).right,
       ),
     );
+    await tester.tap(find.byTooltip('显示歌词详情'));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('歌词详情'), findsOneWidget);
+    expect(find.textContaining('语法格式：'), findsOneWidget);
+    await tester.tap(find.text('关闭'));
+    await tester.pump(const Duration(milliseconds: 300));
     expect(tester.takeException(), isNull);
   });
 
