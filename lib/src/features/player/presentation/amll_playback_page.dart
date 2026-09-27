@@ -946,7 +946,6 @@ class _SeekControl extends StatefulWidget {
 class _SeekControlState extends State<_SeekControl> {
   double? _previewMs;
   bool _dragging = false;
-  bool _hovered = false;
 
   @override
   void didUpdateWidget(covariant _SeekControl oldWidget) {
@@ -965,7 +964,6 @@ class _SeekControlState extends State<_SeekControl> {
     final rightTime = widget.showRemainingTime
         ? widget.track.duration - shownPosition
         : widget.track.duration;
-    final showHandle = _hovered || _dragging;
     final trackHeight = _seekTrackHeight(MediaQuery.sizeOf(context).height);
 
     return SizedBox(
@@ -979,23 +977,12 @@ class _SeekControlState extends State<_SeekControl> {
               inactiveTrackColor: Colors.white.withAlpha(65),
               // 始终保留相同的手柄和覆盖层尺寸，避免 Flutter 重新计算轨道
               // 两端内缩量；非悬浮时只隐藏绘制，不改变进度条几何尺寸。
-              thumbColor: showHandle ? Colors.white : Colors.transparent,
+              thumbColor: Colors.white,
               disabledThumbColor: Colors.transparent,
-              overlayColor: showHandle
-                  ? Colors.white.withAlpha(35)
-                  : Colors.transparent,
-              thumbShape: RoundSliderThumbShape(
-                enabledThumbRadius: 5,
-                elevation: showHandle ? 1 : 0,
-                pressedElevation: showHandle ? 6 : 0,
-              ),
+              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
             ),
             child: MouseRegion(
-              onEnter: (_) => setState(() => _hovered = true),
-              onExit: (_) {
-                if (!_dragging) setState(() => _hovered = false);
-              },
               child: Slider(
                 min: 0,
                 max: durationMs.toDouble(),
