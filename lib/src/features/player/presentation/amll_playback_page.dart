@@ -984,6 +984,7 @@ class _SeekControlState extends State<_SeekControl> {
             ),
             child: MouseRegion(
               child: Slider(
+                padding: EdgeInsets.symmetric(vertical: 8),
                 min: 0,
                 max: durationMs.toDouble(),
                 value: boundedMs,
