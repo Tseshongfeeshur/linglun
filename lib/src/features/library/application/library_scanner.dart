@@ -40,6 +40,11 @@ const _opusGranuleRate = 48000;
 const _beatSampleRate = 20;
 const _ffmpegTimeout = Duration(minutes: 2);
 
+typedef ScanProgressCallback = void Function({
+  required String path,
+  required String stage,
+});
+
 class _OggPage {
   const _OggPage({
     required this.headerType,
@@ -59,6 +64,7 @@ class LibraryScanner {
   Future<List<Track>> scan(
     Iterable<String> rootPaths, {
     Map<String, Track> previousTracks = const {},
+    ScanProgressCallback? onProgress,
   }) async {
     final scanTime = DateTime.now();
     final files = <File>[];
@@ -78,7 +84,10 @@ class LibraryScanner {
         final normalizedPath = path_util.normalize(
           File(entity.path).absolute.path,
         );
-        if (visited.add(normalizedPath)) files.add(File(normalizedPath));
+        if (visited.add(normalizedPath)) {
+          files.add(File(normalizedPath));
+          onProgress?.call(path: normalizedPath, stage: '查找音频文件');
+        }
       }
     }
 
@@ -88,6 +97,7 @@ class LibraryScanner {
         file,
         addedAt: scanTime,
         previousTrack: previousTracks[file.path],
+        onProgress: onProgress,
       );
       if (track != null) tracks.add(track);
     }
@@ -106,9 +116,12 @@ class LibraryScanner {
     File file, {
     required DateTime addedAt,
     Track? previousTrack,
+    ScanProgressCallback? onProgress,
   }) async {
     try {
       final modifiedAt = (await file.stat()).modified;
+      onProgress?.call(path: file.path, stage: '读取音频元数据');
+      await Future<void>.delayed(Duration.zero);
       final detailed = readAllMetadata(file, getImage: true);
       final metadata = _summaryMetadata(file, detailed);
       final preciseDuration = _readOpusOggDuration(file);
@@ -119,6 +132,8 @@ class LibraryScanner {
         metadata.duration = preciseDuration;
       }
       final fallbackTitle = _fileNameWithoutExtension(file.path);
+      onProgress?.call(path: file.path, stage: '解析歌词');
+      await Future<void>.delayed(Duration.zero);
       final sidecarLyrics = await _readSidecarLyrics(file);
       final sources = <LyricsSource>[
         ...sidecarLyrics,
@@ -128,6 +143,11 @@ class LibraryScanner {
       final replayGain = _replayGainInfo(detailed);
       final coverBytes = _coverBytes(detailed);
       final canReuseAnalysis = previousTrack?.modifiedAt == modifiedAt;
+      onProgress?.call(
+        path: file.path,
+        stage: canReuseAnalysis ? '复用已有封面分析' : '提取专辑封面主色',
+      );
+      await Future<void>.delayed(Duration.zero);
       final coverAnalysis = canReuseAnalysis
           ? null
           : coverBytes == null
@@ -135,7 +155,11 @@ class LibraryScanner {
           : analyzeCover(coverBytes);
       final beatEnvelope = canReuseAnalysis
           ? previousTrack?.beatEnvelope
-          : await _analyzeBeat(file, metadata.duration);
+          : await _analyzeBeat(
+              file,
+              metadata.duration,
+              onProgress: onProgress,
+            );
       return Track(
         id: file.path,
         path: file.path,
@@ -173,9 +197,14 @@ class LibraryScanner {
     }
   }
 
-  Future<BeatEnvelope?> _analyzeBeat(File file, Duration? duration) async {
+  Future<BeatEnvelope?> _analyzeBeat(
+    File file,
+    Duration? duration, {
+    ScanProgressCallback? onProgress,
+  }) async {
     if (duration == null || duration <= Duration.zero) return null;
     try {
+      onProgress?.call(path: file.path, stage: '分析 PCM 节拍数据');
       final process = await Process.start('ffmpeg', [
         '-v',
         'error',

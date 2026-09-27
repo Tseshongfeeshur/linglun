@@ -1,24 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../library/application/library_controller.dart';
 import '../../library/presentation/library_page.dart';
 import '../../library/presentation/annual_summary_page.dart';
 import '../../library/presentation/collection_pages.dart';
 import '../../library/presentation/sources_page.dart';
 import '../../player/presentation/floating_player.dart';
+import '../../library/presentation/scan_progress_dialog.dart';
 import 'settings_page.dart';
 
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
 
   @override
   Widget build(BuildContext context) {
+    final libraryState = ref.watch(libraryControllerProvider);
     return Scaffold(
       body: Stack(
         children: [
@@ -33,6 +37,22 @@ class _AppShellState extends State<AppShell> {
             ],
           ),
           const Positioned.fill(child: FloatingPlayer()),
+          if (libraryState.isScanning) ...[
+            const Positioned.fill(
+              child: ModalBarrier(
+                dismissible: false,
+                color: Colors.black54,
+              ),
+            ),
+            Positioned.fill(
+              child: Center(
+                child: ScanProgressDialog(
+                  path: libraryState.scanPath,
+                  stage: libraryState.scanStage,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

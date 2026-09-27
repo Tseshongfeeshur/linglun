@@ -20,25 +20,34 @@ class LibraryState {
     required this.directories,
     required this.isScanning,
     this.error,
+    this.scanPath,
+    this.scanStage,
   });
 
   final List<Track> tracks;
   final List<String> directories;
   final bool isScanning;
   final String? error;
+  final String? scanPath;
+  final String? scanStage;
 
   LibraryState copyWith({
     List<Track>? tracks,
     List<String>? directories,
     bool? isScanning,
     String? error,
+    String? scanPath,
+    String? scanStage,
     bool clearError = false,
+    bool clearScanProgress = false,
   }) {
     return LibraryState(
       tracks: tracks ?? this.tracks,
       directories: directories ?? this.directories,
       isScanning: isScanning ?? this.isScanning,
       error: clearError ? null : error ?? this.error,
+      scanPath: clearScanProgress ? null : scanPath ?? this.scanPath,
+      scanStage: clearScanProgress ? null : scanStage ?? this.scanStage,
     );
   }
 }
@@ -94,7 +103,10 @@ class LibraryController extends Notifier<LibraryState> {
     state = state.copyWith(
       directories: roots,
       isScanning: true,
+      scanPath: null,
+      scanStage: '准备扫描歌曲',
       clearError: true,
+      clearScanProgress: false,
     );
 
     try {
@@ -102,14 +114,28 @@ class LibraryController extends Notifier<LibraryState> {
         for (final track in state.tracks)
           if (track.path != null) track.path!: track,
       };
-      final tracks = await _scanner.scan(roots, previousTracks: previousTracks);
-      state = state.copyWith(tracks: tracks, isScanning: false);
+      final tracks = await _scanner.scan(
+        roots,
+        previousTracks: previousTracks,
+        onProgress: ({required path, required stage}) {
+          state = state.copyWith(scanPath: path, scanStage: stage);
+        },
+      );
+      state = state.copyWith(
+        tracks: tracks,
+        isScanning: false,
+        clearScanProgress: true,
+      );
       // 即使扫描结果为空，也要同步播放器队列，避免界面曲库已经清空而播放器仍
       // 保留上一轮扫描结果。播放器内部会用示例队列维持非空状态不变量。
       ref.read(playerControllerProvider.notifier).replaceQueue(tracks);
       await _repository?.replaceLibrary(tracks: tracks, directories: roots);
     } on Object catch (error) {
-      state = state.copyWith(isScanning: false, error: '扫描曲库失败：$error');
+      state = state.copyWith(
+        isScanning: false,
+        error: '扫描曲库失败：$error',
+        clearScanProgress: true,
+      );
     }
   }
 
