@@ -40,22 +40,38 @@ vec3 linearToSrgb(vec3 color) {
 }
 
 vec3 protectHighlights(vec3 linearColor) {
-  const float highlightThreshold = 0.62;
-  const float kneeStrength = 1.8;
+  // 目标线性亮度上限约 0.30，对应 sRGB ≈ 0.58，
+  // 与白色文字（相对亮度 1.0）的对比度约为 3:1，
+  // 足以保证大号歌词文字基本可读（比之前的 0.90 上限收紧了很多）。
+  const float highlightThreshold = 0.16;
+  const float highlightCeiling = 0.30;
+  // 单通道保护上限：防止高饱和度（如取色得到的纯红/纯黄）颜色
+  // 在 luminance 判断"不算太亮"时，单通道仍然溢出被硬裁剪成死白/死色。
+  const float channelCeiling = 0.34;
+
   float luminance = dot(
     linearColor,
     vec3(0.2126, 0.7152, 0.0722)
   );
 
-  if (luminance <= highlightThreshold || luminance <= 0.0001) {
-    return linearColor;
+  vec3 result = linearColor;
+
+  // 第一步：整体亮度软膝压缩，保持色相比例不变
+  if (luminance > highlightThreshold && luminance > 0.0001) {
+    float excess = luminance - highlightThreshold;
+    float kneeRange = highlightCeiling - highlightThreshold;
+    float compressedLuminance = highlightThreshold
+        + kneeRange * (1.0 - exp(-excess / kneeRange));
+    result *= (compressedLuminance / luminance);
   }
 
-  // 只压缩流光背景的高亮区域，保留暗部和中间调，避免影响歌词与控件的对比度。
-  float excess = luminance - highlightThreshold;
-  float compressedLuminance = highlightThreshold
-      + excess / (1.0 + excess * kneeStrength);
-  return linearColor * (compressedLuminance / luminance);
+  // 第二步：单通道溢出保护，压缩后仍按比例缩放三通道，避免色相偏移
+  float maxChannel = max(result.r, max(result.g, result.b));
+  if (maxChannel > channelCeiling) {
+    result *= (channelCeiling / maxChannel);
+  }
+
+  return result;
 }
 
 void main() {
