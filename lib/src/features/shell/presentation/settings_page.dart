@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../player/presentation/audio_settings_page.dart';
+import '../../player/presentation/playback_background_settings_page.dart';
 
 /// 应用设置页，音频处理设置统一收纳在这里。
 class SettingsPage extends StatelessWidget {
@@ -16,6 +17,8 @@ class SettingsPage extends StatelessWidget {
         Text('调整伶伦的播放行为和音频处理方式。'),
         SizedBox(height: 24),
         AudioSettingsPage(embedded: true),
+        SizedBox(height: 24),
+        PlaybackBackgroundSettingsPage(),
       ],
     );
   }

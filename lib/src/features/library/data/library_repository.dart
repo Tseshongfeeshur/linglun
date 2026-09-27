@@ -6,6 +6,7 @@ import 'package:drift/drift.dart';
 
 import '../../player/domain/track.dart';
 import '../../player/domain/lyrics_source.dart';
+import '../../player/domain/visual_analysis.dart';
 
 class LibraryRepository {
   LibraryRepository(this.database);
@@ -49,6 +50,12 @@ class LibraryRepository {
           album: track.album,
           durationMs: track.duration.inMilliseconds,
           coverColor: track.coverColor,
+          fluidPaletteJson: Value(
+            track.fluidPalette == null
+                ? null
+                : jsonEncode(track.fluidPalette!.toJson()),
+          ),
+          beatEnvelopeJson: Value(track.beatEnvelope?.encode()),
           lyrics: Value(track.lyrics),
           lyricsFormat: Value(track.lyricsFormat),
           lyricsSourcesJson: Value(
@@ -96,7 +103,27 @@ class LibraryRepository {
       addedAt: row.addedAt,
       modifiedAt: row.modifiedAt,
       coverColor: row.coverColor,
+      fluidPalette: _decodePalette(row.fluidPaletteJson),
+      beatEnvelope: _decodeBeatEnvelope(row.beatEnvelopeJson),
     );
+  }
+
+  FluidPalette? _decodePalette(String? value) {
+    if (value == null || value.isEmpty) return null;
+    try {
+      return FluidPalette.fromJson(jsonDecode(value));
+    } on Object {
+      return null;
+    }
+  }
+
+  BeatEnvelope? _decodeBeatEnvelope(String? value) {
+    if (value == null || value.isEmpty) return null;
+    try {
+      return BeatEnvelope.fromJson(jsonDecode(value));
+    } on Object {
+      return null;
+    }
   }
 
   Map<String, String> _decodeMetadata(String? value) {

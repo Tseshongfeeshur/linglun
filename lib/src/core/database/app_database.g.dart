@@ -89,6 +89,28 @@ class $LibraryTracksTable extends LibraryTracks
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _fluidPaletteJsonMeta = const VerificationMeta(
+    'fluidPaletteJson',
+  );
+  @override
+  late final GeneratedColumn<String> fluidPaletteJson = GeneratedColumn<String>(
+    'fluid_palette_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _beatEnvelopeJsonMeta = const VerificationMeta(
+    'beatEnvelopeJson',
+  );
+  @override
+  late final GeneratedColumn<String> beatEnvelopeJson = GeneratedColumn<String>(
+    'beat_envelope_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _lyricsMeta = const VerificationMeta('lyrics');
   @override
   late final GeneratedColumn<String> lyrics = GeneratedColumn<String>(
@@ -220,6 +242,8 @@ class $LibraryTracksTable extends LibraryTracks
     album,
     durationMs,
     coverColor,
+    fluidPaletteJson,
+    beatEnvelopeJson,
     lyrics,
     lyricsFormat,
     lyricsSourcesJson,
@@ -302,6 +326,24 @@ class $LibraryTracksTable extends LibraryTracks
       );
     } else if (isInserting) {
       context.missing(_coverColorMeta);
+    }
+    if (data.containsKey('fluid_palette_json')) {
+      context.handle(
+        _fluidPaletteJsonMeta,
+        fluidPaletteJson.isAcceptableOrUnknown(
+          data['fluid_palette_json']!,
+          _fluidPaletteJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('beat_envelope_json')) {
+      context.handle(
+        _beatEnvelopeJsonMeta,
+        beatEnvelopeJson.isAcceptableOrUnknown(
+          data['beat_envelope_json']!,
+          _beatEnvelopeJsonMeta,
+        ),
+      );
     }
     if (data.containsKey('lyrics')) {
       context.handle(
@@ -430,6 +472,14 @@ class $LibraryTracksTable extends LibraryTracks
         DriftSqlType.int,
         data['${effectivePrefix}cover_color'],
       )!,
+      fluidPaletteJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}fluid_palette_json'],
+      ),
+      beatEnvelopeJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}beat_envelope_json'],
+      ),
       lyrics: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}lyrics'],
@@ -492,6 +542,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
   final String album;
   final int durationMs;
   final int coverColor;
+  final String? fluidPaletteJson;
+  final String? beatEnvelopeJson;
   final String? lyrics;
   final String? lyricsFormat;
   final String? lyricsSourcesJson;
@@ -512,6 +564,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     required this.album,
     required this.durationMs,
     required this.coverColor,
+    this.fluidPaletteJson,
+    this.beatEnvelopeJson,
     this.lyrics,
     this.lyricsFormat,
     this.lyricsSourcesJson,
@@ -537,6 +591,12 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     map['album'] = Variable<String>(album);
     map['duration_ms'] = Variable<int>(durationMs);
     map['cover_color'] = Variable<int>(coverColor);
+    if (!nullToAbsent || fluidPaletteJson != null) {
+      map['fluid_palette_json'] = Variable<String>(fluidPaletteJson);
+    }
+    if (!nullToAbsent || beatEnvelopeJson != null) {
+      map['beat_envelope_json'] = Variable<String>(beatEnvelopeJson);
+    }
     if (!nullToAbsent || lyrics != null) {
       map['lyrics'] = Variable<String>(lyrics);
     }
@@ -581,6 +641,12 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       album: Value(album),
       durationMs: Value(durationMs),
       coverColor: Value(coverColor),
+      fluidPaletteJson: fluidPaletteJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(fluidPaletteJson),
+      beatEnvelopeJson: beatEnvelopeJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(beatEnvelopeJson),
       lyrics: lyrics == null && nullToAbsent
           ? const Value.absent()
           : Value(lyrics),
@@ -627,6 +693,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       album: serializer.fromJson<String>(json['album']),
       durationMs: serializer.fromJson<int>(json['durationMs']),
       coverColor: serializer.fromJson<int>(json['coverColor']),
+      fluidPaletteJson: serializer.fromJson<String?>(json['fluidPaletteJson']),
+      beatEnvelopeJson: serializer.fromJson<String?>(json['beatEnvelopeJson']),
       lyrics: serializer.fromJson<String?>(json['lyrics']),
       lyricsFormat: serializer.fromJson<String?>(json['lyricsFormat']),
       lyricsSourcesJson: serializer.fromJson<String?>(
@@ -654,6 +722,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       'album': serializer.toJson<String>(album),
       'durationMs': serializer.toJson<int>(durationMs),
       'coverColor': serializer.toJson<int>(coverColor),
+      'fluidPaletteJson': serializer.toJson<String?>(fluidPaletteJson),
+      'beatEnvelopeJson': serializer.toJson<String?>(beatEnvelopeJson),
       'lyrics': serializer.toJson<String?>(lyrics),
       'lyricsFormat': serializer.toJson<String?>(lyricsFormat),
       'lyricsSourcesJson': serializer.toJson<String?>(lyricsSourcesJson),
@@ -677,6 +747,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     String? album,
     int? durationMs,
     int? coverColor,
+    Value<String?> fluidPaletteJson = const Value.absent(),
+    Value<String?> beatEnvelopeJson = const Value.absent(),
     Value<String?> lyrics = const Value.absent(),
     Value<String?> lyricsFormat = const Value.absent(),
     Value<String?> lyricsSourcesJson = const Value.absent(),
@@ -697,6 +769,12 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     album: album ?? this.album,
     durationMs: durationMs ?? this.durationMs,
     coverColor: coverColor ?? this.coverColor,
+    fluidPaletteJson: fluidPaletteJson.present
+        ? fluidPaletteJson.value
+        : this.fluidPaletteJson,
+    beatEnvelopeJson: beatEnvelopeJson.present
+        ? beatEnvelopeJson.value
+        : this.beatEnvelopeJson,
     lyrics: lyrics.present ? lyrics.value : this.lyrics,
     lyricsFormat: lyricsFormat.present ? lyricsFormat.value : this.lyricsFormat,
     lyricsSourcesJson: lyricsSourcesJson.present
@@ -729,6 +807,12 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       coverColor: data.coverColor.present
           ? data.coverColor.value
           : this.coverColor,
+      fluidPaletteJson: data.fluidPaletteJson.present
+          ? data.fluidPaletteJson.value
+          : this.fluidPaletteJson,
+      beatEnvelopeJson: data.beatEnvelopeJson.present
+          ? data.beatEnvelopeJson.value
+          : this.beatEnvelopeJson,
       lyrics: data.lyrics.present ? data.lyrics.value : this.lyrics,
       lyricsFormat: data.lyricsFormat.present
           ? data.lyricsFormat.value
@@ -768,6 +852,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
           ..write('album: $album, ')
           ..write('durationMs: $durationMs, ')
           ..write('coverColor: $coverColor, ')
+          ..write('fluidPaletteJson: $fluidPaletteJson, ')
+          ..write('beatEnvelopeJson: $beatEnvelopeJson, ')
           ..write('lyrics: $lyrics, ')
           ..write('lyricsFormat: $lyricsFormat, ')
           ..write('lyricsSourcesJson: $lyricsSourcesJson, ')
@@ -784,7 +870,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     filePath,
     $driftBlobEquality.hash(coverBytes),
@@ -793,6 +879,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     album,
     durationMs,
     coverColor,
+    fluidPaletteJson,
+    beatEnvelopeJson,
     lyrics,
     lyricsFormat,
     lyricsSourcesJson,
@@ -804,7 +892,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     addedAt,
     modifiedAt,
     updatedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -817,6 +905,8 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
           other.album == this.album &&
           other.durationMs == this.durationMs &&
           other.coverColor == this.coverColor &&
+          other.fluidPaletteJson == this.fluidPaletteJson &&
+          other.beatEnvelopeJson == this.beatEnvelopeJson &&
           other.lyrics == this.lyrics &&
           other.lyricsFormat == this.lyricsFormat &&
           other.lyricsSourcesJson == this.lyricsSourcesJson &&
@@ -839,6 +929,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
   final Value<String> album;
   final Value<int> durationMs;
   final Value<int> coverColor;
+  final Value<String?> fluidPaletteJson;
+  final Value<String?> beatEnvelopeJson;
   final Value<String?> lyrics;
   final Value<String?> lyricsFormat;
   final Value<String?> lyricsSourcesJson;
@@ -860,6 +952,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     this.album = const Value.absent(),
     this.durationMs = const Value.absent(),
     this.coverColor = const Value.absent(),
+    this.fluidPaletteJson = const Value.absent(),
+    this.beatEnvelopeJson = const Value.absent(),
     this.lyrics = const Value.absent(),
     this.lyricsFormat = const Value.absent(),
     this.lyricsSourcesJson = const Value.absent(),
@@ -882,6 +976,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     required String album,
     required int durationMs,
     required int coverColor,
+    this.fluidPaletteJson = const Value.absent(),
+    this.beatEnvelopeJson = const Value.absent(),
     this.lyrics = const Value.absent(),
     this.lyricsFormat = const Value.absent(),
     this.lyricsSourcesJson = const Value.absent(),
@@ -911,6 +1007,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     Expression<String>? album,
     Expression<int>? durationMs,
     Expression<int>? coverColor,
+    Expression<String>? fluidPaletteJson,
+    Expression<String>? beatEnvelopeJson,
     Expression<String>? lyrics,
     Expression<String>? lyricsFormat,
     Expression<String>? lyricsSourcesJson,
@@ -933,6 +1031,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
       if (album != null) 'album': album,
       if (durationMs != null) 'duration_ms': durationMs,
       if (coverColor != null) 'cover_color': coverColor,
+      if (fluidPaletteJson != null) 'fluid_palette_json': fluidPaletteJson,
+      if (beatEnvelopeJson != null) 'beat_envelope_json': beatEnvelopeJson,
       if (lyrics != null) 'lyrics': lyrics,
       if (lyricsFormat != null) 'lyrics_format': lyricsFormat,
       if (lyricsSourcesJson != null) 'lyrics_sources_json': lyricsSourcesJson,
@@ -957,6 +1057,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     Value<String>? album,
     Value<int>? durationMs,
     Value<int>? coverColor,
+    Value<String?>? fluidPaletteJson,
+    Value<String?>? beatEnvelopeJson,
     Value<String?>? lyrics,
     Value<String?>? lyricsFormat,
     Value<String?>? lyricsSourcesJson,
@@ -979,6 +1081,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
       album: album ?? this.album,
       durationMs: durationMs ?? this.durationMs,
       coverColor: coverColor ?? this.coverColor,
+      fluidPaletteJson: fluidPaletteJson ?? this.fluidPaletteJson,
+      beatEnvelopeJson: beatEnvelopeJson ?? this.beatEnvelopeJson,
       lyrics: lyrics ?? this.lyrics,
       lyricsFormat: lyricsFormat ?? this.lyricsFormat,
       lyricsSourcesJson: lyricsSourcesJson ?? this.lyricsSourcesJson,
@@ -1020,6 +1124,12 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     }
     if (coverColor.present) {
       map['cover_color'] = Variable<int>(coverColor.value);
+    }
+    if (fluidPaletteJson.present) {
+      map['fluid_palette_json'] = Variable<String>(fluidPaletteJson.value);
+    }
+    if (beatEnvelopeJson.present) {
+      map['beat_envelope_json'] = Variable<String>(beatEnvelopeJson.value);
     }
     if (lyrics.present) {
       map['lyrics'] = Variable<String>(lyrics.value);
@@ -1071,6 +1181,8 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
           ..write('album: $album, ')
           ..write('durationMs: $durationMs, ')
           ..write('coverColor: $coverColor, ')
+          ..write('fluidPaletteJson: $fluidPaletteJson, ')
+          ..write('beatEnvelopeJson: $beatEnvelopeJson, ')
           ..write('lyrics: $lyrics, ')
           ..write('lyricsFormat: $lyricsFormat, ')
           ..write('lyricsSourcesJson: $lyricsSourcesJson, ')
@@ -1857,6 +1969,8 @@ typedef $$LibraryTracksTableCreateCompanionBuilder =
       required String album,
       required int durationMs,
       required int coverColor,
+      Value<String?> fluidPaletteJson,
+      Value<String?> beatEnvelopeJson,
       Value<String?> lyrics,
       Value<String?> lyricsFormat,
       Value<String?> lyricsSourcesJson,
@@ -1880,6 +1994,8 @@ typedef $$LibraryTracksTableUpdateCompanionBuilder =
       Value<String> album,
       Value<int> durationMs,
       Value<int> coverColor,
+      Value<String?> fluidPaletteJson,
+      Value<String?> beatEnvelopeJson,
       Value<String?> lyrics,
       Value<String?> lyricsFormat,
       Value<String?> lyricsSourcesJson,
@@ -1940,6 +2056,16 @@ class $$LibraryTracksTableFilterComposer
 
   ColumnFilters<int> get coverColor => $composableBuilder(
     column: $table.coverColor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fluidPaletteJson => $composableBuilder(
+    column: $table.fluidPaletteJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get beatEnvelopeJson => $composableBuilder(
+    column: $table.beatEnvelopeJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2048,6 +2174,16 @@ class $$LibraryTracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get fluidPaletteJson => $composableBuilder(
+    column: $table.fluidPaletteJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get beatEnvelopeJson => $composableBuilder(
+    column: $table.beatEnvelopeJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get lyrics => $composableBuilder(
     column: $table.lyrics,
     builder: (column) => ColumnOrderings(column),
@@ -2143,6 +2279,16 @@ class $$LibraryTracksTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get fluidPaletteJson => $composableBuilder(
+    column: $table.fluidPaletteJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get beatEnvelopeJson => $composableBuilder(
+    column: $table.beatEnvelopeJson,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get lyrics =>
       $composableBuilder(column: $table.lyrics, builder: (column) => column);
 
@@ -2230,6 +2376,8 @@ class $$LibraryTracksTableTableManager
                 Value<String> album = const Value.absent(),
                 Value<int> durationMs = const Value.absent(),
                 Value<int> coverColor = const Value.absent(),
+                Value<String?> fluidPaletteJson = const Value.absent(),
+                Value<String?> beatEnvelopeJson = const Value.absent(),
                 Value<String?> lyrics = const Value.absent(),
                 Value<String?> lyricsFormat = const Value.absent(),
                 Value<String?> lyricsSourcesJson = const Value.absent(),
@@ -2251,6 +2399,8 @@ class $$LibraryTracksTableTableManager
                 album: album,
                 durationMs: durationMs,
                 coverColor: coverColor,
+                fluidPaletteJson: fluidPaletteJson,
+                beatEnvelopeJson: beatEnvelopeJson,
                 lyrics: lyrics,
                 lyricsFormat: lyricsFormat,
                 lyricsSourcesJson: lyricsSourcesJson,
@@ -2274,6 +2424,8 @@ class $$LibraryTracksTableTableManager
                 required String album,
                 required int durationMs,
                 required int coverColor,
+                Value<String?> fluidPaletteJson = const Value.absent(),
+                Value<String?> beatEnvelopeJson = const Value.absent(),
                 Value<String?> lyrics = const Value.absent(),
                 Value<String?> lyricsFormat = const Value.absent(),
                 Value<String?> lyricsSourcesJson = const Value.absent(),
@@ -2295,6 +2447,8 @@ class $$LibraryTracksTableTableManager
                 album: album,
                 durationMs: durationMs,
                 coverColor: coverColor,
+                fluidPaletteJson: fluidPaletteJson,
+                beatEnvelopeJson: beatEnvelopeJson,
                 lyrics: lyrics,
                 lyricsFormat: lyricsFormat,
                 lyricsSourcesJson: lyricsSourcesJson,

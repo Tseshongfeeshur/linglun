@@ -6,6 +6,7 @@ import 'dart:math' as math;
 
 import '../../../core/database/app_database.dart';
 import '../domain/audio_processing.dart';
+import '../domain/playback_background.dart';
 import '../domain/track.dart';
 
 final playerControllerProvider =
@@ -21,6 +22,7 @@ class PlayerState {
     required this.isPlaying,
     required this.position,
     required this.audioSettings,
+    this.backgroundSettings = const PlaybackBackgroundSettings(),
     this.shuffleEnabled = false,
     this.repeatMode = RepeatMode.off,
   });
@@ -30,6 +32,7 @@ class PlayerState {
   final bool isPlaying;
   final Duration position;
   final AudioProcessingSettings audioSettings;
+  final PlaybackBackgroundSettings backgroundSettings;
   final bool shuffleEnabled;
   final RepeatMode repeatMode;
 
@@ -43,6 +46,7 @@ class PlayerState {
     bool? isPlaying,
     Duration? position,
     AudioProcessingSettings? audioSettings,
+    PlaybackBackgroundSettings? backgroundSettings,
     bool? shuffleEnabled,
     RepeatMode? repeatMode,
   }) {
@@ -52,6 +56,7 @@ class PlayerState {
       isPlaying: isPlaying ?? this.isPlaying,
       position: position ?? this.position,
       audioSettings: audioSettings ?? this.audioSettings,
+      backgroundSettings: backgroundSettings ?? this.backgroundSettings,
       shuffleEnabled: shuffleEnabled ?? this.shuffleEnabled,
       repeatMode: repeatMode ?? this.repeatMode,
     );
@@ -60,6 +65,7 @@ class PlayerState {
 
 class PlayerController extends Notifier<PlayerState> {
   static const _audioSettingsKey = 'audio.processing.v1';
+  static const _backgroundSettingsKey = 'visual.playbackBackground.v1';
 
   Player? _player;
   Timer? _playbackTimer;
@@ -77,12 +83,14 @@ class PlayerController extends Notifier<PlayerState> {
       _player?.dispose();
     });
     unawaited(_loadAudioSettings());
+    unawaited(_loadBackgroundSettings());
     return PlayerState(
       queue: demoTracks,
       currentIndex: 0,
       isPlaying: false,
       position: Duration.zero,
       audioSettings: AudioProcessingSettings(),
+      backgroundSettings: const PlaybackBackgroundSettings(),
     );
   }
 
@@ -169,6 +177,11 @@ class PlayerController extends Notifier<PlayerState> {
     state = state.copyWith(audioSettings: settings);
     unawaited(_saveAudioSettings(settings));
     unawaited(_applyAudioProcessing(state.currentTrack));
+  }
+
+  void updateBackgroundSettings(PlaybackBackgroundSettings settings) {
+    state = state.copyWith(backgroundSettings: settings);
+    unawaited(_saveBackgroundSettings(settings));
   }
 
   /// 用曲库扫描结果替换播放队列，同时保留当前播放项（如果仍存在）。
@@ -335,6 +348,30 @@ class PlayerController extends Notifier<PlayerState> {
     try {
       final database = await sharedLinglunDatabase();
       await database.saveSetting(_audioSettingsKey, settings.encode());
+    } on Object {
+      // 设置持久化失败时仍保持当前进程内的设置。
+    }
+  }
+
+  Future<void> _loadBackgroundSettings() async {
+    try {
+      final database = await sharedLinglunDatabase();
+      final value = await database.loadSetting(_backgroundSettingsKey);
+      if (value == null || value.isEmpty) return;
+      state = state.copyWith(
+        backgroundSettings: PlaybackBackgroundSettings.decode(value),
+      );
+    } on Object {
+      // 设置读取失败时保留默认值，不能影响应用启动。
+    }
+  }
+
+  Future<void> _saveBackgroundSettings(
+    PlaybackBackgroundSettings settings,
+  ) async {
+    try {
+      final database = await sharedLinglunDatabase();
+      await database.saveSetting(_backgroundSettingsKey, settings.encode());
     } on Object {
       // 设置持久化失败时仍保持当前进程内的设置。
     }

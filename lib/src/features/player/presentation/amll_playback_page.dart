@@ -13,6 +13,7 @@ import '../application/player_controller.dart';
 import '../domain/lyrics.dart';
 import '../domain/track.dart';
 import 'lyric_emphasis.dart';
+import 'isolation_background.dart';
 
 const _pageAnimationCurve = Curves.easeOutCubic;
 const _lyricDefaultFontSize = 38.0;
@@ -162,9 +163,11 @@ class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        _AmllAmbientBackground(
+        IsolationBackground(
           track: widget.track,
-          color: Color(widget.track.coverColor),
+          settings: widget.state.backgroundSettings,
+          isPlaying: widget.state.isPlaying,
+          position: widget.state.position,
         ),
         SafeArea(
           child: Column(
@@ -230,120 +233,6 @@ class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
       ],
     );
   }
-}
-
-class _AmllAmbientBackground extends StatefulWidget {
-  const _AmllAmbientBackground({required this.track, required this.color});
-
-  final Track track;
-  final Color color;
-
-  @override
-  State<_AmllAmbientBackground> createState() => _AmllAmbientBackgroundState();
-}
-
-class _AmllAmbientBackgroundState extends State<_AmllAmbientBackground>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ambientController;
-
-  @override
-  void initState() {
-    super.initState();
-    _ambientController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 18),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _ambientController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _ambientController,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (widget.track.coverBytes != null)
-            Transform.scale(
-              scale: 1.24,
-              child: ImageFiltered(
-                imageFilter: ui.ImageFilter.blur(sigmaX: 56, sigmaY: 56),
-                child: Image.memory(
-                  widget.track.coverBytes!,
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                  filterQuality: FilterQuality.medium,
-                ),
-              ),
-            )
-          else
-            ColoredBox(color: widget.color),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Color(0x66333B3F),
-                  Color(0xCC101315),
-                  Color(0xF20A0C0D),
-                ],
-              ),
-            ),
-          ),
-          const ColoredBox(color: Color(0x55000000)),
-        ],
-      ),
-      builder: (context, child) {
-        final phase = Curves.easeInOutSine.transform(_ambientController.value);
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            child!,
-            Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _AmbientWashPainter(
-                    color: widget.color,
-                    phase: phase,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _AmbientWashPainter extends CustomPainter {
-  const _AmbientWashPainter({required this.color, required this.phase});
-
-  final Color color;
-  final double phase;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final direction = .2 + phase * .6;
-    final bounds = Offset.zero & size;
-    final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment(-direction, -direction),
-        end: Alignment(direction, direction),
-        colors: [color.withAlpha(22), Colors.transparent, color.withAlpha(12)],
-      ).createShader(bounds);
-    canvas.drawRect(bounds, paint);
-  }
-
-  @override
-  bool shouldRepaint(_AmbientWashPainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.phase != phase;
 }
 
 class _PageHeader extends StatelessWidget {

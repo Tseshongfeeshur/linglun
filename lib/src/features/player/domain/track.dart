@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'lyrics.dart';
 import 'lyrics_source.dart';
+import 'visual_analysis.dart';
 
 /// 曲库中最小的可播放单元。
 class Track {
@@ -24,6 +25,8 @@ class Track {
     this.addedAt,
     this.modifiedAt,
     this.coverColor = 0xFF263238,
+    this.fluidPalette,
+    this.beatEnvelope,
   });
 
   final String id;
@@ -48,6 +51,8 @@ class Track {
   final DateTime? addedAt;
   final DateTime? modifiedAt;
   final int coverColor;
+  final FluidPalette? fluidPalette;
+  final BeatEnvelope? beatEnvelope;
 
   /// 统一的歌词文档，供各个界面直接消费，避免渲染层重复解析原始文本。
   LyricsDocument get lyricsDocument {
@@ -93,6 +98,8 @@ class Track {
       addedAt: addedAt ?? this.addedAt,
       modifiedAt: modifiedAt ?? this.modifiedAt,
       coverColor: coverColor,
+      fluidPalette: fluidPalette,
+      beatEnvelope: beatEnvelope,
     );
   }
 }

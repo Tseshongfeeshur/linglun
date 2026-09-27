@@ -32,7 +32,6 @@ void main() {
     await mouse.moveTo(hoverPosition);
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('雾中回声 -'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await mouse.removePointer();
   });

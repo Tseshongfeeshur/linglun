@@ -16,6 +16,8 @@ class LibraryTracks extends Table {
   TextColumn get album => text()();
   IntColumn get durationMs => integer()();
   IntColumn get coverColor => integer()();
+  TextColumn get fluidPaletteJson => text().nullable()();
+  TextColumn get beatEnvelopeJson => text().nullable()();
   TextColumn get lyrics => text().nullable()();
   TextColumn get lyricsFormat => text().nullable()();
   TextColumn get lyricsSourcesJson => text().nullable()();
@@ -63,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -98,7 +100,11 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(libraryTracks, libraryTracks.addedAt);
         await m.addColumn(libraryTracks, libraryTracks.modifiedAt);
       }
+      if (from < 10) {
+        await _ensureLibraryVisualColumns();
+      }
     },
+    beforeOpen: (_) => _ensureLibraryVisualColumns(),
   );
 
   Future<List<LibraryTrack>> loadTracks() => select(libraryTracks).get();
@@ -176,6 +182,24 @@ class AppDatabase extends _$AppDatabase {
       );
     }
     return counts;
+  }
+
+  Future<void> _ensureLibraryVisualColumns() async {
+    final columns = await customSelect('PRAGMA table_info(library_tracks)')
+        .get();
+    if (columns.isEmpty) return;
+
+    final names = columns.map((row) => row.read<String>('name')).toSet();
+    if (!names.contains('fluid_palette_json')) {
+      await customStatement(
+        'ALTER TABLE library_tracks ADD COLUMN fluid_palette_json TEXT',
+      );
+    }
+    if (!names.contains('beat_envelope_json')) {
+      await customStatement(
+        'ALTER TABLE library_tracks ADD COLUMN beat_envelope_json TEXT',
+      );
+    }
   }
 }
 

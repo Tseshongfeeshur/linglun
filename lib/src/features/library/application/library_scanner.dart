@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
@@ -17,6 +18,8 @@ import 'package:audio_metadata_reader/src/metadata/base.dart'
 import '../../player/domain/track.dart';
 import '../../player/domain/lyrics_source.dart';
 import '../../player/domain/lyrics.dart';
+import '../../player/domain/visual_analysis.dart';
+import 'cover_analysis.dart';
 
 const supportedAudioExtensions = {
   '.mp3',
@@ -34,6 +37,8 @@ const supportedAudioExtensions = {
 
 const _oggExtensions = {'.ogg', '.oga', '.opus'};
 const _opusGranuleRate = 48000;
+const _beatSampleRate = 20;
+const _ffmpegTimeout = Duration(minutes: 2);
 
 class _OggPage {
   const _OggPage({
@@ -51,7 +56,10 @@ class _OggPage {
 
 /// 递归扫描目录并将音频文件转换成应用层的曲目模型。
 class LibraryScanner {
-  Future<List<Track>> scan(Iterable<String> rootPaths) async {
+  Future<List<Track>> scan(
+    Iterable<String> rootPaths, {
+    Map<String, Track> previousTracks = const {},
+  }) async {
     final scanTime = DateTime.now();
     final files = <File>[];
     final visited = <String>{};
@@ -76,7 +84,11 @@ class LibraryScanner {
 
     final tracks = <Track>[];
     for (final file in files) {
-      final track = await _readTrack(file, addedAt: scanTime);
+      final track = await _readTrack(
+        file,
+        addedAt: scanTime,
+        previousTrack: previousTracks[file.path],
+      );
       if (track != null) tracks.add(track);
     }
 
@@ -90,7 +102,11 @@ class LibraryScanner {
     return tracks;
   }
 
-  Future<Track?> _readTrack(File file, {required DateTime addedAt}) async {
+  Future<Track?> _readTrack(
+    File file, {
+    required DateTime addedAt,
+    Track? previousTrack,
+  }) async {
     try {
       final modifiedAt = (await file.stat()).modified;
       final detailed = readAllMetadata(file, getImage: true);
@@ -110,10 +126,20 @@ class LibraryScanner {
       ];
       final selectedLyrics = selectLyricsSource(sources);
       final replayGain = _replayGainInfo(detailed);
+      final coverBytes = _coverBytes(detailed);
+      final canReuseAnalysis = previousTrack?.modifiedAt == modifiedAt;
+      final coverAnalysis = canReuseAnalysis
+          ? null
+          : coverBytes == null
+          ? null
+          : analyzeCover(coverBytes);
+      final beatEnvelope = canReuseAnalysis
+          ? previousTrack?.beatEnvelope
+          : await _analyzeBeat(file, metadata.duration);
       return Track(
         id: file.path,
         path: file.path,
-        coverBytes: _coverBytes(detailed),
+        coverBytes: coverBytes,
         title: _clean(metadata.title) ?? fallbackTitle,
         artist: _clean(metadata.artist) ?? '未知艺术家',
         album: _clean(metadata.album) ?? '未知专辑',
@@ -124,7 +150,13 @@ class LibraryScanner {
         lyricsSources: sources,
         replayGainDb: replayGain.db,
         replayGainMode: replayGain.mode,
-        coverColor: _colorForPath(file.path),
+        coverColor: canReuseAnalysis
+            ? previousTrack!.coverColor
+            : coverAnalysis?.primaryColor ?? 0xFF263238,
+        fluidPalette: canReuseAnalysis
+            ? previousTrack!.fluidPalette
+            : coverAnalysis?.palette,
+        beatEnvelope: beatEnvelope,
         addedAt: addedAt,
         modifiedAt: modifiedAt,
         metadata: _metadataMap(
@@ -137,6 +169,70 @@ class LibraryScanner {
       );
     } on Object {
       // 损坏或暂不支持的文件不应中断整个曲库扫描。
+      return null;
+    }
+  }
+
+  Future<BeatEnvelope?> _analyzeBeat(File file, Duration? duration) async {
+    if (duration == null || duration <= Duration.zero) return null;
+    try {
+      final process = await Process.start('ffmpeg', [
+        '-v',
+        'error',
+        '-i',
+        file.path,
+        '-map',
+        '0:a:0',
+        '-ac',
+        '1',
+        '-ar',
+        '200',
+        '-f',
+        'f32le',
+        'pipe:1',
+      ]).timeout(_ffmpegTimeout);
+      final outputFuture = process.stdout.fold<List<int>>(
+        <int>[],
+        (buffer, chunk) => buffer..addAll(chunk),
+      );
+      final errorFuture = process.stderr.drain<void>();
+      final exitCode = await process.exitCode;
+      final output = await outputFuture;
+      await errorFuture;
+      if (exitCode != 0 || output.isEmpty) return null;
+
+      final bytes = Uint8List.fromList(output);
+      final samples = ByteData.sublistView(bytes);
+      const sourceRate = 200;
+      final blockSize = sourceRate ~/ _beatSampleRate;
+      final values = <double>[];
+      final sampleCount = samples.lengthInBytes ~/ 4;
+      for (
+        var offset = 0;
+        offset + blockSize <= sampleCount;
+        offset += blockSize
+      ) {
+        var energy = 0.0;
+        var peak = 0.0;
+        for (var index = 0; index < blockSize; index++) {
+          final sample = samples.getFloat32(
+            (offset + index) * 4,
+            Endian.little,
+          );
+          final magnitude = sample.abs();
+          energy += sample * sample;
+          peak = math.max(peak, magnitude);
+        }
+        final rms = math.sqrt(energy / blockSize);
+        values.add(((rms * .55 + peak * .45) * 2.4).clamp(0.0, 1.0));
+      }
+      if (values.isEmpty) return null;
+      return BeatEnvelope(
+        durationMs: duration.inMilliseconds,
+        sampleRate: _beatSampleRate,
+        values: values,
+      );
+    } on Object {
       return null;
     }
   }
@@ -716,14 +812,5 @@ class LibraryScanner {
   String? _clean(String? value) {
     final result = value?.trim();
     return result == null || result.isEmpty ? null : result;
-  }
-
-  int _colorForPath(String path) {
-    final value = path.codeUnits.fold<int>(
-      17,
-      (hash, code) => hash * 31 + code,
-    );
-    final colors = const [0xFF315A61, 0xFF5F4B62, 0xFF806044, 0xFF3C536D];
-    return colors[value.abs() % colors.length];
   }
 }

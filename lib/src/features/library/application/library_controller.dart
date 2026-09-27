@@ -98,7 +98,11 @@ class LibraryController extends Notifier<LibraryState> {
     );
 
     try {
-      final tracks = await _scanner.scan(roots);
+      final previousTracks = {
+        for (final track in state.tracks)
+          if (track.path != null) track.path!: track,
+      };
+      final tracks = await _scanner.scan(roots, previousTracks: previousTracks);
       state = state.copyWith(tracks: tracks, isScanning: false);
       // 即使扫描结果为空，也要同步播放器队列，避免界面曲库已经清空而播放器仍
       // 保留上一轮扫描结果。播放器内部会用示例队列维持非空状态不变量。
