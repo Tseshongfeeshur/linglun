@@ -16,7 +16,6 @@ import 'lyric_emphasis.dart';
 import 'isolation_background.dart';
 import 'artist_label.dart';
 
-const _pageAnimationCurve = Curves.easeOutCubic;
 const _lyricDefaultFontSize = 38.0;
 const _wideLyricsHeightFactor = .9;
 const _lyricLetterSpacing = .1;
@@ -691,8 +690,11 @@ class _PortraitMainArea extends StatefulWidget {
 }
 
 class _PortraitMainAreaState extends State<_PortraitMainArea>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _transition;
+  late final AnimationController _lyricsOpacityController;
+  late final Animation<double> _lyricsOpacity;
+  bool _lyricsMounted = false;
 
   @override
   void initState() {
@@ -702,6 +704,17 @@ class _PortraitMainAreaState extends State<_PortraitMainArea>
       duration: const Duration(milliseconds: 560),
       value: widget.showLyrics ? 1 : 0,
     );
+    _lyricsOpacityController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 560),
+      value: widget.showLyrics ? 1 : 0,
+    )..addStatusListener(_handleLyricsOpacityStatus);
+    _lyricsOpacity = CurvedAnimation(
+      parent: _lyricsOpacityController,
+      curve: Curves.easeInOutCubic,
+      reverseCurve: Curves.easeInOutCubic,
+    );
+    _lyricsMounted = widget.showLyrics;
   }
 
   @override
@@ -711,14 +724,31 @@ class _PortraitMainAreaState extends State<_PortraitMainArea>
 
     final target = widget.showLyrics ? 1.0 : 0.0;
     if (widget.animateTransition) {
+      if (widget.showLyrics) {
+        setState(() => _lyricsMounted = true);
+        _lyricsOpacityController.forward();
+      } else {
+        _lyricsOpacityController.reverse();
+      }
       _transition.animateTo(target, curve: Curves.easeOutCubic);
     } else {
       _transition.value = target;
+      _lyricsOpacityController.value = target;
+      setState(() => _lyricsMounted = widget.showLyrics);
+    }
+  }
+
+  void _handleLyricsOpacityStatus(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed && !widget.showLyrics && mounted) {
+      setState(() => _lyricsMounted = false);
     }
   }
 
   @override
   void dispose() {
+    _lyricsOpacityController
+      ..removeStatusListener(_handleLyricsOpacityStatus)
+      ..dispose();
     _transition.dispose();
     super.dispose();
   }
@@ -779,16 +809,14 @@ class _PortraitMainAreaState extends State<_PortraitMainArea>
         return Stack(
           clipBehavior: Clip.none,
           children: [
-            if (widget.showLyrics)
+            if (_lyricsMounted)
               Positioned(
                 left: -lyricExpansion,
                 right: -lyricExpansion,
                 top: headerHeight + 12,
                 bottom: 0,
-                child: AnimatedOpacity(
-                  opacity: 1,
-                  duration: const Duration(milliseconds: 350),
-                  curve: _pageAnimationCurve,
+                child: FadeTransition(
+                  opacity: _lyricsOpacity,
                   child: _LyricsViewport(
                     key: const ValueKey('portrait-lyrics'),
                     track: widget.track,

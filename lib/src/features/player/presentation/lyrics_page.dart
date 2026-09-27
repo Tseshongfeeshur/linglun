@@ -138,6 +138,7 @@ class _Header extends StatelessWidget {
                     artists,
                     style: const TextStyle(color: Colors.white60),
                     separatorColor: Colors.white38,
+                    separatorWeight: FontWeight(300),
                   ),
                 ],
               ),
