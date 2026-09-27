@@ -208,6 +208,56 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('低高度横屏不会因宽度低于旧断点突变歌词字号', (tester) async {
+    tester.view.physicalSize = const Size(760, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final track = Track(
+      id: 'lyrics-short-wide',
+      title: '低高度横屏',
+      artist: '测试歌手',
+      album: '测试专辑',
+      duration: const Duration(minutes: 2),
+      lyrics: '[00:00.00]横屏歌词字号',
+      lyricsFormat: 'lrc',
+    );
+    final state = PlayerState(
+      queue: [track],
+      currentIndex: 0,
+      isPlaying: false,
+      position: Duration.zero,
+      audioSettings: AudioProcessingSettings(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: Scaffold(
+          body: AmllPlaybackPage(
+            track: track,
+            state: state,
+            onClose: () {},
+            onPrevious: () {},
+            onTogglePlay: () {},
+            onNext: () {},
+            onSeek: (_) {},
+            onToggleShuffle: () {},
+            onCycleRepeat: () {},
+            onPlayTrack: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.byKey(const ValueKey('wide-lyrics-pane')), findsOneWidget);
+    final lyric = tester.widget<Text>(find.text('横屏歌词字号'));
+    expect(lyric.style?.fontSize, closeTo(35, .01));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('窄竖屏默认展示歌曲信息，点击封面后展开歌词', (tester) async {
     tester.view.physicalSize = const Size(420, 900);
     tester.view.devicePixelRatio = 1;

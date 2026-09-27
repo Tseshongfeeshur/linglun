@@ -322,6 +322,7 @@ class _WidePlaybackLayout extends StatelessWidget {
                 state: state,
                 onSeek: onSeek,
                 seekRequest: seekRequest,
+                compact: false,
               ),
             ),
           ),
@@ -603,6 +604,7 @@ class _PortraitMainArea extends StatelessWidget {
                     state: state,
                     onSeek: onSeek,
                     seekRequest: seekRequest,
+                    compact: true,
                   ),
                 ),
               ),
@@ -1257,6 +1259,7 @@ class _LyricsViewport extends StatefulWidget {
     required this.state,
     required this.onSeek,
     required this.seekRequest,
+    required this.compact,
     super.key,
   });
 
@@ -1264,6 +1267,7 @@ class _LyricsViewport extends StatefulWidget {
   final PlayerState state;
   final ValueChanged<Duration> onSeek;
   final ValueListenable<_LyricSeekRequest> seekRequest;
+  final bool compact;
 
   @override
   State<_LyricsViewport> createState() => _LyricsViewportState();
@@ -1711,7 +1715,6 @@ class _LyricsViewportState extends State<_LyricsViewport>
   }) {
     final interlude = _displayableInterlude(_playhead.value - _document.offset);
     if (interlude == null || _lyricsWidth <= 0) return;
-    final compact = MediaQuery.sizeOf(context).width <= 768;
     var focalCenter = _listTopPadding;
     if (interlude.anchor >= 0) {
       for (var index = 0; index <= interlude.anchor; index++) {
@@ -1720,7 +1723,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
           _lyricsWidth,
           Directionality.of(context),
           context: context,
-          compact: compact,
+          compact: widget.compact,
           defaultTextStyle: DefaultTextStyle.of(context).style,
           textHeightBehavior: _effectiveTextHeightBehavior(context),
           textScaler: MediaQuery.textScalerOf(context),
@@ -1773,7 +1776,6 @@ class _LyricsViewportState extends State<_LyricsViewport>
     if (_lyricsWidth <= 0 || index < 0 || index >= _document.lines.length) {
       return;
     }
-    final compact = MediaQuery.sizeOf(context).width <= 768;
     final direction = Directionality.of(context);
     var precedingExtent = 0.0;
     for (var lineIndex = 0; lineIndex < index; lineIndex++) {
@@ -1783,7 +1785,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
         _lyricsWidth,
         direction,
         context: context,
-        compact: compact,
+        compact: widget.compact,
         defaultTextStyle: DefaultTextStyle.of(context).style,
         textHeightBehavior: _effectiveTextHeightBehavior(context),
         textScaler: MediaQuery.textScalerOf(context),
@@ -1796,7 +1798,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
       _lyricsWidth,
       direction,
       context: context,
-      compact: compact,
+      compact: widget.compact,
       defaultTextStyle: DefaultTextStyle.of(context).style,
       textHeightBehavior: _effectiveTextHeightBehavior(context),
       textScaler: MediaQuery.textScalerOf(context),
@@ -1914,7 +1916,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
                     _previousLyricsSize != lyricsSize;
                 _previousLyricsSize = lyricsSize;
                 final viewportSize = MediaQuery.sizeOf(context);
-                _lyricFontSize = viewportSize.width <= 768
+                _lyricFontSize = widget.compact
                     ? math.max(12, viewportSize.width * .08)
                     : math.max(
                         12,
@@ -1924,7 +1926,6 @@ class _LyricsViewportState extends State<_LyricsViewport>
                         ),
                       );
                 if (_document.lines.isNotEmpty) {
-                  final compact = MediaQuery.sizeOf(context).width <= 768;
                   final direction = Directionality.of(context);
                   final textScaler = MediaQuery.textScalerOf(context);
                   final firstExtent = _measureLyricRowExtent(
@@ -1932,7 +1933,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
                     constraints.maxWidth,
                     direction,
                     context: context,
-                    compact: compact,
+                    compact: widget.compact,
                     defaultTextStyle: DefaultTextStyle.of(context).style,
                     textHeightBehavior: _effectiveTextHeightBehavior(context),
                     textScaler: textScaler,
@@ -1943,7 +1944,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
                     constraints.maxWidth,
                     direction,
                     context: context,
-                    compact: compact,
+                    compact: widget.compact,
                     defaultTextStyle: DefaultTextStyle.of(context).style,
                     textHeightBehavior: _effectiveTextHeightBehavior(context),
                     textScaler: textScaler,
@@ -2012,6 +2013,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
                                         _synchronizeLineMotion,
                                     interludeResetPosition:
                                         _interludeResetPosition,
+                                    compact: widget.compact,
                                     topPadding: _listTopPadding,
                                     bottomPadding: _listBottomPadding,
                                     onSeek: _seekToLyric,
@@ -2056,6 +2058,7 @@ class _TimedLyricsList extends StatelessWidget {
     required this.interludeMotionOffset,
     required this.synchronizeLineMotion,
     required this.interludeResetPosition,
+    required this.compact,
     required this.topPadding,
     required this.bottomPadding,
     required this.onSeek,
@@ -2077,6 +2080,7 @@ class _TimedLyricsList extends StatelessWidget {
   final double interludeMotionOffset;
   final bool synchronizeLineMotion;
   final Duration? interludeResetPosition;
+  final bool compact;
   final double topPadding;
   final double bottomPadding;
   final ValueChanged<Duration> onSeek;
@@ -2085,7 +2089,6 @@ class _TimedLyricsList extends StatelessWidget {
   Widget build(BuildContext context) {
     final lines = document.lines;
     final adjustedPosition = position - document.offset;
-    final compact = MediaQuery.sizeOf(context).width <= 768;
     // 滚动焦点和视觉高亮并不总是相同：一行结束后仍可作为滚动焦点，
     // 但应立即恢复为未高亮的字号和样式。
     final highlightedIndex = _highlightedLineIndex(lines, adjustedPosition);
