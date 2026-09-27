@@ -967,7 +967,8 @@ class _SeekControlState extends State<_SeekControl> {
         _dragMs ?? _hoverMs ?? widget.position.inMilliseconds.toDouble();
     final boundedMs = currentMs.clamp(0, durationMs.toDouble()).toDouble();
     final shownPosition = Duration(milliseconds: boundedMs.round());
-    final lyricLabel = '  ${_seekLyricLabel(shownPosition)}  ';
+    final lyricLabel = _seekLyricLabel(shownPosition);
+    final lyricLabelText = '  $lyricLabel  ';
     final rightTime = widget.showRemainingTime
         ? widget.track.duration - shownPosition
         : widget.track.duration;
@@ -977,56 +978,62 @@ class _SeekControlState extends State<_SeekControl> {
       width: widget.width,
       child: Column(
         children: [
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: trackHeight,
-              activeTrackColor: Colors.white,
-              inactiveTrackColor: Colors.white.withAlpha(65),
-              // 始终保留相同的手柄和覆盖层尺寸，避免 Flutter 重新计算轨道
-              // 两端内缩量；非悬浮时只隐藏绘制，不改变进度条几何尺寸。
-              thumbColor: Colors.white,
-              disabledThumbColor: Colors.transparent,
-              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-            ),
-            child: MouseRegion(
-              onHover: (event) {
-                if (widget.track.duration <= Duration.zero) return;
-                final width = context.size?.width ?? 0;
-                if (width <= 0) return;
-                final value = (event.localPosition.dx / width * durationMs)
-                    .clamp(0, durationMs.toDouble())
-                    .toDouble();
-                if ((_hoverMs ?? -1) == value) return;
-                setState(() => _hoverMs = value);
-              },
-              onExit: (_) {
-                if (_dragging) return;
-                if (_hoverMs != null) setState(() => _hoverMs = null);
-              },
-              child: Slider(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                min: 0,
-                max: durationMs.toDouble(),
-                value: boundedMs,
-                label: _dragging || _hoverMs != null ? lyricLabel : null,
-                showValueIndicator: lyricLabel == null
-                    ? ShowValueIndicator.never
-                    : ShowValueIndicator.alwaysVisible,
-                onChangeStart: (value) => setState(() {
-                  _dragging = true;
-                  _dragMs = value;
-                }),
-                onChanged: widget.track.duration <= Duration.zero
-                    ? null
-                    : (value) => setState(() => _dragMs = value),
-                onChangeEnd: (value) {
-                  setState(() {
-                    _dragMs = null;
-                    _dragging = false;
-                  });
-                  widget.onSeek(Duration(milliseconds: value.round()));
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: trackHeight,
+                activeTrackColor: Colors.white,
+                inactiveTrackColor: Colors.white.withAlpha(65),
+                // 始终保留相同的手柄和覆盖层尺寸，避免 Flutter 重新计算轨道
+                // 两端内缩量；非悬浮时只隐藏绘制，不改变进度条几何尺寸。
+                thumbColor: Colors.white,
+                disabledThumbColor: Colors.transparent,
+                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+              ),
+              child: MouseRegion(
+                onHover: (event) {
+                  if (widget.track.duration <= Duration.zero) return;
+                  final width = context.size?.width ?? 0;
+                  if (width <= 0) return;
+                  final value = (event.localPosition.dx / width * durationMs)
+                      .clamp(0, durationMs.toDouble())
+                      .toDouble();
+                  if ((_hoverMs ?? -1) == value) return;
+                  setState(() => _hoverMs = value);
                 },
+                onExit: (_) {
+                  if (_dragging) return;
+                  if (_hoverMs != null) setState(() => _hoverMs = null);
+                },
+                child: Slider(
+                  padding: EdgeInsets.zero,
+                  min: 0,
+                  max: durationMs.toDouble(),
+                  value: boundedMs,
+                  label: _dragging || _hoverMs != null ? lyricLabelText : null,
+                  showValueIndicator: lyricLabel == null
+                      ? ShowValueIndicator.never
+                      : ShowValueIndicator.alwaysVisible,
+                  onChangeStart: (value) => setState(() {
+                    _dragging = true;
+                    _dragMs = value;
+                  }),
+                  onChanged: widget.track.duration <= Duration.zero
+                      ? null
+                      : (value) => setState(() => _dragMs = value),
+                  onChangeEnd: (value) {
+                    setState(() {
+                      _dragMs = null;
+                      _dragging = false;
+                      // 释放后鼠标通常仍停留在进度条上。把悬停预览同步到
+                      // 最终拖动值，避免清除拖动值后回退到旧的悬停位置。
+                      _hoverMs = value;
+                    });
+                    widget.onSeek(Duration(milliseconds: value.round()));
+                  },
+                ),
               ),
             ),
           ),

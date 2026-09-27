@@ -58,13 +58,16 @@ void main() {
     await mouse.moveTo(rect.center);
     await tester.pump();
 
-    expect(tester.widget<Slider>(slider).label, '目标主歌词');
+    expect(tester.widget<Slider>(slider).label?.trim(), '目标主歌词');
     expect(tester.widget<Slider>(slider).showValueIndicator, ShowValueIndicator.alwaysVisible);
 
     await mouse.down(rect.center);
     await tester.pump();
-    expect(tester.widget<Slider>(slider).label, '目标主歌词');
+    expect(tester.widget<Slider>(slider).label?.trim(), '目标主歌词');
     await mouse.up();
+    await tester.pump();
+    expect(tester.widget<Slider>(slider).value, closeTo(60000, 1));
+    expect(tester.widget<Slider>(slider).label?.trim(), '目标主歌词');
     await mouse.removePointer();
   });
 }
