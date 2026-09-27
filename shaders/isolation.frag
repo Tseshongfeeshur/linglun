@@ -12,8 +12,13 @@ uniform vec3 uRandom;
 
 out vec4 fragColor;
 
+// 纯 float 运算的 hash，不依赖 sin()（避免大参数下三角函数精度退化导致的条纹），
+// 也不依赖 uint / 位运算（避免 Flutter shader 编译工具链对这类构造的兼容性问题）。
+// 写法参考自常见的乘法混合 hash（IQ 风格），在各平台/精度模式下表现稳定。
 float hash(vec2 point) {
-  return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453);
+  vec3 p3 = fract(vec3(point.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 
 float noise(vec2 point) {
@@ -40,13 +45,8 @@ vec3 linearToSrgb(vec3 color) {
 }
 
 vec3 protectHighlights(vec3 linearColor) {
-  // 目标线性亮度上限约 0.30，对应 sRGB ≈ 0.58，
-  // 与白色文字（相对亮度 1.0）的对比度约为 3:1，
-  // 足以保证大号歌词文字基本可读（比之前的 0.90 上限收紧了很多）。
   const float highlightThreshold = 0.16;
   const float highlightCeiling = 0.30;
-  // 单通道保护上限：防止高饱和度（如取色得到的纯红/纯黄）颜色
-  // 在 luminance 判断"不算太亮"时，单通道仍然溢出被硬裁剪成死白/死色。
   const float channelCeiling = 0.34;
 
   float luminance = dot(
@@ -56,7 +56,6 @@ vec3 protectHighlights(vec3 linearColor) {
 
   vec3 result = linearColor;
 
-  // 第一步：整体亮度软膝压缩，保持色相比例不变
   if (luminance > highlightThreshold && luminance > 0.0001) {
     float excess = luminance - highlightThreshold;
     float kneeRange = highlightCeiling - highlightThreshold;
@@ -65,7 +64,6 @@ vec3 protectHighlights(vec3 linearColor) {
     result *= (compressedLuminance / luminance);
   }
 
-  // 第二步：单通道溢出保护，压缩后仍按比例缩放三通道，避免色相偏移
   float maxChannel = max(result.r, max(result.g, result.b));
   if (maxChannel > channelCeiling) {
     result *= (channelCeiling / maxChannel);

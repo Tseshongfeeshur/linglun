@@ -629,7 +629,7 @@ class _NarrowPlaybackLayoutState extends State<_NarrowPlaybackLayout> {
                       onSeek: widget.onSeek,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 24),
                   SizedBox(
                     key: const ValueKey('playback-controls-container'),
                     width: double.infinity,
@@ -963,7 +963,7 @@ class _TrackMetadata extends StatelessWidget {
     final titleStyle = TextStyle(
       color: Colors.white,
       fontSize: _compactMetadataTitleFontSize * (compact ? 0.9 : 1),
-      fontWeight: FontWeight(480),
+      fontWeight: FontWeight(450),
       height: 1,
     );
     return Column(
@@ -1010,16 +1010,20 @@ class _ScrollingTrackTitle extends StatefulWidget {
 
 class _ScrollingTrackTitleState extends State<_ScrollingTrackTitle>
     with SingleTickerProviderStateMixin {
+  static const _pauseDuration = Duration(seconds: 2);
+  static const _pixelsPerSecond = 80.0;
+
   late final AnimationController _controller;
-  Timer? _startTimer;
-  double _overflow = 0;
+  double _textWidth = 0;
+  double _viewportWidth = 0;
+  Duration _cycleDuration = Duration.zero;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 850),
+      duration: const Duration(seconds: 2),
     );
   }
 
@@ -1027,44 +1031,97 @@ class _ScrollingTrackTitleState extends State<_ScrollingTrackTitle>
   void didUpdateWidget(covariant _ScrollingTrackTitle oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.text != widget.text || oldWidget.style != widget.style) {
-      _startTimer?.cancel();
       _controller
         ..stop()
         ..value = 0;
-      _overflow = 0;
+      _textWidth = 0;
+      _viewportWidth = 0;
+      _cycleDuration = Duration.zero;
     }
   }
 
   @override
   void dispose() {
-    _startTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
-  void _updateOverflow(double value) {
-    if ((_overflow - value).abs() < .5) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || (_overflow - value).abs() < .5) return;
-      setState(() => _overflow = value);
-      _startTimer?.cancel();
+  void _syncMeasurement(double textWidth, double viewportWidth) {
+    if (!mounted || viewportWidth <= 0) return;
+    if ((textWidth - _textWidth).abs() < .5 &&
+        (viewportWidth - _viewportWidth).abs() < .5) {
+      return;
+    }
+
+    final overflow = textWidth - viewportWidth;
+    final isOverflowing = overflow > .5;
+    final firstDistance = textWidth - viewportWidth / 2;
+    final secondDistance = textWidth + viewportWidth;
+    final movementDuration = isOverflowing
+        ? Duration(
+            milliseconds:
+                ((firstDistance + secondDistance) / _pixelsPerSecond * 1000)
+                    .round(),
+          )
+        : Duration.zero;
+    final cycleDuration = isOverflowing
+        ? _pauseDuration + movementDuration + _pauseDuration
+        : Duration.zero;
+
+    _controller
+      ..stop()
+      ..value = 0;
+    _textWidth = textWidth;
+    _viewportWidth = viewportWidth;
+    _cycleDuration = cycleDuration;
+    if (isOverflowing) {
       _controller
-        ..stop()
-        ..value = 0;
-      if (value > 0) {
-        _startTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-          if (!mounted) return;
-          final target = _controller.value < .5 ? 1.0 : 0.0;
-          unawaited(
-            _controller.animateTo(
-              target,
-              duration: const Duration(milliseconds: 850),
-              curve: Curves.easeInOutCubic,
-            ),
-          );
-        });
-      }
+        ..duration = cycleDuration
+        ..repeat();
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
     });
+  }
+
+  // 两段文本共享同一条线性时间轴，首尾停顿只改变位置，不改变移动速度。
+  double _firstTextOffset(double elapsedMilliseconds) {
+    final pauseMilliseconds = _pauseDuration.inMilliseconds.toDouble();
+    if (elapsedMilliseconds <= pauseMilliseconds) return 0;
+
+    final firstDistance = _textWidth - _viewportWidth / 2;
+    final secondDistance = _textWidth + _viewportWidth;
+    final firstDuration = firstDistance / _pixelsPerSecond * 1000;
+    final secondDuration = secondDistance / _pixelsPerSecond * 1000;
+    final movementElapsed = elapsedMilliseconds - pauseMilliseconds;
+
+    if (movementElapsed <= firstDuration) {
+      return -firstDistance * (movementElapsed / firstDuration);
+    }
+
+    final secondElapsed = (movementElapsed - firstDuration).clamp(
+      0.0,
+      secondDuration,
+    );
+    return -firstDistance - secondDistance * (secondElapsed / secondDuration);
+  }
+
+  double _secondTextOffset(double elapsedMilliseconds) {
+    final pauseMilliseconds = _pauseDuration.inMilliseconds.toDouble();
+    final firstDistance = _textWidth - _viewportWidth / 2;
+    final secondDistance = _textWidth + _viewportWidth;
+    final firstDuration = firstDistance / _pixelsPerSecond * 1000;
+    final secondDuration = secondDistance / _pixelsPerSecond * 1000;
+    final movementElapsed = elapsedMilliseconds - pauseMilliseconds;
+
+    if (movementElapsed <= firstDuration) return _viewportWidth;
+
+    final secondElapsed = (movementElapsed - firstDuration).clamp(
+      0.0,
+      secondDuration,
+    );
+    return _viewportWidth - secondDistance * (secondElapsed / secondDuration);
   }
 
   @override
@@ -1078,23 +1135,46 @@ class _ScrollingTrackTitleState extends State<_ScrollingTrackTitle>
           maxLines: 1,
         )..layout();
         final naturalWidth = painter.width;
-        final overflow = math.max(0.0, naturalWidth - constraints.maxWidth);
-        _updateOverflow(overflow);
+        final viewportWidth = constraints.maxWidth;
+        if (viewportWidth.isFinite) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _syncMeasurement(naturalWidth, viewportWidth);
+          });
+        }
+
+        final isReady =
+            (_textWidth - naturalWidth).abs() < .5 &&
+            (_viewportWidth - viewportWidth).abs() < .5;
+        final isOverflowing = isReady && naturalWidth > viewportWidth + .5;
         return ClipRect(
           child: SizedBox(
             height: painter.height,
-            width: constraints.maxWidth,
+            width: viewportWidth,
             child: AnimatedBuilder(
               animation: _controller,
-              builder: (context, child) => Transform.translate(
-                offset: Offset(
-                  -_overflow * Curves.easeInOut.transform(_controller.value),
-                  0,
-                ),
-                child: child,
-              ),
+              builder: (context, child) {
+                if (!isOverflowing) return child!;
+
+                final elapsed =
+                    _controller.value * _cycleDuration.inMilliseconds;
+                final firstOffset = _firstTextOffset(elapsed);
+                final secondOffset = _secondTextOffset(elapsed);
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Transform.translate(
+                      offset: Offset(firstOffset, 0),
+                      child: child,
+                    ),
+                    Transform.translate(
+                      offset: Offset(secondOffset, 0),
+                      child: child,
+                    ),
+                  ],
+                );
+              },
               child: SizedBox(
-                width: math.max(naturalWidth, constraints.maxWidth),
+                width: naturalWidth,
                 child: Text(
                   widget.text,
                   maxLines: 1,
@@ -1133,6 +1213,61 @@ class _SeekControl extends StatefulWidget {
   State<_SeekControl> createState() => _SeekControlState();
 }
 
+class RoundedRectSliderThumbShape extends SliderComponentShape {
+  final double thumbWidth;
+  final double thumbHeight;
+  final double borderRadius;
+
+  const RoundedRectSliderThumbShape({
+    this.thumbWidth = 3, // 手柄宽度
+    this.thumbHeight = 12, // 手柄高度
+    this.borderRadius = 9, // 圆角半径
+  });
+
+  @override
+  Size getPreferredSize(bool isEnabled, bool isDiscrete) {
+    return Size(thumbWidth, thumbHeight);
+  }
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset center, {
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
+  }) {
+    final Canvas canvas = context.canvas;
+
+    final paint = Paint()
+      ..color = sliderTheme.thumbColor ?? Colors.blue
+      ..style = PaintingStyle.fill;
+
+    // 根据中心点计算出矩形的区域
+    final Rect rect = Rect.fromCenter(
+      center: center,
+      width: thumbWidth,
+      height: thumbHeight,
+    );
+
+    // 生成圆角矩形
+    final RRect rRect = RRect.fromRectAndRadius(
+      rect,
+      Radius.circular(borderRadius),
+    );
+
+    // 绘制
+    canvas.drawRRect(rRect, paint);
+  }
+}
+
 class _SeekControlState extends State<_SeekControl> {
   double? _dragMs;
   double? _hoverMs;
@@ -1162,7 +1297,7 @@ class _SeekControlState extends State<_SeekControl> {
     final rightTime = widget.showRemainingTime
         ? widget.track.duration - shownPosition
         : widget.track.duration;
-    final trackHeight = _seekTrackHeight(MediaQuery.sizeOf(context).height);
+    final trackHeight = 1.2;
 
     return SizedBox(
       width: widget.width,
@@ -1179,8 +1314,8 @@ class _SeekControlState extends State<_SeekControl> {
                 // 两端内缩量；非悬浮时只隐藏绘制，不改变进度条几何尺寸。
                 thumbColor: Colors.white,
                 disabledThumbColor: Colors.transparent,
-                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 5),
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                thumbShape: RoundedRectSliderThumbShape(),
+                overlayShape: SliderComponentShape.noOverlay,
               ),
               child: MouseRegion(
                 onHover: (event) {
@@ -1284,12 +1419,6 @@ const _timeTextStyle = TextStyle(
   fontSize: 11,
   fontFeatures: [ui.FontFeature.tabularFigures()],
 );
-
-double _seekTrackHeight(double windowHeight) {
-  // 只做轻微变化，避免大窗口下进度条显得过重，小窗口下又过细。
-  final progress = ((windowHeight - 600) / 500).clamp(0.0, 1.0);
-  return 3 + progress * 1.2;
-}
 
 class _AudioQualityBadge extends StatelessWidget {
   const _AudioQualityBadge({required this.track});
