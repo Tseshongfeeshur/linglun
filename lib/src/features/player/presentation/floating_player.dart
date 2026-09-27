@@ -11,10 +11,11 @@ import '../../../core/database/app_database.dart';
 import '../application/player_controller.dart';
 import '../domain/lyrics.dart';
 import '../domain/track.dart';
-import 'amll_playback_page.dart';
+import 'amll_playback_route.dart';
+import 'playback_progress_circle.dart';
 
-const _circleSize = 72.0;
-const _ringSize = 104.0;
+const _circleSize = playbackCircleSize;
+const _ringSize = playbackRingSize;
 const _ringInset = (_ringSize - _circleSize) / 2;
 const _panelGap = 12.0;
 const _floatingPositionSettingKey = 'player.floating.position.v1';
@@ -27,8 +28,7 @@ class FloatingPlayer extends ConsumerStatefulWidget {
   ConsumerState<FloatingPlayer> createState() => _FloatingPlayerState();
 }
 
-class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
-    with SingleTickerProviderStateMixin {
+class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
   // 使用归一化坐标保存位置，这样窗口尺寸变化后仍能保持相同的相对位置。
   Offset _positionFactor = const Offset(0, 1);
   Offset? _dragStart;
@@ -37,25 +37,17 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
   bool _hovered = false;
   bool _dragging = false;
   bool _seeking = false;
-  bool _expanded = false;
-  bool _openingExpanded = false;
   Timer? _hoverExitTimer;
-  late final AnimationController _expandController;
 
   @override
   void initState() {
     super.initState();
-    _expandController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 420),
-    );
     unawaited(_loadFloatingPosition());
   }
 
   @override
   void dispose() {
     _hoverExitTimer?.cancel();
-    _expandController.dispose();
     super.dispose();
   }
 
@@ -99,8 +91,6 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
                 state: state,
                 hovered: _hovered,
                 dragging: _dragging,
-                expanded: _expanded,
-                openingExpanded: _openingExpanded,
                 seekPreviewProgress: _seekPreviewProgress,
                 showAbove: showAbove,
                 showLeft: showLeft,
@@ -170,77 +160,33 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
                     _seekPreviewProgress = null;
                     return;
                   }
-                  _openExpanded();
+                  _openPlaybackPage(context, circleCenter);
                 },
               ),
             ),
-            if (_expanded)
-              const Positioned.fill(
-                child: ModalBarrier(
-                  color: Colors.transparent,
-                  dismissible: false,
-                  barrierSemanticsDismissible: false,
-                ),
-              ),
-            if (_expanded)
-              Positioned.fill(
-                child: _ExpandedPlayer(
-                  track: track,
-                  state: state,
-                  hovered: _hovered,
-                  animation: _expandController,
-                  sourceCenter: center + const Offset(36, 36),
-                  viewport: size,
-                  onClose: _closeExpanded,
-                  onPrevious: ref
-                      .read(playerControllerProvider.notifier)
-                      .previous,
-                  onTogglePlay: ref
-                      .read(playerControllerProvider.notifier)
-                      .togglePlay,
-                  onNext: ref.read(playerControllerProvider.notifier).skipNext,
-                  onSeek: ref.read(playerControllerProvider.notifier).seek,
-                  onToggleShuffle: ref
-                      .read(playerControllerProvider.notifier)
-                      .toggleShuffle,
-                  onCycleRepeat: ref
-                      .read(playerControllerProvider.notifier)
-                      .cycleRepeatMode,
-                  onPlayTrack: ref
-                      .read(playerControllerProvider.notifier)
-                      .playTrack,
-                ),
-              ),
           ],
         );
       },
     );
   }
 
-  void _openExpanded() {
+  void _openPlaybackPage(BuildContext context, Offset localSourceCenter) {
     _hoverExitTimer?.cancel();
-    setState(() {
-      _expanded = true;
-      _openingExpanded = true;
-    });
-    _expandController.forward(from: 0);
-    // 先让展开层继承点击瞬间的悬停状态，再在下一帧切换到非悬停状态，
-    // 使原有的 AnimatedScale 和阴影动画能够真正收到状态变化。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _expanded) setState(() => _hovered = false);
-    });
+    setState(() => _hovered = false);
+    final renderBox = context.findRenderObject() as RenderBox;
+    final sourceCenter = renderBox.localToGlobal(localSourceCenter);
     unawaited(
-      Future<void>.delayed(const Duration(milliseconds: 280), () {
-        if (mounted && _expanded) {
-          setState(() => _openingExpanded = false);
-        }
-      }),
+      Navigator.of(context).push<void>(
+        AmllPlaybackPageRoute(
+          sourceCenter: sourceCenter,
+          settings: const RouteSettings(name: '/playback'),
+        ),
+      ),
     );
   }
 
   void _setHovered(bool value) {
     _hoverExitTimer?.cancel();
-    if (_expanded) return;
     if (value) {
       if (!_hovered) setState(() => _hovered = true);
       return;
@@ -248,17 +194,6 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
     // 给光标从圆移动到面板留出时间，避免经过透明间隙时面板立即收回。
     _hoverExitTimer = Timer(const Duration(milliseconds: 180), () {
       if (mounted) setState(() => _hovered = false);
-    });
-  }
-
-  void _closeExpanded() {
-    _expandController.reverse().whenComplete(() {
-      if (mounted) {
-        setState(() {
-          _expanded = false;
-          _openingExpanded = false;
-        });
-      }
     });
   }
 
@@ -367,8 +302,6 @@ class _FloatingCluster extends ConsumerWidget {
     required this.state,
     required this.hovered,
     required this.dragging,
-    required this.expanded,
-    required this.openingExpanded,
     required this.seekPreviewProgress,
     required this.showAbove,
     required this.showLeft,
@@ -385,8 +318,6 @@ class _FloatingCluster extends ConsumerWidget {
   final PlayerState state;
   final bool hovered;
   final bool dragging;
-  final bool expanded;
-  final bool openingExpanded;
   final double? seekPreviewProgress;
   final bool showAbove;
   final bool showLeft;
@@ -469,10 +400,7 @@ class _FloatingCluster extends ConsumerWidget {
       return MouseRegion(
         onEnter: (_) => onHover(true),
         onExit: (_) => onHover(false),
-        child: IgnorePointer(
-          ignoring: !hovered || dragging || expanded || openingExpanded,
-          child: child,
-        ),
+        child: IgnorePointer(ignoring: !hovered || dragging, child: child),
       );
     }
 
@@ -540,7 +468,7 @@ class _FloatingCluster extends ConsumerWidget {
       children: [
         // 透明桥接区只在菜单已经打开后出现，避免未悬停时扩大封面圆的
         // 命中范围；菜单位置变化时桥接区也会立即跟随新锚点。
-        if (!expanded && hovered)
+        if (hovered)
           Positioned(
             left: showLeft ? infoRightAnchor : position.dx + _circleSize,
             top: position.dy,
@@ -553,7 +481,7 @@ class _FloatingCluster extends ConsumerWidget {
               child: const SizedBox.expand(),
             ),
           ),
-        if (!expanded && hovered)
+        if (hovered)
           Positioned(
             left: position.dx,
             top: showAbove
@@ -568,8 +496,8 @@ class _FloatingCluster extends ConsumerWidget {
               child: const SizedBox.expand(),
             ),
           ),
-        if (!expanded || openingExpanded) infoMenu,
-        if (!expanded || openingExpanded) controlMenu,
+        infoMenu,
+        controlMenu,
         Positioned(
           left: circleLeft,
           top: circleTop,
@@ -587,7 +515,7 @@ class _FloatingCluster extends ConsumerWidget {
                 onPanEnd: onDragEnd,
                 // 只裁切内部封面。进度环和手柄位于封面外侧，若在这里裁切
                 // 整个组件，手柄经过圆周边缘时会被截断。
-                child: _ProgressCircle(
+                child: PlaybackProgressCircle(
                   track: track,
                   progress: seekPreviewProgress ?? _progress(state),
                   hovered: hovered,
@@ -1057,249 +985,6 @@ List<(int, int)> _simpleKaraokeWordRanges(String text, List<LyricWord> words) {
     cursor = end;
   }
   return ranges;
-}
-
-class _ProgressCircle extends StatelessWidget {
-  const _ProgressCircle({
-    required this.track,
-    required this.progress,
-    required this.hovered,
-    required this.dragging,
-  });
-
-  final Track track;
-  final double progress;
-  final bool hovered;
-  final bool dragging;
-
-  @override
-  Widget build(BuildContext context) {
-    final scale = dragging
-        ? .94
-        : hovered
-        ? 1.08
-        : 1.0;
-    return AnimatedScale(
-      scale: scale,
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      child: SizedBox(
-        width: _ringSize,
-        height: _ringSize,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            CustomPaint(
-              size: const Size.square(_ringSize),
-              painter: _ProgressPainter(
-                progress: progress,
-                hovered: hovered,
-                colorScheme: Theme.of(context).colorScheme,
-              ),
-            ),
-            Container(
-              width: _circleSize,
-              height: _circleSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(hovered ? 105 : 70),
-                    blurRadius: hovered ? 32 : 22,
-                    spreadRadius: hovered ? 5 : 1,
-                  ),
-                ],
-              ),
-              child: ClipOval(
-                child: track.coverBytes == null
-                    ? ColoredBox(
-                        color: Color(track.coverColor),
-                        child: const Icon(
-                          Icons.music_note,
-                          color: Colors.white70,
-                        ),
-                      )
-                    : Image.memory(track.coverBytes!, fit: BoxFit.cover),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProgressPainter extends CustomPainter {
-  const _ProgressPainter({
-    required this.progress,
-    required this.hovered,
-    required this.colorScheme,
-  });
-
-  final double progress;
-  final bool hovered;
-  final ColorScheme colorScheme;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final radius = hovered ? 46.0 : 39.0;
-    final bounds = Rect.fromCircle(center: center, radius: radius);
-    final trackPaint = Paint()
-      ..color = Colors.white.withAlpha(hovered ? 70 : 34)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = hovered ? 3.5 : 3.2;
-    final progressPaint = Paint()
-      ..color = colorScheme.secondary
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = hovered ? 4.2 : 3.2
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(bounds, 0, math.pi * 2, false, trackPaint);
-    canvas.drawArc(
-      bounds,
-      -math.pi / 2,
-      math.pi * 2 * progress,
-      false,
-      progressPaint,
-    );
-
-    if (hovered) {
-      final angle = -math.pi / 2 + math.pi * 2 * progress;
-      final handleCenter = Offset(
-        center.dx + radius * math.cos(angle),
-        center.dy + radius * math.sin(angle),
-      );
-      canvas.drawCircle(
-        handleCenter,
-        6.5,
-        Paint()..color = colorScheme.secondaryContainer,
-      );
-      canvas.drawCircle(
-        handleCenter,
-        3,
-        Paint()..color = colorScheme.onSecondaryContainer,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_ProgressPainter oldDelegate) =>
-      oldDelegate.progress != progress ||
-      oldDelegate.hovered != hovered ||
-      oldDelegate.colorScheme != colorScheme;
-}
-
-class _ExpandedPlayer extends StatelessWidget {
-  const _ExpandedPlayer({
-    required this.track,
-    required this.state,
-    required this.hovered,
-    required this.animation,
-    required this.sourceCenter,
-    required this.viewport,
-    required this.onClose,
-    required this.onPrevious,
-    required this.onTogglePlay,
-    required this.onNext,
-    required this.onSeek,
-    required this.onToggleShuffle,
-    required this.onCycleRepeat,
-    required this.onPlayTrack,
-  });
-
-  final Track track;
-  final PlayerState state;
-  final bool hovered;
-  final Animation<double> animation;
-  final Offset sourceCenter;
-  final Size viewport;
-  final VoidCallback onClose;
-  final VoidCallback onPrevious;
-  final VoidCallback onTogglePlay;
-  final VoidCallback onNext;
-  final ValueChanged<Duration> onSeek;
-  final VoidCallback onToggleShuffle;
-  final VoidCallback onCycleRepeat;
-  final ValueChanged<Track> onPlayTrack;
-
-  @override
-  Widget build(BuildContext context) {
-    final curved = CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-    final maxRadius =
-        math.sqrt(
-          viewport.width * viewport.width + viewport.height * viewport.height,
-        ) +
-        20;
-
-    return AnimatedBuilder(
-      animation: curved,
-      builder: (context, child) {
-        final value = curved.value;
-        return ClipPath(
-          clipper: _ExpandingCircleClipper(
-            center: sourceCenter,
-            radius: lerpDouble(_ringSize / 2, maxRadius, value)!,
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              FadeTransition(
-                opacity: curved,
-                child: AmllPlaybackPage(
-                  track: track,
-                  state: state,
-                  onClose: onClose,
-                  onPrevious: onPrevious,
-                  onTogglePlay: onTogglePlay,
-                  onNext: onNext,
-                  onSeek: onSeek,
-                  onToggleShuffle: onToggleShuffle,
-                  onCycleRepeat: onCycleRepeat,
-                  onPlayTrack: onPlayTrack,
-                ),
-              ),
-              Positioned(
-                // 展开期间封面保持在原悬浮圆心，只参与渐隐，不再移动到播放页中心。
-                left: sourceCenter.dx - 52,
-                top: sourceCenter.dy - 52,
-                child: IgnorePointer(
-                  child: Opacity(
-                    opacity: (1 - value).clamp(0, 1),
-                    child: _ProgressCircle(
-                      track: track,
-                      progress: _progress(state),
-                      hovered: hovered,
-                      dragging: false,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _ExpandingCircleClipper extends CustomClipper<Path> {
-  const _ExpandingCircleClipper({required this.center, required this.radius});
-
-  final Offset center;
-  final double radius;
-
-  @override
-  Path getClip(Size size) =>
-      Path()..addOval(Rect.fromCircle(center: center, radius: radius));
-
-  @override
-  bool shouldReclip(_ExpandingCircleClipper oldClipper) =>
-      oldClipper.center != center || oldClipper.radius != radius;
 }
 
 LyricsDocument _lyricsDocument(Track track) {

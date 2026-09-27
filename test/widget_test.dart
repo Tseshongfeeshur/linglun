@@ -6,6 +6,7 @@ import 'package:linglun/main.dart';
 import 'package:linglun/src/core/theme/app_typography.dart';
 import 'package:linglun/src/features/player/application/player_controller.dart';
 import 'package:linglun/src/features/player/domain/track.dart';
+import 'package:linglun/src/features/player/presentation/amll_playback_page.dart';
 import 'package:linglun/src/features/player/presentation/floating_player.dart';
 
 void main() {
@@ -48,7 +49,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final progressFinder = find.byWidgetPredicate(
-      (widget) => widget.runtimeType.toString() == '_ProgressCircle',
+      (widget) => widget.runtimeType.toString() == 'PlaybackProgressCircle',
     );
     final ringCenter = tester.getRect(progressFinder).center;
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
@@ -86,5 +87,29 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     await mouse.removePointer();
+  });
+
+  testWidgets('播放页路由打开后不会响应主页导航点击', (WidgetTester tester) async {
+    await tester.pumpWidget(const ProviderScope(child: LinglunApp()));
+    await tester.pumpAndSettle();
+
+    final progressFinder = find.byWidgetPredicate(
+      (widget) => widget.runtimeType.toString() == 'PlaybackProgressCircle',
+    );
+    await tester.tap(progressFinder);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    expect(find.byType(AmllPlaybackPage), findsOneWidget);
+
+    await tester.tap(find.text('设置').first, warnIfMissed: false);
+    await tester.pump();
+    expect(find.byType(AmllPlaybackPage), findsOneWidget);
+
+    await tester.tap(find.byTooltip('收起播放页'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(AmllPlaybackPage), findsNothing);
+    expect(find.text('你的本地音乐，从这里开始。'), findsOneWidget);
   });
 }
