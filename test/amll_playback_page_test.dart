@@ -372,8 +372,19 @@ void main() {
     final portraitLyrics = tester.getRect(
       find.byKey(const ValueKey('portrait-lyrics')),
     );
-    expect(portraitLyrics.left, closeTo(resizedCover.left, .01));
-    expect(portraitLyrics.right, closeTo(resizedCover.right, .01));
+    final lyricLinePadding = 400 * .075 * .4;
+    expect(
+      portraitLyrics.left,
+      closeTo(resizedCover.left - lyricLinePadding, .01),
+    );
+    expect(
+      portraitLyrics.right,
+      closeTo(resizedCover.right + lyricLinePadding, .01),
+    );
+    expect(
+      tester.getRect(find.text('竖屏歌词')).left,
+      closeTo(resizedCover.left, .01),
+    );
     expect(
       tester.getRect(find.byKey(const ValueKey('amll-album-cover'))).height,
       closeTo(24 + 8 + 15 + 4, .01),

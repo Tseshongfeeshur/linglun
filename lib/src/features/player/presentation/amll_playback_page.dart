@@ -758,14 +758,22 @@ class _PortraitMainAreaState extends State<_PortraitMainArea>
         final lyricsMetadataTop =
             lyricsTop + (compactCoverSize - compactMetadataHeight) / 2;
         final headerHeight = compactCoverSize;
+        final viewportWidth = MediaQuery.sizeOf(context).width;
+        final lyricLinePadding = _lyricHorizontalPadding(
+          math.max(12, viewportWidth * .075),
+        );
+        final lyricExpansion = math.min(
+          lyricLinePadding,
+          (viewportWidth - width) / 2,
+        );
 
         return Stack(
-          clipBehavior: Clip.hardEdge,
+          clipBehavior: Clip.none,
           children: [
             if (widget.showLyrics)
               Positioned(
-                left: 0,
-                right: 0,
+                left: -lyricExpansion,
+                right: -lyricExpansion,
                 top: headerHeight + 12,
                 bottom: 0,
                 child: AnimatedOpacity(
@@ -1056,7 +1064,8 @@ class _ScrollingTrackTitleState extends State<_ScrollingTrackTitle>
     final overflow = textWidth - viewportWidth;
     final isOverflowing = overflow > .5;
     final firstDistance = textWidth - viewportWidth / 2;
-    final secondDistance = textWidth + viewportWidth;
+    // 第二段从显示区域右端进入，只需移动一个视口宽度即可让开头贴左。
+    final secondDistance = viewportWidth;
     final movementDuration = isOverflowing
         ? Duration(
             milliseconds:
@@ -1091,7 +1100,7 @@ class _ScrollingTrackTitleState extends State<_ScrollingTrackTitle>
     if (elapsedMilliseconds <= pauseMilliseconds) return 0;
 
     final firstDistance = _textWidth - _viewportWidth / 2;
-    final secondDistance = _textWidth + _viewportWidth;
+    final secondDistance = _viewportWidth;
     final firstDuration = firstDistance / _pixelsPerSecond * 1000;
     final secondDuration = secondDistance / _pixelsPerSecond * 1000;
     final movementElapsed = elapsedMilliseconds - pauseMilliseconds;
@@ -1110,7 +1119,7 @@ class _ScrollingTrackTitleState extends State<_ScrollingTrackTitle>
   double _secondTextOffset(double elapsedMilliseconds) {
     final pauseMilliseconds = _pauseDuration.inMilliseconds.toDouble();
     final firstDistance = _textWidth - _viewportWidth / 2;
-    final secondDistance = _textWidth + _viewportWidth;
+    final secondDistance = _viewportWidth;
     final firstDuration = firstDistance / _pixelsPerSecond * 1000;
     final secondDuration = secondDistance / _pixelsPerSecond * 1000;
     final movementElapsed = elapsedMilliseconds - pauseMilliseconds;
