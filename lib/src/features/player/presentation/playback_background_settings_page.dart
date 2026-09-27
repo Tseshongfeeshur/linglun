@@ -17,10 +17,10 @@ class PlaybackBackgroundSettingsPage extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('播放页背景', style: Theme.of(context).textTheme.headlineMedium),
+        Text('流光背景', style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),
         const Text(
-          '使用封面颜色驱动的 Isolation 流体背景。提高帧率会增加显卡负载。',
+          '使用封面颜色驱动的流光背景。提高帧率会增加显卡负载。',
           style: TextStyle(color: Colors.white60),
         ),
         const SizedBox(height: 16),
@@ -29,7 +29,7 @@ class PlaybackBackgroundSettingsPage extends ConsumerWidget {
             children: [
               _SettingSlider(
                 label: '流动速度',
-                description: '流体背景的动画流动速度',
+                description: '流光背景的动画流动速度',
                 value: settings.flowSpeed,
                 min: .1,
                 max: 10,
@@ -55,7 +55,7 @@ class PlaybackBackgroundSettingsPage extends ConsumerWidget {
               const Divider(height: 1),
               SwitchListTile(
                 title: const Text('暂停时冻结'),
-                subtitle: const Text('暂停播放时同时停止流体背景动画'),
+                subtitle: const Text('暂停播放时同时停止流光背景动画'),
                 value: settings.freezeOnPause,
                 onChanged: (value) => controller.updateBackgroundSettings(
                   settings.copyWith(freezeOnPause: value),

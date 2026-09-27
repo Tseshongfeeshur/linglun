@@ -25,7 +25,7 @@ void main() {
     expect(await database.yearlyPlayCounts(), {2025: 1, 2026: 1});
   });
 
-  test('旧数据库版本号正确但缺少流体背景列时会自动修复', () async {
+  test('旧数据库版本号正确但缺少流光背景列时会自动修复', () async {
     final database = AppDatabase(
       NativeDatabase.memory(
         setup: (database) {

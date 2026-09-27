@@ -175,6 +175,14 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer>
               ),
             ),
             if (_expanded)
+              const Positioned.fill(
+                child: ModalBarrier(
+                  color: Colors.transparent,
+                  dismissible: false,
+                  barrierSemanticsDismissible: false,
+                ),
+              ),
+            if (_expanded)
               Positioned.fill(
                 child: _ExpandedPlayer(
                   track: track,
@@ -1083,7 +1091,11 @@ class _ProgressCircle extends StatelessWidget {
           children: [
             CustomPaint(
               size: const Size.square(_ringSize),
-              painter: _ProgressPainter(progress: progress, hovered: hovered),
+              painter: _ProgressPainter(
+                progress: progress,
+                hovered: hovered,
+                colorScheme: Theme.of(context).colorScheme,
+              ),
             ),
             Container(
               width: _circleSize,
@@ -1118,10 +1130,15 @@ class _ProgressCircle extends StatelessWidget {
 }
 
 class _ProgressPainter extends CustomPainter {
-  const _ProgressPainter({required this.progress, required this.hovered});
+  const _ProgressPainter({
+    required this.progress,
+    required this.hovered,
+    required this.colorScheme,
+  });
 
   final double progress;
   final bool hovered;
+  final ColorScheme colorScheme;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1133,7 +1150,7 @@ class _ProgressPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = hovered ? 3.5 : 3.2;
     final progressPaint = Paint()
-      ..color = const Color(0xFF80CBC4)
+      ..color = colorScheme.secondary
       ..style = PaintingStyle.stroke
       ..strokeWidth = hovered ? 4.2 : 3.2
       ..strokeCap = StrokeCap.round;
@@ -1156,19 +1173,21 @@ class _ProgressPainter extends CustomPainter {
       canvas.drawCircle(
         handleCenter,
         6.5,
-        Paint()..color = const Color(0xFFB2DFDB),
+        Paint()..color = colorScheme.secondaryContainer,
       );
       canvas.drawCircle(
         handleCenter,
         3,
-        Paint()..color = const Color(0xFF244744),
+        Paint()..color = colorScheme.onSecondaryContainer,
       );
     }
   }
 
   @override
   bool shouldRepaint(_ProgressPainter oldDelegate) =>
-      oldDelegate.progress != progress || oldDelegate.hovered != hovered;
+      oldDelegate.progress != progress ||
+      oldDelegate.hovered != hovered ||
+      oldDelegate.colorScheme != colorScheme;
 }
 
 class _ExpandedPlayer extends StatelessWidget {

@@ -1,8 +1,8 @@
-# 播放页 Isolation 流体背景
+# 播放页流光背景
 
 ## 状态
 
-已实现第一版，目标平台为 Linux。播放页只使用 Isolation 四色程序化流体，未移植 Mesh 或 Pixi。
+已实现第一版，目标平台为 Linux。播放页只使用 Isolation 四色程序化背景，未移植 Mesh 或 Pixi。
 
 ## 来源与许可证
 

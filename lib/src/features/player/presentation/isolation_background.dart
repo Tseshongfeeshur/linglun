@@ -7,7 +7,7 @@ import 'package:flutter/scheduler.dart';
 import '../domain/playback_background.dart';
 import '../domain/track.dart';
 
-/// Flutter 版 Isolation 流体背景。
+/// Flutter 版流光背景。
 class IsolationBackground extends StatefulWidget {
   const IsolationBackground({
     required this.track,

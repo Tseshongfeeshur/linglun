@@ -51,6 +51,7 @@ Uint8List _opusFixture() {
       headerType: 0,
       granule: 0,
     ),
+    ..._invalidOggPage(serial: serial, granule: 1728000),
     ..._oggPage(
       payload: [0],
       serial: serial,
@@ -73,7 +74,36 @@ List<int> _oggPage({
     ..setRange(6, 14, _littleEndian(granule, 8))
     ..setRange(14, 18, _littleEndian(serial, 4))
     ..[26] = 1;
-  return [...header, payload.length, ...payload];
+  final page = [...header, payload.length, ...payload];
+  final checksum = _oggChecksum(page);
+  page.setRange(22, 26, _littleEndian(checksum, 4));
+  return page;
+}
+
+List<int> _invalidOggPage({required int serial, required int granule}) {
+  final page = _oggPage(
+    payload: [1, 2, 3],
+    serial: serial,
+    headerType: 0,
+    granule: granule,
+  );
+  page[30] ^= 0xFF;
+  return page;
+}
+
+int _oggChecksum(List<int> page) {
+  var checksum = 0;
+  for (var index = 0; index < page.length; index++) {
+    final byte = index >= 22 && index < 26 ? 0 : page[index];
+    checksum ^= byte << 24;
+    for (var bit = 0; bit < 8; bit++) {
+      checksum = checksum & 0x80000000 != 0
+          ? (checksum << 1) ^ 0x04C11DB7
+          : checksum << 1;
+      checksum &= 0xFFFFFFFF;
+    }
+  }
+  return checksum;
 }
 
 List<int> _littleEndian(int value, int length) => [

@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-/// 播放页 Isolation 流体背景设置。
+/// 播放页流光背景设置。
 class PlaybackBackgroundSettings {
   const PlaybackBackgroundSettings({
     this.flowSpeed = 4,

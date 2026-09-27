@@ -278,32 +278,66 @@ class LibraryScanner {
   }
 
   _OggPage? _readOggPage(RandomAccessFile reader, {required bool readPayload}) {
-    final header = reader.readSync(27);
-    if (header.length != 27 || !_hasBytes(header, [0x4F, 0x67, 0x67, 0x53])) {
-      return null;
-    }
-    if (header[4] != 0) return null;
+    final fileLength = reader.lengthSync();
+    while (reader.positionSync() + 27 <= fileLength) {
+      final pageStart = reader.positionSync();
+      final header = reader.readSync(27);
+      if (header.length != 27 ||
+          !_hasBytes(header, [0x4F, 0x67, 0x67, 0x53]) ||
+          header[4] != 0) {
+        reader.setPositionSync(pageStart + 1);
+        continue;
+      }
 
-    final segmentCount = header[26];
-    final segmentTable = reader.readSync(segmentCount);
-    if (segmentTable.length != segmentCount) return null;
-    var payloadLength = 0;
-    for (final segmentLength in segmentTable) {
-      payloadLength += segmentLength;
-    }
+      final segmentCount = header[26];
+      final segmentTable = reader.readSync(segmentCount);
+      if (segmentTable.length != segmentCount) {
+        reader.setPositionSync(pageStart + 1);
+        continue;
+      }
+      var payloadLength = 0;
+      for (final segmentLength in segmentTable) {
+        payloadLength += segmentLength;
+      }
 
-    final payload = readPayload ? reader.readSync(payloadLength) : Uint8List(0);
-    if (readPayload && payload.length != payloadLength) return null;
-    if (!readPayload && payloadLength > 0) {
-      reader.setPositionSync(reader.positionSync() + payloadLength);
-    }
+      final rawPayload = reader.readSync(payloadLength);
+      if (rawPayload.length != payloadLength) {
+        reader.setPositionSync(pageStart + 1);
+        continue;
+      }
+      final rawPage = <int>[...header, ...segmentTable, ...rawPayload];
+      if (!_hasValidOggChecksum(rawPage)) {
+        // 压缩数据中可能偶然出现 OggS 字节序列，校验失败时继续寻找
+        // 下一个真实页面，避免把坏页误当成文件结尾。
+        reader.setPositionSync(pageStart + 1);
+        continue;
+      }
 
-    return _OggPage(
-      headerType: header[5],
-      granule: _readLittleEndianUint64(header, 6),
-      serial: _readLittleEndianUint32(header, 14),
-      payload: payload,
-    );
+      return _OggPage(
+        headerType: header[5],
+        granule: _readLittleEndianUint64(header, 6),
+        serial: _readLittleEndianUint32(header, 14),
+        payload: readPayload ? Uint8List.fromList(rawPayload) : Uint8List(0),
+      );
+    }
+    return null;
+  }
+
+  bool _hasValidOggChecksum(List<int> page) {
+    if (page.length < 27) return false;
+    final expected = _readLittleEndianUint32(page, 22);
+    var checksum = 0;
+    for (var index = 0; index < page.length; index++) {
+      final byte = index >= 22 && index < 26 ? 0 : page[index];
+      checksum ^= byte << 24;
+      for (var bit = 0; bit < 8; bit++) {
+        checksum = checksum & 0x80000000 != 0
+            ? (checksum << 1) ^ 0x04C11DB7
+            : checksum << 1;
+        checksum &= 0xFFFFFFFF;
+      }
+    }
+    return checksum == expected;
   }
 
   bool _isOpusHead(Uint8List payload) {
