@@ -944,23 +944,30 @@ class _SeekControl extends StatefulWidget {
 }
 
 class _SeekControlState extends State<_SeekControl> {
-  double? _previewMs;
+  double? _dragMs;
+  double? _hoverMs;
   bool _dragging = false;
 
   @override
   void didUpdateWidget(covariant _SeekControl oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_dragging && oldWidget.position != widget.position) {
-      _previewMs = null;
+    // 播放位置刷新不应覆盖鼠标悬停预览，否则原生标签会在实际位置和
+    // 悬停位置之间来回切换而闪烁。只有切换歌曲时，原来的预览位置才失效。
+    if (oldWidget.track.id != widget.track.id) {
+      _hoverMs = null;
+      _dragMs = null;
+      _dragging = false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final durationMs = math.max(1, widget.track.duration.inMilliseconds);
-    final currentMs = _previewMs ?? widget.position.inMilliseconds.toDouble();
+    final currentMs =
+        _dragMs ?? _hoverMs ?? widget.position.inMilliseconds.toDouble();
     final boundedMs = currentMs.clamp(0, durationMs.toDouble()).toDouble();
     final shownPosition = Duration(milliseconds: boundedMs.round());
+    final lyricLabel = '  ${_seekLyricLabel(shownPosition)}  ';
     final rightTime = widget.showRemainingTime
         ? widget.track.duration - shownPosition
         : widget.track.duration;
@@ -983,18 +990,39 @@ class _SeekControlState extends State<_SeekControl> {
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
             ),
             child: MouseRegion(
+              onHover: (event) {
+                if (widget.track.duration <= Duration.zero) return;
+                final width = context.size?.width ?? 0;
+                if (width <= 0) return;
+                final value = (event.localPosition.dx / width * durationMs)
+                    .clamp(0, durationMs.toDouble())
+                    .toDouble();
+                if ((_hoverMs ?? -1) == value) return;
+                setState(() => _hoverMs = value);
+              },
+              onExit: (_) {
+                if (_dragging) return;
+                if (_hoverMs != null) setState(() => _hoverMs = null);
+              },
               child: Slider(
                 padding: EdgeInsets.symmetric(vertical: 8),
                 min: 0,
                 max: durationMs.toDouble(),
                 value: boundedMs,
-                onChangeStart: (_) => setState(() => _dragging = true),
+                label: _dragging || _hoverMs != null ? lyricLabel : null,
+                showValueIndicator: lyricLabel == null
+                    ? ShowValueIndicator.never
+                    : ShowValueIndicator.alwaysVisible,
+                onChangeStart: (value) => setState(() {
+                  _dragging = true;
+                  _dragMs = value;
+                }),
                 onChanged: widget.track.duration <= Duration.zero
                     ? null
-                    : (value) => setState(() => _previewMs = value),
+                    : (value) => setState(() => _dragMs = value),
                 onChangeEnd: (value) {
                   setState(() {
-                    _previewMs = null;
+                    _dragMs = null;
                     _dragging = false;
                   });
                   widget.onSeek(Duration(milliseconds: value.round()));
@@ -1028,6 +1056,29 @@ class _SeekControlState extends State<_SeekControl> {
         ],
       ),
     );
+  }
+
+  String? _seekLyricLabel(Duration position) {
+    final document = widget.track.lyricsDocument;
+    if (!document.hasTimestamps) return null;
+
+    final lines = document.lines
+        .where(
+          (line) =>
+              line.role != LyricRole.translation && line.text.trim().isNotEmpty,
+        )
+        .toList(growable: false);
+    for (var index = lines.length - 1; index >= 0; index--) {
+      final line = lines[index];
+      if (position < line.start) continue;
+      final nextStart = index + 1 < lines.length
+          ? lines[index + 1].start
+          : null;
+      final end = _latestKnownLyricEnd(line) ?? nextStart;
+      if (end != null && position >= end) return null;
+      return line.text.trim();
+    }
+    return null;
   }
 }
 
