@@ -22,13 +22,13 @@ const _lyricTranslationFontWeight = FontWeight.w500;
 const _lyricBackgroundFontWeight = FontWeight.w600;
 const _lyricVerticalPaddingEm = .4;
 const _lyricFocusPosition = 1 / 3;
-const _lyricLineMotionDuration = Duration(milliseconds: 1500);
+const _lyricLineMotionDuration = Duration(milliseconds: 1400);
 const _lyricLineStaggerBaseDelay = Duration(milliseconds: 26);
 const _lyricLineStaggerCompression = 1.05;
 const _lyricLineUpperLead = Duration(milliseconds: 36);
 const _lyricSpringMass = 1.4;
 // 欠阻尼使动画从零初速自然加速，并以小幅过冲逐步衰减到目标位置。
-const _lyricSpringDampingRatio = .74;
+const _lyricSpringDampingRatio = .7;
 const _synchronizedLyricScrollDuration = Duration(milliseconds: 480);
 const _minimumInterludeGap = Duration(seconds: 7);
 const _lyricAutoFollowDelay = Duration(seconds: 3);

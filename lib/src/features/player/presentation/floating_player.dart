@@ -449,17 +449,9 @@ class _FloatingCluster extends ConsumerWidget {
           else ...[
             _LyricPreviewLine(line: currentLine, position: lyricPosition),
             if (currentLine.translation != null)
-              _LyricPreviewVariant(
-                text: currentLine.translation!,
-                words: currentLine.translationWords,
-                position: lyricPosition,
-              ),
+              _LyricPreviewVariant(text: currentLine.translation!),
             for (final variant in currentLine.variants)
-              _LyricPreviewVariant(
-                text: variant.text,
-                words: variant.words,
-                position: lyricPosition,
-              ),
+              _LyricPreviewVariant(text: variant.text),
           ],
         ],
       ),
@@ -492,9 +484,7 @@ class _FloatingCluster extends ConsumerWidget {
         : const EdgeInsets.only(top: 14);
     final collapsedInfoAnchor = Offset(
       circleCenterX +
-          (showLeft
-              ? infoOuterPadding.right / 2
-              : -infoOuterPadding.left / 2),
+          (showLeft ? infoOuterPadding.right / 2 : -infoOuterPadding.left / 2),
       circleCenterY,
     );
     final collapsedControlAnchor = Offset(
@@ -517,15 +507,10 @@ class _FloatingCluster extends ConsumerWidget {
         circleCenterY,
       ),
       collapsedTranslation: const Offset(-.5, -.5),
-        expandedTranslation: showLeft
+      expandedTranslation: showLeft
           ? const Offset(-1, -.5)
           : const Offset(0, -.5),
-      child: panel(
-        Padding(
-          padding: infoOuterPadding,
-          child: info,
-        ),
-      ),
+      child: panel(Padding(padding: infoOuterPadding, child: info)),
     );
     final controlMenu = _MenuMotion(
       expanded: panelsExpanded,
@@ -539,12 +524,7 @@ class _FloatingCluster extends ConsumerWidget {
       expandedTranslation: showAbove
           ? const Offset(-.5, -1)
           : const Offset(-.5, 0),
-      child: panel(
-        Padding(
-          padding: controlOuterPadding,
-          child: bubble,
-        ),
-      ),
+      child: panel(Padding(padding: controlOuterPadding, child: bubble)),
     );
 
     return Stack(
@@ -750,9 +730,10 @@ class _MorphingGlassBubbleState extends State<_MorphingGlassBubble> {
         ? Duration.zero
         : const Duration(milliseconds: 240);
     final expandedSize = _expandedSize(context);
-    final collapsedSize = widget.collapseToHeight
-        ? expandedSize.height
-        : expandedSize.width;
+    final collapsedSize = math.min(
+      widget.collapseToHeight ? expandedSize.height : expandedSize.width,
+      _circleSize,
+    );
     final size = widget.expanded ? expandedSize : Size.square(collapsedSize);
     final maxContentWidth = math.max(
       1.0,
@@ -850,74 +831,224 @@ class _LyricPreviewLine extends StatelessWidget {
           color: Theme.of(context).colorScheme.primary,
           fontSize: 15,
           height: 1,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w400,
           wordSpacing: 1,
         ),
       );
     }
 
-    return RichText(
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      text: TextSpan(
-        children: [
-          for (final word in line.words)
-            TextSpan(
-              text: word.text,
-              style: TextStyle(
-                color: word.start <= position
-                    ? Theme.of(context).colorScheme.onSurface
-                    : Colors.white54,
-                fontSize: 15,
-                height: 1,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1,
-              ),
-            ),
-        ],
-      ),
+    return _SimpleKaraokeText(
+      text: line.text,
+      words: line.words,
+      position: position,
+      fontSize: 15,
+      baseAlpha: .35,
+      highlightAlpha: .95,
     );
   }
 }
 
 class _LyricPreviewVariant extends StatelessWidget {
-  const _LyricPreviewVariant({
+  const _LyricPreviewVariant({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(color: Colors.white54, fontSize: 14, height: 1),
+    );
+  }
+}
+
+/// 浮动歌词菜单的轻量逐字高亮：只改变颜色和右侧羽化，不改变排版。
+class _SimpleKaraokeText extends StatelessWidget {
+  const _SimpleKaraokeText({
     required this.text,
     required this.words,
     required this.position,
+    required this.fontSize,
+    required this.baseAlpha,
+    required this.highlightAlpha,
   });
 
   final String text;
   final List<LyricWord> words;
   final Duration position;
+  final double fontSize;
+  final double baseAlpha;
+  final double highlightAlpha;
 
   @override
   Widget build(BuildContext context) {
-    if (words.isEmpty) {
-      return Text(
+    final style = TextStyle(
+      color: Colors.white,
+      fontSize: fontSize,
+      height: 1,
+      fontWeight: FontWeight(480),
+    );
+    return CustomPaint(
+      painter: _SimpleKaraokePainter(
+        text: text,
+        words: words,
+        position: position,
+        style: style,
+        baseAlpha: baseAlpha,
+        highlightAlpha: highlightAlpha,
+      ),
+      child: Text(
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: Colors.white54, fontSize: 13),
-      );
-    }
-    return RichText(
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      text: TextSpan(
-        children: [
-          for (final word in words)
-            TextSpan(
-              text: word.text,
-              style: TextStyle(
-                color: word.start <= position ? Colors.white70 : Colors.white38,
-                fontSize: 13,
-              ),
-            ),
-        ],
+        style: style.copyWith(color: Colors.transparent),
       ),
     );
   }
+}
+
+class _SimpleKaraokePainter extends CustomPainter {
+  _SimpleKaraokePainter({
+    required this.text,
+    required this.words,
+    required this.position,
+    required this.style,
+    required this.baseAlpha,
+    required this.highlightAlpha,
+  }) : _ranges = _simpleKaraokeWordRanges(text, words);
+
+  final String text;
+  final List<LyricWord> words;
+  final Duration position;
+  final TextStyle style;
+  final double baseAlpha;
+  final double highlightAlpha;
+  final List<(int, int)> _ranges;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.start,
+      maxLines: 1,
+      ellipsis: '…',
+    )..layout(maxWidth: size.width);
+    final brightPainter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: style.copyWith(color: Colors.white),
+      ),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.start,
+      maxLines: 1,
+      ellipsis: '…',
+    )..layout(maxWidth: size.width);
+
+    final base = baseAlpha.clamp(0.0, 1.0);
+    if (base < 1) {
+      canvas.saveLayer(
+        Offset.zero & size,
+        Paint()..color = Colors.white.withAlpha((base * 255).round()),
+      );
+    }
+    painter.paint(canvas, Offset.zero);
+    if (base < 1) canvas.restore();
+
+    for (var index = 0; index < words.length; index++) {
+      final range = index < _ranges.length ? _ranges[index] : (0, 0);
+      if (range.$2 <= range.$1) continue;
+      final boxes = painter.getBoxesForSelection(
+        TextSelection(baseOffset: range.$1, extentOffset: range.$2),
+      );
+      if (boxes.isEmpty) continue;
+
+      final word = words[index];
+      final end =
+          word.end ??
+          (index + 1 < words.length
+              ? words[index + 1].start
+              : word.start + const Duration(milliseconds: 350));
+      final duration = end - word.start;
+      final progress = duration <= Duration.zero
+          ? (position >= word.start ? 1.0 : 0.0)
+          : ((position - word.start).inMicroseconds / duration.inMicroseconds)
+                .clamp(0.0, 1.0);
+      if (progress <= 0) continue;
+
+      for (final box in boxes) {
+        final rect = box.toRect();
+        if (rect.isEmpty) continue;
+        if (progress >= 1) {
+          canvas.save();
+          canvas.clipRect(rect);
+          brightPainter.paint(canvas, Offset.zero);
+          canvas.restore();
+          continue;
+        }
+
+        final feather = math.min(.45, rect.height * .6 / rect.width);
+        final leadingStop = (progress - feather / 2).clamp(0.0, 1.0);
+        final trailingStop = (progress + feather / 2).clamp(0.0, 1.0);
+        final shader = LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: const [
+            Colors.white,
+            Colors.white,
+            Colors.transparent,
+            Colors.transparent,
+          ],
+          stops: [0, leadingStop, trailingStop, 1],
+        ).createShader(rect);
+
+        canvas.saveLayer(
+          rect,
+          Paint()
+            ..color = Colors.white.withAlpha(
+              (highlightAlpha.clamp(0.0, 1.0) * 255).round(),
+            ),
+        );
+        canvas.clipRect(rect);
+        brightPainter.paint(canvas, Offset.zero);
+        canvas.drawRect(
+          rect,
+          Paint()
+            ..shader = shader
+            ..blendMode = BlendMode.dstIn,
+        );
+        canvas.restore();
+      }
+    }
+
+    painter.dispose();
+    brightPainter.dispose();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SimpleKaraokePainter oldDelegate) =>
+      oldDelegate.text != text ||
+      oldDelegate.words != words ||
+      oldDelegate.position != position ||
+      oldDelegate.style != style ||
+      oldDelegate.baseAlpha != baseAlpha ||
+      oldDelegate.highlightAlpha != highlightAlpha;
+}
+
+List<(int, int)> _simpleKaraokeWordRanges(String text, List<LyricWord> words) {
+  final ranges = <(int, int)>[];
+  var cursor = 0;
+  for (final word in words) {
+    var start = text.indexOf(word.text, cursor);
+    if (start < 0) start = cursor;
+    final end = math.min(text.length, start + word.text.length);
+    ranges.add((start, end));
+    cursor = end;
+  }
+  return ranges;
 }
 
 class _ProgressCircle extends StatelessWidget {
