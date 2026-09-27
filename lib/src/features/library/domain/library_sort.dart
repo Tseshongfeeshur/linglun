@@ -36,7 +36,10 @@ List<Track> sortLibraryTracks(
 int _compareTrackValue(Track left, Track right, LibrarySortField field) {
   return switch (field) {
     LibrarySortField.title => _compareText(left.title, right.title),
-    LibrarySortField.artist => _compareText(left.artist, right.artist),
+    LibrarySortField.artist => _compareText(
+      left.artistNames.join(' '),
+      right.artistNames.join(' '),
+    ),
     LibrarySortField.album => _compareText(left.album, right.album),
     LibrarySortField.playCount => left.playCount.compareTo(right.playCount),
     LibrarySortField.duration => left.duration.compareTo(right.duration),

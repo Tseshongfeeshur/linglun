@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/player_controller.dart';
 import '../domain/lyrics.dart';
+import 'artist_label.dart';
 
 class LyricsPage extends ConsumerStatefulWidget {
   const LyricsPage({super.key});
@@ -82,7 +83,7 @@ class _LyricsPageState extends ConsumerState<LyricsPage> {
 
     return Column(
       children: [
-        _Header(trackTitle: track.title, artist: track.artist),
+        _Header(trackTitle: track.title, artists: track.artistNames),
         Expanded(child: lyricsContent),
       ],
     );
@@ -112,10 +113,10 @@ class _LyricsPageState extends ConsumerState<LyricsPage> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.trackTitle, required this.artist});
+  const _Header({required this.trackTitle, required this.artists});
 
   final String trackTitle;
-  final String artist;
+  final List<String> artists;
 
   @override
   Widget build(BuildContext context) {
@@ -125,10 +126,24 @@ class _Header extends StatelessWidget {
         children: [
           Text('歌词', style: Theme.of(context).textTheme.headlineMedium),
           const Spacer(),
-          Text(
-            '$trackTitle  ·  $artist',
-            style: const TextStyle(color: Colors.white60),
-            overflow: TextOverflow.ellipsis,
+          Flexible(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$trackTitle  ·  ',
+                    style: const TextStyle(color: Colors.white60),
+                  ),
+                  ...artistTextSpans(
+                    artists,
+                    style: const TextStyle(color: Colors.white60),
+                    separatorColor: Colors.white38,
+                  ),
+                ],
+              ),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+            ),
           ),
         ],
       ),

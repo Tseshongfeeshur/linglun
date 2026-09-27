@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/library_controller.dart';
 import '../../player/application/player_controller.dart';
 import '../../player/domain/track.dart';
+import '../../player/presentation/artist_label.dart';
 
 /// 展示按专辑归类的曲目，作为播放页和专辑视觉设计的基础列表。
 class AlbumsPage extends ConsumerWidget {
@@ -29,7 +30,7 @@ class ArtistsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tracks = ref.watch(libraryControllerProvider).tracks;
-    final artists = _groupBy(tracks, (track) => track.artist);
+    final artists = _groupByMany(tracks, (track) => track.artistNames);
     return _CollectionPage(
       title: '艺术家',
       emptyText: '扫描本地歌曲后，这里会显示艺术家。',
@@ -135,7 +136,11 @@ class _CollectionGroup extends StatelessWidget {
               contentPadding: const EdgeInsets.symmetric(horizontal: 8),
               leading: _CollectionCover(track: track),
               title: Text(track.title),
-              subtitle: Text(track.artist),
+              subtitle: ArtistLabel(
+                artists: track.artistNames,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
               trailing: IconButton(
                 tooltip: '播放',
                 onPressed: () => ref
@@ -199,6 +204,24 @@ Map<String, List<Track>> _groupBy(
   final groups = <String, List<Track>>{};
   for (final track in tracks) {
     groups.putIfAbsent(keyOf(track), () => []).add(track);
+  }
+  return Map.fromEntries(
+    groups.entries.toList()
+      ..sort((a, b) => a.key.toLowerCase().compareTo(b.key.toLowerCase())),
+  );
+}
+
+Map<String, List<Track>> _groupByMany(
+  Iterable<Track> tracks,
+  Iterable<String> Function(Track) keysOf,
+) {
+  final groups = <String, List<Track>>{};
+  for (final track in tracks) {
+    for (final key in keysOf(track)) {
+      final normalized = key.trim();
+      if (normalized.isEmpty) continue;
+      groups.putIfAbsent(normalized, () => []).add(track);
+    }
   }
   return Map.fromEntries(
     groups.entries.toList()

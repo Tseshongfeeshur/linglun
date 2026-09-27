@@ -47,6 +47,7 @@ class LibraryRepository {
           coverBytes: Value(track.coverBytes),
           title: track.title,
           artist: track.artist,
+          artistsJson: Value(jsonEncode(track.artistNames)),
           album: track.album,
           durationMs: track.duration.inMilliseconds,
           coverColor: track.coverColor,
@@ -90,6 +91,7 @@ class LibraryRepository {
       coverBytes: row.coverBytes,
       title: row.title,
       artist: row.artist,
+      artists: _decodeArtists(row.artistsJson, row.artist),
       album: row.album,
       duration: Duration(milliseconds: row.durationMs),
       lyrics: row.lyrics,
@@ -139,6 +141,24 @@ class LibraryRepository {
       // 旧版本或损坏的详情数据不应影响曲库加载。
     }
     return const {};
+  }
+
+  List<String> _decodeArtists(String? value, String fallback) {
+    if (value != null && value.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is List) {
+          final artists = decoded
+              .map((item) => item.toString().trim())
+              .where((item) => item.isNotEmpty)
+              .toList(growable: false);
+          if (artists.isNotEmpty) return artists;
+        }
+      } on FormatException {
+        // 损坏的艺术家列表回退到兼容字段。
+      }
+    }
+    return splitArtistNames(fallback);
   }
 
   List<LyricsSource> _decodeLyricsSources(String? value) {

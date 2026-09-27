@@ -79,6 +79,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                     child: ScanProgressDialog(
                       path: libraryState.scanPath,
                       stage: libraryState.scanStage,
+                      artists: libraryState.scanArtists,
                     ),
                   ),
                 ),

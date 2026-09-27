@@ -22,6 +22,7 @@ class LibraryState {
     this.error,
     this.scanPath,
     this.scanStage,
+    this.scanArtists = const [],
   });
 
   final List<Track> tracks;
@@ -30,6 +31,7 @@ class LibraryState {
   final String? error;
   final String? scanPath;
   final String? scanStage;
+  final List<String> scanArtists;
 
   LibraryState copyWith({
     List<Track>? tracks,
@@ -38,6 +40,7 @@ class LibraryState {
     String? error,
     String? scanPath,
     String? scanStage,
+    List<String>? scanArtists,
     bool clearError = false,
     bool clearScanProgress = false,
   }) {
@@ -48,6 +51,9 @@ class LibraryState {
       error: clearError ? null : error ?? this.error,
       scanPath: clearScanProgress ? null : scanPath ?? this.scanPath,
       scanStage: clearScanProgress ? null : scanStage ?? this.scanStage,
+      scanArtists: clearScanProgress
+          ? const []
+          : scanArtists ?? this.scanArtists,
     );
   }
 }
@@ -105,6 +111,7 @@ class LibraryController extends Notifier<LibraryState> {
       isScanning: true,
       scanPath: null,
       scanStage: '准备扫描歌曲',
+      scanArtists: const [],
       clearError: true,
       clearScanProgress: false,
     );
@@ -117,8 +124,12 @@ class LibraryController extends Notifier<LibraryState> {
       final tracks = await _scanner.scan(
         roots,
         previousTracks: previousTracks,
-        onProgress: ({required path, required stage}) {
-          state = state.copyWith(scanPath: path, scanStage: stage);
+        onProgress: ({required path, required stage, artists}) {
+          state = state.copyWith(
+            scanPath: path,
+            scanStage: stage,
+            scanArtists: artists ?? const [],
+          );
         },
       );
       state = state.copyWith(

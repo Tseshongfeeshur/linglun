@@ -43,6 +43,7 @@ const _ffmpegTimeout = Duration(minutes: 2);
 typedef ScanProgressCallback = void Function({
   required String path,
   required String stage,
+  List<String>? artists,
 });
 
 class _OggPage {
@@ -124,6 +125,9 @@ class LibraryScanner {
       await Future<void>.delayed(Duration.zero);
       final detailed = readAllMetadata(file, getImage: true);
       final metadata = _summaryMetadata(file, detailed);
+      final artistText = _clean(metadata.artist) ?? '未知艺术家';
+      final artists = splitArtistNames(artistText);
+      onProgress?.call(path: file.path, stage: '读取音频元数据', artists: artists);
       final preciseDuration = _readOpusOggDuration(file);
       if (preciseDuration != null) {
         // Opus 的 Ogg 粒度位置使用固定的 48 kHz 时钟，不能使用
@@ -155,17 +159,14 @@ class LibraryScanner {
           : analyzeCover(coverBytes);
       final beatEnvelope = canReuseAnalysis
           ? previousTrack?.beatEnvelope
-          : await _analyzeBeat(
-              file,
-              metadata.duration,
-              onProgress: onProgress,
-            );
+          : await _analyzeBeat(file, metadata.duration, onProgress: onProgress);
       return Track(
         id: file.path,
         path: file.path,
         coverBytes: coverBytes,
         title: _clean(metadata.title) ?? fallbackTitle,
-        artist: _clean(metadata.artist) ?? '未知艺术家',
+        artist: artistText,
+        artists: artists,
         album: _clean(metadata.album) ?? '未知专辑',
         duration: metadata.duration ?? Duration.zero,
         lyrics: selectedLyrics?.content,

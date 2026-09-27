@@ -14,6 +14,7 @@ import '../domain/lyrics.dart';
 import '../domain/track.dart';
 import 'lyric_emphasis.dart';
 import 'isolation_background.dart';
+import 'artist_label.dart';
 
 const _pageAnimationCurve = Curves.easeOutCubic;
 const _lyricDefaultFontSize = 38.0;
@@ -992,10 +993,10 @@ class _TrackMetadata extends StatelessWidget {
           textAlign: TextAlign.start,
         ),
         const SizedBox(height: 8),
-        Text(
-          _artistAlbumLabel(track.artist, track.album),
+        ArtistLabel(
+          artists: track.artistNames,
+          suffix: track.album.trim().isEmpty ? null : ' · ${track.album}',
           maxLines: 1,
-          softWrap: false,
           overflow: TextOverflow.ellipsis,
           textAlign: TextAlign.start,
           style: TextStyle(
@@ -4455,8 +4456,10 @@ class _QueueOverlay extends StatelessWidget {
                                               : FontWeight.w400,
                                         ),
                                       ),
-                                      subtitle: Text(
-                                        '${track.artist} · ${_formatDuration(track.duration)}',
+                                      subtitle: ArtistLabel(
+                                        artists: track.artistNames,
+                                        suffix:
+                                            ' · ${_formatDuration(track.duration)}',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
@@ -4830,14 +4833,6 @@ TextAlign _variantAlignment(
   return _isRightAligned(variant.speaker ?? _lineSpeaker(line), speakerOrder)
       ? TextAlign.end
       : TextAlign.start;
-}
-
-String _artistAlbumLabel(String artist, String album) {
-  final normalizedArtist = artist.trim();
-  final normalizedAlbum = album.trim();
-  if (normalizedArtist.isEmpty) return normalizedAlbum;
-  if (normalizedAlbum.isEmpty) return normalizedArtist;
-  return '$normalizedArtist · $normalizedAlbum';
 }
 
 double _wideCoverDetailsGap(double height) {

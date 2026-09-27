@@ -11,6 +11,7 @@ void main() {
           body: ScanProgressDialog(
             path: filePath,
             stage: '提取专辑封面主色',
+            artists: ['甲', '乙'],
           ),
         ),
       ),
@@ -20,5 +21,13 @@ void main() {
     expect(find.text('提取专辑封面主色'), findsOneWidget);
     expect(find.text('第一首歌.flac'), findsOneWidget);
     expect(find.text(filePath), findsOneWidget);
+    expect(find.text('艺术家：'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is RichText && widget.text.toPlainText().contains('甲 / 乙'),
+      ),
+      findsOneWidget,
+    );
   });
 }

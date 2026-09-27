@@ -13,6 +13,7 @@ class LibraryTracks extends Table {
   BlobColumn get coverBytes => blob().nullable()();
   TextColumn get title => text()();
   TextColumn get artist => text()();
+  TextColumn get artistsJson => text().nullable()();
   TextColumn get album => text()();
   IntColumn get durationMs => integer()();
   IntColumn get coverColor => integer()();
@@ -65,7 +66,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -103,8 +104,14 @@ class AppDatabase extends _$AppDatabase {
       if (from < 10) {
         await _ensureLibraryVisualColumns();
       }
+      if (from < 11) {
+        await _ensureArtistColumns();
+      }
     },
-    beforeOpen: (_) => _ensureLibraryVisualColumns(),
+    beforeOpen: (_) async {
+      await _ensureLibraryVisualColumns();
+      await _ensureArtistColumns();
+    },
   );
 
   Future<List<LibraryTrack>> loadTracks() => select(libraryTracks).get();
@@ -198,6 +205,19 @@ class AppDatabase extends _$AppDatabase {
     if (!names.contains('beat_envelope_json')) {
       await customStatement(
         'ALTER TABLE library_tracks ADD COLUMN beat_envelope_json TEXT',
+      );
+    }
+  }
+
+  Future<void> _ensureArtistColumns() async {
+    final columns = await customSelect('PRAGMA table_info(library_tracks)')
+        .get();
+    if (columns.isEmpty) return;
+
+    final names = columns.map((row) => row.read<String>('name')).toSet();
+    if (!names.contains('artists_json')) {
+      await customStatement(
+        'ALTER TABLE library_tracks ADD COLUMN artists_json TEXT',
       );
     }
   }

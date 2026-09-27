@@ -10,6 +10,7 @@ class Track {
     required this.id,
     required this.title,
     required this.artist,
+    this.artists = const [],
     required this.album,
     required this.duration,
     this.path,
@@ -32,6 +33,9 @@ class Track {
   final String id;
   final String title;
   final String artist;
+
+  /// 扫描后拆分出的艺术家列表。为空时兼容旧数据并从 artist 现场拆分。
+  final List<String> artists;
   final String album;
   final Duration duration;
   final String? path;
@@ -54,6 +58,9 @@ class Track {
   final FluidPalette? fluidPalette;
   final BeatEnvelope? beatEnvelope;
 
+  List<String> get artistNames =>
+      artists.isEmpty ? splitArtistNames(artist) : artists;
+
   /// 统一的歌词文档，供各个界面直接消费，避免渲染层重复解析原始文本。
   LyricsDocument get lyricsDocument {
     final sources = lyricsSources.isEmpty && lyrics != null
@@ -71,6 +78,7 @@ class Track {
   Track copyWith({
     String? title,
     String? artist,
+    List<String>? artists,
     String? album,
     Duration? duration,
     String? path,
@@ -83,6 +91,7 @@ class Track {
       id: id,
       title: title ?? this.title,
       artist: artist ?? this.artist,
+      artists: artists ?? this.artists,
       album: album ?? this.album,
       duration: duration ?? this.duration,
       path: path ?? this.path,
@@ -102,6 +111,16 @@ class Track {
       beatEnvelope: beatEnvelope,
     );
   }
+}
+
+/// 按本地音乐标签中常见的多人分隔符拆分艺术家名称。
+List<String> splitArtistNames(String value) {
+  final names = value
+      .split(RegExp(r'\s*[/、;&]\s*'))
+      .map((name) => name.trim())
+      .where((name) => name.isNotEmpty)
+      .toList(growable: false);
+  return names.isEmpty ? const ['未知艺术家'] : names;
 }
 
 const demoTracks = [

@@ -5,6 +5,7 @@ import '../application/library_controller.dart';
 import '../domain/library_sort.dart';
 import '../../player/application/player_controller.dart';
 import '../../player/domain/track.dart';
+import '../../player/presentation/artist_label.dart';
 
 class LibraryPage extends ConsumerStatefulWidget {
   const LibraryPage({super.key});
@@ -25,7 +26,7 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
     final filteredTracks = sourceTracks.where((track) {
       final query = _query.trim().toLowerCase();
       if (query.isEmpty) return true;
-      return '${track.title} ${track.artist} ${track.album}'
+      return '${track.title} ${track.artistNames.join(' ')} ${track.album}'
           .toLowerCase()
           .contains(query);
     }).toList();
@@ -190,7 +191,13 @@ class _TrackTile extends ConsumerWidget {
             fontWeight: isCurrent ? FontWeight.w600 : null,
           ),
         ),
-        subtitle: Text('${track.artist}  ·  ${track.album}'),
+        subtitle: ArtistLabel(
+          artists: track.artistNames,
+          suffix: '  ·  ${track.album}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: Colors.white.withAlpha(190)),
+        ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -349,7 +356,7 @@ class _TrackDetailsDialog extends StatelessWidget {
     final hasLyrics = lyricDocument.plainLyrics.trim().isNotEmpty;
     final values = <String, String>{
       '标题': track.title,
-      '艺术家': track.artist,
+      '艺术家': track.artistNames.join(' / '),
       '专辑': track.album,
       '时长': track.duration.toString().split('.').first,
       '播放次数': '${track.playCount}',

@@ -116,10 +116,10 @@ void main() {
         .first;
     final idleThumb =
         tester.widget<SliderTheme>(sliderThemeFinder).data.thumbShape!
-            as RoundSliderThumbShape;
-    expect(idleThumb.enabledThumbRadius, 5);
-    expect(idleThumb.elevation, 1);
-    expect(idleThumb.pressedElevation, 6);
+            as RoundedRectSliderThumbShape;
+    expect(idleThumb.thumbWidth, 3);
+    expect(idleThumb.thumbHeight, 12);
+    expect(idleThumb.borderRadius, 9);
     expect(
       tester.widget<SliderTheme>(sliderThemeFinder).data.thumbColor,
       Colors.white,
@@ -135,10 +135,10 @@ void main() {
         .first;
     final hoveredThumb =
         tester.widget<SliderTheme>(sliderThemeFinder).data.thumbShape!
-            as RoundSliderThumbShape;
-    expect(hoveredThumb.enabledThumbRadius, 5);
-    expect(hoveredThumb.elevation, 1);
-    expect(hoveredThumb.pressedElevation, 6);
+            as RoundedRectSliderThumbShape;
+    expect(hoveredThumb.thumbWidth, 3);
+    expect(hoveredThumb.thumbHeight, 12);
+    expect(hoveredThumb.borderRadius, 9);
     expect(
       tester.widget<SliderTheme>(sliderThemeFinder).data.thumbColor,
       Colors.white,
@@ -181,7 +181,7 @@ void main() {
     );
     expect(
       tester.widget<SliderTheme>(sliderThemeFinder).data.trackHeight!,
-      greaterThan(initialTrackHeight),
+      initialTrackHeight,
     );
 
     tester.view.physicalSize = const Size(1280, 600);

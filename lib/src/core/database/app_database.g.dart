@@ -58,6 +58,17 @@ class $LibraryTracksTable extends LibraryTracks
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _artistsJsonMeta = const VerificationMeta(
+    'artistsJson',
+  );
+  @override
+  late final GeneratedColumn<String> artistsJson = GeneratedColumn<String>(
+    'artists_json',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _albumMeta = const VerificationMeta('album');
   @override
   late final GeneratedColumn<String> album = GeneratedColumn<String>(
@@ -239,6 +250,7 @@ class $LibraryTracksTable extends LibraryTracks
     coverBytes,
     title,
     artist,
+    artistsJson,
     album,
     durationMs,
     coverColor,
@@ -302,6 +314,15 @@ class $LibraryTracksTable extends LibraryTracks
       );
     } else if (isInserting) {
       context.missing(_artistMeta);
+    }
+    if (data.containsKey('artists_json')) {
+      context.handle(
+        _artistsJsonMeta,
+        artistsJson.isAcceptableOrUnknown(
+          data['artists_json']!,
+          _artistsJsonMeta,
+        ),
+      );
     }
     if (data.containsKey('album')) {
       context.handle(
@@ -460,6 +481,10 @@ class $LibraryTracksTable extends LibraryTracks
         DriftSqlType.string,
         data['${effectivePrefix}artist'],
       )!,
+      artistsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}artists_json'],
+      ),
       album: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}album'],
@@ -539,6 +564,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
   final Uint8List? coverBytes;
   final String title;
   final String artist;
+  final String? artistsJson;
   final String album;
   final int durationMs;
   final int coverColor;
@@ -561,6 +587,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     this.coverBytes,
     required this.title,
     required this.artist,
+    this.artistsJson,
     required this.album,
     required this.durationMs,
     required this.coverColor,
@@ -588,6 +615,9 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     }
     map['title'] = Variable<String>(title);
     map['artist'] = Variable<String>(artist);
+    if (!nullToAbsent || artistsJson != null) {
+      map['artists_json'] = Variable<String>(artistsJson);
+    }
     map['album'] = Variable<String>(album);
     map['duration_ms'] = Variable<int>(durationMs);
     map['cover_color'] = Variable<int>(coverColor);
@@ -638,6 +668,9 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
           : Value(coverBytes),
       title: Value(title),
       artist: Value(artist),
+      artistsJson: artistsJson == null && nullToAbsent
+          ? const Value.absent()
+          : Value(artistsJson),
       album: Value(album),
       durationMs: Value(durationMs),
       coverColor: Value(coverColor),
@@ -690,6 +723,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       coverBytes: serializer.fromJson<Uint8List?>(json['coverBytes']),
       title: serializer.fromJson<String>(json['title']),
       artist: serializer.fromJson<String>(json['artist']),
+      artistsJson: serializer.fromJson<String?>(json['artistsJson']),
       album: serializer.fromJson<String>(json['album']),
       durationMs: serializer.fromJson<int>(json['durationMs']),
       coverColor: serializer.fromJson<int>(json['coverColor']),
@@ -719,6 +753,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
       'coverBytes': serializer.toJson<Uint8List?>(coverBytes),
       'title': serializer.toJson<String>(title),
       'artist': serializer.toJson<String>(artist),
+      'artistsJson': serializer.toJson<String?>(artistsJson),
       'album': serializer.toJson<String>(album),
       'durationMs': serializer.toJson<int>(durationMs),
       'coverColor': serializer.toJson<int>(coverColor),
@@ -744,6 +779,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     Value<Uint8List?> coverBytes = const Value.absent(),
     String? title,
     String? artist,
+    Value<String?> artistsJson = const Value.absent(),
     String? album,
     int? durationMs,
     int? coverColor,
@@ -766,6 +802,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     coverBytes: coverBytes.present ? coverBytes.value : this.coverBytes,
     title: title ?? this.title,
     artist: artist ?? this.artist,
+    artistsJson: artistsJson.present ? artistsJson.value : this.artistsJson,
     album: album ?? this.album,
     durationMs: durationMs ?? this.durationMs,
     coverColor: coverColor ?? this.coverColor,
@@ -800,6 +837,9 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
           : this.coverBytes,
       title: data.title.present ? data.title.value : this.title,
       artist: data.artist.present ? data.artist.value : this.artist,
+      artistsJson: data.artistsJson.present
+          ? data.artistsJson.value
+          : this.artistsJson,
       album: data.album.present ? data.album.value : this.album,
       durationMs: data.durationMs.present
           ? data.durationMs.value
@@ -849,6 +889,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
           ..write('coverBytes: $coverBytes, ')
           ..write('title: $title, ')
           ..write('artist: $artist, ')
+          ..write('artistsJson: $artistsJson, ')
           ..write('album: $album, ')
           ..write('durationMs: $durationMs, ')
           ..write('coverColor: $coverColor, ')
@@ -876,6 +917,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
     $driftBlobEquality.hash(coverBytes),
     title,
     artist,
+    artistsJson,
     album,
     durationMs,
     coverColor,
@@ -902,6 +944,7 @@ class LibraryTrack extends DataClass implements Insertable<LibraryTrack> {
           $driftBlobEquality.equals(other.coverBytes, this.coverBytes) &&
           other.title == this.title &&
           other.artist == this.artist &&
+          other.artistsJson == this.artistsJson &&
           other.album == this.album &&
           other.durationMs == this.durationMs &&
           other.coverColor == this.coverColor &&
@@ -926,6 +969,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
   final Value<Uint8List?> coverBytes;
   final Value<String> title;
   final Value<String> artist;
+  final Value<String?> artistsJson;
   final Value<String> album;
   final Value<int> durationMs;
   final Value<int> coverColor;
@@ -949,6 +993,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     this.coverBytes = const Value.absent(),
     this.title = const Value.absent(),
     this.artist = const Value.absent(),
+    this.artistsJson = const Value.absent(),
     this.album = const Value.absent(),
     this.durationMs = const Value.absent(),
     this.coverColor = const Value.absent(),
@@ -973,6 +1018,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     this.coverBytes = const Value.absent(),
     required String title,
     required String artist,
+    this.artistsJson = const Value.absent(),
     required String album,
     required int durationMs,
     required int coverColor,
@@ -1004,6 +1050,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     Expression<Uint8List>? coverBytes,
     Expression<String>? title,
     Expression<String>? artist,
+    Expression<String>? artistsJson,
     Expression<String>? album,
     Expression<int>? durationMs,
     Expression<int>? coverColor,
@@ -1028,6 +1075,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
       if (coverBytes != null) 'cover_bytes': coverBytes,
       if (title != null) 'title': title,
       if (artist != null) 'artist': artist,
+      if (artistsJson != null) 'artists_json': artistsJson,
       if (album != null) 'album': album,
       if (durationMs != null) 'duration_ms': durationMs,
       if (coverColor != null) 'cover_color': coverColor,
@@ -1054,6 +1102,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     Value<Uint8List?>? coverBytes,
     Value<String>? title,
     Value<String>? artist,
+    Value<String?>? artistsJson,
     Value<String>? album,
     Value<int>? durationMs,
     Value<int>? coverColor,
@@ -1078,6 +1127,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
       coverBytes: coverBytes ?? this.coverBytes,
       title: title ?? this.title,
       artist: artist ?? this.artist,
+      artistsJson: artistsJson ?? this.artistsJson,
       album: album ?? this.album,
       durationMs: durationMs ?? this.durationMs,
       coverColor: coverColor ?? this.coverColor,
@@ -1115,6 +1165,9 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
     }
     if (artist.present) {
       map['artist'] = Variable<String>(artist.value);
+    }
+    if (artistsJson.present) {
+      map['artists_json'] = Variable<String>(artistsJson.value);
     }
     if (album.present) {
       map['album'] = Variable<String>(album.value);
@@ -1178,6 +1231,7 @@ class LibraryTracksCompanion extends UpdateCompanion<LibraryTrack> {
           ..write('coverBytes: $coverBytes, ')
           ..write('title: $title, ')
           ..write('artist: $artist, ')
+          ..write('artistsJson: $artistsJson, ')
           ..write('album: $album, ')
           ..write('durationMs: $durationMs, ')
           ..write('coverColor: $coverColor, ')
@@ -1966,6 +2020,7 @@ typedef $$LibraryTracksTableCreateCompanionBuilder =
       Value<Uint8List?> coverBytes,
       required String title,
       required String artist,
+      Value<String?> artistsJson,
       required String album,
       required int durationMs,
       required int coverColor,
@@ -1991,6 +2046,7 @@ typedef $$LibraryTracksTableUpdateCompanionBuilder =
       Value<Uint8List?> coverBytes,
       Value<String> title,
       Value<String> artist,
+      Value<String?> artistsJson,
       Value<String> album,
       Value<int> durationMs,
       Value<int> coverColor,
@@ -2041,6 +2097,11 @@ class $$LibraryTracksTableFilterComposer
 
   ColumnFilters<String> get artist => $composableBuilder(
     column: $table.artist,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get artistsJson => $composableBuilder(
+    column: $table.artistsJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2159,6 +2220,11 @@ class $$LibraryTracksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get artistsJson => $composableBuilder(
+    column: $table.artistsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get album => $composableBuilder(
     column: $table.album,
     builder: (column) => ColumnOrderings(column),
@@ -2265,6 +2331,11 @@ class $$LibraryTracksTableAnnotationComposer
 
   GeneratedColumn<String> get artist =>
       $composableBuilder(column: $table.artist, builder: (column) => column);
+
+  GeneratedColumn<String> get artistsJson => $composableBuilder(
+    column: $table.artistsJson,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get album =>
       $composableBuilder(column: $table.album, builder: (column) => column);
@@ -2373,6 +2444,7 @@ class $$LibraryTracksTableTableManager
                 Value<Uint8List?> coverBytes = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<String> artist = const Value.absent(),
+                Value<String?> artistsJson = const Value.absent(),
                 Value<String> album = const Value.absent(),
                 Value<int> durationMs = const Value.absent(),
                 Value<int> coverColor = const Value.absent(),
@@ -2396,6 +2468,7 @@ class $$LibraryTracksTableTableManager
                 coverBytes: coverBytes,
                 title: title,
                 artist: artist,
+                artistsJson: artistsJson,
                 album: album,
                 durationMs: durationMs,
                 coverColor: coverColor,
@@ -2421,6 +2494,7 @@ class $$LibraryTracksTableTableManager
                 Value<Uint8List?> coverBytes = const Value.absent(),
                 required String title,
                 required String artist,
+                Value<String?> artistsJson = const Value.absent(),
                 required String album,
                 required int durationMs,
                 required int coverColor,
@@ -2444,6 +2518,7 @@ class $$LibraryTracksTableTableManager
                 coverBytes: coverBytes,
                 title: title,
                 artist: artist,
+                artistsJson: artistsJson,
                 album: album,
                 durationMs: durationMs,
                 coverColor: coverColor,

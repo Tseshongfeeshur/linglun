@@ -13,7 +13,7 @@ void main() {
     final columnNames = columns.map((row) => row.read<String>('name')).toSet();
     expect(
       columnNames,
-      containsAll(['fluid_palette_json', 'beat_envelope_json']),
+      containsAll(['fluid_palette_json', 'beat_envelope_json', 'artists_json']),
     );
 
     await database.saveSetting('test.setting', '{"enabled":true}');
@@ -64,7 +64,7 @@ void main() {
     final columnNames = columns.map((row) => row.read<String>('name')).toSet();
     expect(
       columnNames,
-      containsAll(['fluid_palette_json', 'beat_envelope_json']),
+      containsAll(['fluid_palette_json', 'beat_envelope_json', 'artists_json']),
     );
   });
 }

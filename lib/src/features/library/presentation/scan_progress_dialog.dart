@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as path_util;
 
+import '../../player/presentation/artist_label.dart';
+
 /// 扫描期间阻止误触其他播放操作，并展示扫描器当前处理位置。
 class ScanProgressDialog extends StatelessWidget {
   const ScanProgressDialog({
     required this.path,
     required this.stage,
+    this.artists = const [],
     super.key,
   });
 
   final String? path;
   final String? stage;
+  final List<String> artists;
 
   @override
   Widget build(BuildContext context) {
@@ -49,13 +53,32 @@ class ScanProgressDialog extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
+              if (artists.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Text(
+                      '艺术家：',
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: Colors.white60),
+                    ),
+                    Expanded(
+                      child: ArtistLabel(
+                        artists: artists,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 6),
               SelectableText(
                 path ?? '正在查找音频文件…',
                 maxLines: 3,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white60,
-                ),
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: Colors.white60),
               ),
               const SizedBox(height: 20),
               const LinearProgressIndicator(),
