@@ -17,6 +17,7 @@ import 'isolation_background.dart';
 
 const _pageAnimationCurve = Curves.easeOutCubic;
 const _lyricDefaultFontSize = 38.0;
+const _wideLyricsHeightFactor = .9;
 const _lyricLetterSpacing = .1;
 const _lyricMainFontWeight = FontWeight(450);
 const _lyricTranslationFontWeight = FontWeight.w500;
@@ -408,13 +409,20 @@ class _WidePlaybackLayout extends StatelessWidget {
             flex: 1,
             child: SizedBox.expand(
               key: const ValueKey('wide-lyrics-pane'),
-              child: _LyricsViewport(
-                key: const ValueKey('wide-lyrics'),
-                track: track,
-                state: state,
-                onSeek: onSeek,
-                seekRequest: seekRequest,
-                compact: false,
+              child: Align(
+                alignment: Alignment.center,
+                child: FractionallySizedBox(
+                  widthFactor: 1,
+                  heightFactor: _wideLyricsHeightFactor,
+                  child: _LyricsViewport(
+                    key: const ValueKey('wide-lyrics'),
+                    track: track,
+                    state: state,
+                    onSeek: onSeek,
+                    seekRequest: seekRequest,
+                    compact: false,
+                  ),
+                ),
               ),
             ),
           ),

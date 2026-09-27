@@ -76,6 +76,11 @@ void main() {
       find.byKey(const ValueKey('wide-lyrics-pane')),
     );
     expect(leftPane.width, closeTo(rightPane.width, .01));
+    final lyricsViewport = tester.getRect(
+      find.byKey(const ValueKey('wide-lyrics')),
+    );
+    expect(lyricsViewport.height, closeTo(rightPane.height * .9, .01));
+    expect(lyricsViewport.center.dy, closeTo(rightPane.center.dy, .01));
     final trackStack = find.byKey(const ValueKey('wide-track-stack'));
     final initialTrackStackRect = tester.getRect(trackStack);
     expect(initialTrackStackRect.center.dy, closeTo(leftPane.center.dy, .5));
