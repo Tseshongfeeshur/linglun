@@ -39,6 +39,25 @@ vec3 linearToSrgb(vec3 color) {
   return pow(max(color, vec3(0.0)), vec3(1.0 / 2.2));
 }
 
+vec3 protectHighlights(vec3 linearColor) {
+  const float highlightThreshold = 0.62;
+  const float kneeStrength = 1.8;
+  float luminance = dot(
+    linearColor,
+    vec3(0.2126, 0.7152, 0.0722)
+  );
+
+  if (luminance <= highlightThreshold || luminance <= 0.0001) {
+    return linearColor;
+  }
+
+  // 只压缩流光背景的高亮区域，保留暗部和中间调，避免影响歌词与控件的对比度。
+  float excess = luminance - highlightThreshold;
+  float compressedLuminance = highlightThreshold
+      + excess / (1.0 + excess * kneeStrength);
+  return linearColor * (compressedLuminance / luminance);
+}
+
 void main() {
   vec2 uv = FlutterFragCoord().xy / uSize;
   vec2 point = uv - 0.5;
@@ -59,7 +78,9 @@ void main() {
   vec3 bottom = mix(uColor2, uColor3, horizontal);
   vec3 color = mix(top, bottom, vertical);
   color = mix(color, color * (1.0 + uPulse * 0.02), uPulse);
-  color = linearToSrgb(srgbToLinear(color));
+  vec3 linearColor = srgbToLinear(color);
+  linearColor = protectHighlights(linearColor);
+  color = linearToSrgb(linearColor);
   color += (hash(FlutterFragCoord().xy + uRandom.xy * 97.0) - 0.5) / 255.0;
   fragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
 }
