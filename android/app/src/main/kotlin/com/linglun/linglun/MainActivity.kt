@@ -163,7 +163,7 @@ class MainActivity : AudioServiceActivity() {
                     source = source,
                     durationMs = durationMs,
                     isCancelled = { cancelledPcmAnalyses.contains(requestId) },
-                    onProgress = { progress ->
+                    onProgress = { progress, offset, values ->
                         runOnUiThread {
                             if (!cancelledPcmAnalyses.contains(requestId)) {
                                 mediaLibraryChannel?.invokeMethod(
@@ -171,6 +171,8 @@ class MainActivity : AudioServiceActivity() {
                                     mapOf(
                                         "requestId" to requestId,
                                         "progress" to progress,
+                                        "offset" to offset,
+                                        "values" to values,
                                     ),
                                 )
                             }

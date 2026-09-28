@@ -36,15 +36,23 @@ class BeatEnvelope {
     required this.durationMs,
     required this.sampleRate,
     required this.values,
-  });
+    int? analyzedDurationMs,
+  }) : analyzedDurationMs = analyzedDurationMs ?? durationMs;
 
   final int durationMs;
   final int sampleRate;
   final List<double> values;
 
+  /// 当前包络已经覆盖的音频时长。分析中允许小于歌曲总时长。
+  final int analyzedDurationMs;
+
+  bool get isComplete => analyzedDurationMs >= durationMs;
+
   double valueAt(Duration position) {
-    if (values.isEmpty || durationMs <= 0) return 0;
-    final ratio = (position.inMilliseconds / durationMs).clamp(0.0, 1.0);
+    if (values.isEmpty || durationMs <= 0 || analyzedDurationMs <= 0) return 0;
+    final positionMs = position.inMilliseconds;
+    if (positionMs < 0 || positionMs > analyzedDurationMs) return 0;
+    final ratio = (positionMs / analyzedDurationMs).clamp(0.0, 1.0);
     final location = ratio * (values.length - 1);
     final lower = location.floor();
     final upper = location.ceil();
@@ -54,8 +62,9 @@ class BeatEnvelope {
   }
 
   Map<String, Object> toJson() => {
-    'version': 1,
+    'version': 2,
     'durationMs': durationMs,
+    'analyzedDurationMs': analyzedDurationMs,
     'sampleRate': sampleRate,
     'values': values,
   };
@@ -66,9 +75,14 @@ class BeatEnvelope {
     if (value is! Map) throw const FormatException('节拍数据格式错误');
     final values = value['values'];
     if (values is! List) throw const FormatException('节拍序列格式错误');
+    final analyzedDurationMs = value['analyzedDurationMs'];
+    if (analyzedDurationMs == null) {
+      throw const FormatException('节拍覆盖时长缺失');
+    }
     return BeatEnvelope(
       durationMs: _asInt(value['durationMs']),
       sampleRate: _asInt(value['sampleRate']),
+      analyzedDurationMs: _asInt(analyzedDurationMs),
       values: [
         for (final item in values) (_asDouble(item)).clamp(0.0, 1.0).toDouble(),
       ],

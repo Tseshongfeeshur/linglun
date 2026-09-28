@@ -9,6 +9,12 @@ import '../domain/track.dart';
 import '../domain/visual_analysis.dart';
 
 typedef BeatAnalysisProgressCallback = void Function(double progress);
+typedef BeatEnvelopeCallback = void Function(BeatEnvelope envelope);
+typedef _AndroidProgressCallback = void Function(
+  double progress,
+  int offset,
+  List<double> values,
+);
 
 /// 播放期间按需解码 PCM，并生成背景跳动使用的低频能量包络。
 ///
@@ -23,6 +29,8 @@ class PcmVisualAnalyzer {
 
   static final Map<String, BeatAnalysisProgressCallback>
   _androidProgressListeners = {};
+  static final Map<String, _AndroidProgressCallback> _androidChunkListeners =
+      {};
   static bool _androidProgressHandlerInstalled = false;
 
   Process? _linuxProcess;
@@ -33,6 +41,7 @@ class PcmVisualAnalyzer {
     Track track, {
     required String requestId,
     required BeatAnalysisProgressCallback onProgress,
+    required BeatEnvelopeCallback onEnvelope,
   }) async {
     final filePath = track.path;
     if (_disposed || filePath == null || track.duration <= Duration.zero) {
@@ -52,6 +61,7 @@ class PcmVisualAnalyzer {
           track.duration,
           requestId: requestId,
           onProgress: onProgress,
+          onEnvelope: onEnvelope,
         );
       }
       if (Platform.isAndroid) {
@@ -59,11 +69,14 @@ class PcmVisualAnalyzer {
           filePath,
           track.duration,
           requestId: requestId,
+          onProgress: onProgress,
+          onEnvelope: onEnvelope,
         );
       }
       return null;
     } finally {
       _androidProgressListeners.remove(requestId);
+      _androidChunkListeners.remove(requestId);
       if (_linuxRequestId == requestId) {
         _linuxRequestId = null;
         _linuxProcess = null;
@@ -74,6 +87,7 @@ class PcmVisualAnalyzer {
   /// 取消当前请求，切歌时避免继续占用解码器和 CPU。
   Future<void> cancel(String requestId) async {
     _androidProgressListeners.remove(requestId);
+    _androidChunkListeners.remove(requestId);
     if (_linuxRequestId == requestId) {
       _linuxProcess?.kill();
       _linuxProcess = null;
@@ -103,6 +117,7 @@ class PcmVisualAnalyzer {
     Duration duration, {
     required String requestId,
     required BeatAnalysisProgressCallback onProgress,
+    required BeatEnvelopeCallback onEnvelope,
   }) async {
     Process? process;
     try {
@@ -132,8 +147,10 @@ class PcmVisualAnalyzer {
       );
       final outputFuture = _readLinuxOutput(
         process,
+        duration: duration,
         expectedBytes: expectedBytes,
         onProgress: onProgress,
+        onEnvelope: onEnvelope,
       );
       final errorFuture = process.stderr.drain<void>();
       final result = await Future.wait<Object?>([
@@ -142,58 +159,40 @@ class PcmVisualAnalyzer {
       ]).timeout(_ffmpegTimeout);
       await errorFuture;
 
-      final output = result[0] as Uint8List;
+      final partialEnvelope = result[0] as BeatEnvelope?;
       final exitCode = result[1] as int;
-      if (exitCode != 0 || output.isEmpty) return null;
-
-      final samples = ByteData.sublistView(output);
-      const sourceRate = 200;
-      final blockSize = sourceRate ~/ _beatSampleRate;
-      final values = <double>[];
-      final sampleCount = samples.lengthInBytes ~/ 4;
-      for (
-        var offset = 0;
-        offset + blockSize <= sampleCount;
-        offset += blockSize
-      ) {
-        var energy = 0.0;
-        var peak = 0.0;
-        for (var index = 0; index < blockSize; index++) {
-          final sample = samples.getFloat32(
-            (offset + index) * 4,
-            Endian.little,
-          );
-          final magnitude = sample.abs();
-          energy += sample * sample;
-          peak = math.max(peak, magnitude);
-        }
-        final rms = math.sqrt(energy / blockSize);
-        values.add(((rms * .55 + peak * .45) * 2.4).clamp(0.0, 1.0));
-      }
-      if (values.isEmpty) return null;
-      onProgress(1);
-      return BeatEnvelope(
+      if (exitCode != 0 || partialEnvelope == null) return null;
+      final envelope = BeatEnvelope(
         durationMs: duration.inMilliseconds,
         sampleRate: _beatSampleRate,
-        values: values,
+        values: partialEnvelope.values,
+        analyzedDurationMs: duration.inMilliseconds,
       );
+      onEnvelope(envelope);
+      onProgress(1);
+      return envelope;
     } on Object {
       process?.kill();
       return null;
     }
   }
 
-  Future<Uint8List> _readLinuxOutput(
+  Future<BeatEnvelope?> _readLinuxOutput(
     Process process, {
+    required Duration duration,
     required int expectedBytes,
     required BeatAnalysisProgressCallback onProgress,
+    required BeatEnvelopeCallback onEnvelope,
   }) async {
-    final output = BytesBuilder(copy: false);
+    final accumulator = _LinuxEnvelopeAccumulator(
+      duration: duration,
+      onEnvelope: onEnvelope,
+    );
     var receivedBytes = 0;
     var lastProgress = -1.0;
     var lastUpdate = DateTime.now();
     await for (final chunk in process.stdout) {
-      output.add(chunk);
+      accumulator.add(chunk);
       receivedBytes += chunk.length;
       final now = DateTime.now();
       final progress = (receivedBytes / expectedBytes).clamp(0.0, 1.0);
@@ -204,15 +203,44 @@ class PcmVisualAnalyzer {
         onProgress(progress);
       }
     }
-    return output.takeBytes();
+    return accumulator.finish();
   }
 
   Future<BeatEnvelope?> _analyzeAndroid(
     String filePath,
     Duration duration, {
     required String requestId,
+    required BeatAnalysisProgressCallback onProgress,
+    required BeatEnvelopeCallback onEnvelope,
   }) async {
     try {
+      final values = <double>[];
+      _androidChunkListeners[requestId] = (progress, offset, chunk) {
+        onProgress(progress);
+        if (chunk.isEmpty) return;
+        if (offset == values.length) {
+          values.addAll(chunk);
+        } else if (offset < values.length) {
+          values.replaceRange(
+            offset,
+            math.min(values.length, offset + chunk.length),
+            chunk,
+          );
+        } else {
+          return;
+        }
+        onEnvelope(
+          BeatEnvelope(
+            durationMs: duration.inMilliseconds,
+            sampleRate: _beatSampleRate,
+            values: List.unmodifiable(values),
+            analyzedDurationMs: math.min(
+              duration.inMilliseconds,
+              values.length * 1000 ~/ _beatSampleRate,
+            ),
+          ),
+        );
+      };
       var source = filePath;
       try {
         final uri = await _androidMediaLibrary.invokeMethod<String>(
@@ -235,20 +263,23 @@ class PcmVisualAnalyzer {
       if (result is! Map) return null;
       final rawValues = result['values'];
       if (rawValues is! List || rawValues.isEmpty) return null;
-      final values = [
+      final finalValues = [
         for (final value in rawValues)
           if (value is num) value.toDouble().clamp(0.0, 1.0).toDouble(),
       ];
-      if (values.isEmpty) return null;
+      if (finalValues.isEmpty) return null;
       final sampleRate = result['sampleRate'];
       final durationMs = result['durationMs'];
       if (sampleRate is! num || durationMs is! num) return null;
-      _androidProgressListeners[requestId]?.call(1);
-      return BeatEnvelope(
+      final envelope = BeatEnvelope(
         durationMs: durationMs.round(),
         sampleRate: sampleRate.round(),
-        values: values,
+        values: finalValues,
+        analyzedDurationMs: durationMs.round(),
       );
+      onEnvelope(envelope);
+      onProgress(1);
+      return envelope;
     } on Object {
       // Android 设备缺少对应解码器时，保留歌曲并跳过视觉分析。
       return null;
@@ -264,7 +295,22 @@ class PcmVisualAnalyzer {
       if (arguments is Map) {
         final requestId = arguments['requestId'];
         final progress = arguments['progress'];
-        if (requestId is String && progress is num) {
+        final offset = arguments['offset'];
+        final rawValues = arguments['values'];
+        if (requestId is String && progress is num && offset is num) {
+          final values = rawValues is List
+              ? [
+                  for (final value in rawValues)
+                    if (value is num)
+                      value.toDouble().clamp(0.0, 1.0).toDouble(),
+                ]
+              : const <double>[];
+          _androidChunkListeners[requestId]?.call(
+            progress.toDouble().clamp(0.0, 1.0).toDouble(),
+            offset.round(),
+            values,
+          );
+        } else if (requestId is String && progress is num) {
           _androidProgressListeners[requestId]?.call(
             progress.toDouble().clamp(0.0, 1.0).toDouble(),
           );
@@ -272,5 +318,81 @@ class PcmVisualAnalyzer {
       }
       return null;
     });
+  }
+}
+
+class _LinuxEnvelopeAccumulator {
+  _LinuxEnvelopeAccumulator({required this.duration, required this.onEnvelope});
+
+  final Duration duration;
+  final BeatEnvelopeCallback onEnvelope;
+  final _pendingBytes = <int>[];
+  final _values = <double>[];
+  var _lastEmittedValueCount = 0;
+  var _lastEmitAt = DateTime.now();
+
+  void add(List<int> chunk) {
+    _pendingBytes.addAll(chunk);
+    const blockBytes = 10 * 4;
+    final completeBytes =
+        _pendingBytes.length - _pendingBytes.length % blockBytes;
+    if (completeBytes == 0) return;
+    final samples = ByteData.sublistView(
+      Uint8List.fromList(_pendingBytes.sublist(0, completeBytes)),
+    );
+    _pendingBytes.removeRange(0, completeBytes);
+    const blockSize = 10;
+    final sampleCount = samples.lengthInBytes ~/ 4;
+    for (
+      var offset = 0;
+      offset + blockSize <= sampleCount;
+      offset += blockSize
+    ) {
+      var energy = 0.0;
+      var peak = 0.0;
+      for (var index = 0; index < blockSize; index++) {
+        final sample = samples.getFloat32((offset + index) * 4, Endian.little);
+        energy += sample * sample;
+        peak = math.max(peak, sample.abs());
+      }
+      final rms = math.sqrt(energy / blockSize);
+      _values.add(((rms * .55 + peak * .45) * 2.4).clamp(0.0, 1.0));
+    }
+    final now = DateTime.now();
+    if (_values.length - _lastEmittedValueCount >= 4 ||
+        now.difference(_lastEmitAt) >= const Duration(milliseconds: 200)) {
+      _emit(now);
+    }
+  }
+
+  BeatEnvelope? finish() {
+    if (_values.isEmpty) return null;
+    _emit(DateTime.now());
+    return BeatEnvelope(
+      durationMs: duration.inMilliseconds,
+      sampleRate: 20,
+      values: List.unmodifiable(_values),
+      analyzedDurationMs: math.min(
+        duration.inMilliseconds,
+        _values.length * 1000 ~/ 20,
+      ),
+    );
+  }
+
+  void _emit(DateTime now) {
+    if (_values.length == _lastEmittedValueCount) return;
+    _lastEmittedValueCount = _values.length;
+    _lastEmitAt = now;
+    onEnvelope(
+      BeatEnvelope(
+        durationMs: duration.inMilliseconds,
+        sampleRate: 20,
+        values: List.unmodifiable(_values),
+        analyzedDurationMs: math.min(
+          duration.inMilliseconds,
+          _values.length * 1000 ~/ 20,
+        ),
+      ),
+    );
   }
 }

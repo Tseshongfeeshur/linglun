@@ -364,7 +364,7 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   void _startBeatAnalysis(Track track) {
-    if (track.path == null || track.beatEnvelope != null) {
+    if (track.path == null || track.beatEnvelope?.isComplete == true) {
       state = state.copyWith(clearBeatAnalysisProgress: true);
       return;
     }
@@ -383,6 +383,19 @@ class PlayerController extends Notifier<PlayerState> {
       onProgress: (progress) {
         if (_beatAnalysisRequestId != requestId) return;
         state = state.copyWith(beatAnalysisProgress: progress);
+      },
+      onEnvelope: (envelope) {
+        if (_beatAnalysisRequestId != requestId) return;
+        final index = state.queue.indexWhere((item) => item.id == track.id);
+        if (index == -1) return;
+        final currentTrack = state.queue[index];
+        if (currentTrack.path != track.path ||
+            currentTrack.modifiedAt != track.modifiedAt) {
+          return;
+        }
+        final queue = [...state.queue];
+        queue[index] = currentTrack.copyWith(beatEnvelope: envelope);
+        state = state.copyWith(queue: queue);
       },
     );
     if (_beatAnalysisRequestId != requestId) return;

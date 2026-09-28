@@ -39,6 +39,32 @@ void main() {
     expect(envelope.valueAt(const Duration(seconds: 2)), 0);
   });
 
+  test('分析中的节拍序列只覆盖已经计算到的播放区间', () {
+    const envelope = BeatEnvelope(
+      durationMs: 2000,
+      analyzedDurationMs: 500,
+      sampleRate: 20,
+      values: [0, 1, 0],
+    );
+
+    expect(envelope.isComplete, isFalse);
+    expect(envelope.valueAt(const Duration(milliseconds: 125)), .5);
+    expect(envelope.valueAt(const Duration(milliseconds: 750)), 0);
+  });
+
+  test('节拍 JSON 会保存已分析覆盖时长', () {
+    final envelope = BeatEnvelope.fromJson({
+      'version': 2,
+      'durationMs': 1000,
+      'analyzedDurationMs': 1000,
+      'sampleRate': 20,
+      'values': [0, 1],
+    });
+
+    expect(envelope.isComplete, isTrue);
+    expect(envelope.analyzedDurationMs, 1000);
+  });
+
   test('四色调色板可以往返 JSON', () {
     final palette = FluidPalette([0x102030, 0x405060, 0x708090, 0xA0B0C0]);
     expect(FluidPalette.fromJson(palette.toJson()).colors, palette.colors);

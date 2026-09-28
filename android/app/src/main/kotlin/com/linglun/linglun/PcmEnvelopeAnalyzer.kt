@@ -25,7 +25,7 @@ internal class PcmEnvelopeAnalyzer(private val context: Context) {
         source: String,
         durationMs: Long,
         isCancelled: () -> Boolean,
-        onProgress: (Double) -> Unit,
+        onProgress: (Double, Int, List<Double>) -> Unit,
     ): Map<String, Any> {
         val startedAt = System.nanoTime()
         val extractor = MediaExtractor()
@@ -67,6 +67,8 @@ internal class PcmEnvelopeAnalyzer(private val context: Context) {
                 var decodedFrames = 0L
                 var lastProgress = -1.0
                 var lastProgressAt = System.nanoTime()
+                var emittedValueCount = 0
+                val pendingValues = mutableListOf<Double>()
 
                 while (!outputEnded) {
                     if (isCancelled()) {
@@ -124,12 +126,14 @@ internal class PcmEnvelopeAnalyzer(private val context: Context) {
                                     .order(ByteOrder.LITTLE_ENDIAN)
                                 buffer.position(info.offset)
                                 buffer.limit(info.offset + info.size)
-                                decodedFrames += accumulator.consume(
+                                val newValues = accumulator.consume(
                                     buffer.slice().order(ByteOrder.LITTLE_ENDIAN),
                                     sampleRate,
                                     channels,
                                     encoding,
                                 )
+                                decodedFrames += accumulator.lastConsumedFrames
+                                pendingValues += newValues
                                 val expectedFrames = max(
                                     1L,
                                     durationMs * sampleRate.toLong() / 1000L,
@@ -143,7 +147,17 @@ internal class PcmEnvelopeAnalyzer(private val context: Context) {
                                 ) {
                                     lastProgress = progress
                                     lastProgressAt = now
-                                    onProgress(progress)
+                                    if (pendingValues.isNotEmpty()) {
+                                        onProgress(
+                                            progress,
+                                            emittedValueCount,
+                                            pendingValues.toList(),
+                                        )
+                                        emittedValueCount += pendingValues.size
+                                        pendingValues.clear()
+                                    } else {
+                                        onProgress(progress, emittedValueCount, emptyList())
+                                    }
                                 }
                             }
                             decoder.releaseOutputBuffer(outputIndex, false)
@@ -156,7 +170,11 @@ internal class PcmEnvelopeAnalyzer(private val context: Context) {
 
                 val values = accumulator.finish()
                 if (values.isEmpty()) throw IllegalArgumentException("未产生 PCM 数据")
-                onProgress(1.0)
+                if (pendingValues.isNotEmpty()) {
+                    onProgress(1.0, emittedValueCount, pendingValues.toList())
+                } else {
+                    onProgress(1.0, emittedValueCount, emptyList())
+                }
                 return mapOf(
                     "version" to 1,
                     "durationMs" to durationMs,
@@ -185,8 +203,10 @@ internal class PcmEnvelopeAnalyzer(private val context: Context) {
         private var resampleCount = 0
         private var pendingBytes = ByteArray(0)
         private val values = mutableListOf<Double>()
+        var lastConsumedFrames = 0
+            private set
 
-        fun consume(buffer: ByteBuffer, sampleRate: Int, channels: Int, encoding: Int): Int {
+        fun consume(buffer: ByteBuffer, sampleRate: Int, channels: Int, encoding: Int): List<Double> {
             val incoming = ByteArray(buffer.remaining())
             buffer.get(incoming)
             val bytes = if (pendingBytes.isEmpty()) {
@@ -201,6 +221,8 @@ internal class PcmEnvelopeAnalyzer(private val context: Context) {
             val bytesPerSample = if (encoding == pcmFloatEncoding) 4 else 2
             val frameBytes = safeChannels * bytesPerSample
             val completeBytes = bytes.size - bytes.size % frameBytes
+            lastConsumedFrames = completeBytes / frameBytes
+            val valuesBefore = values.size
             val frames = ByteBuffer.wrap(bytes, 0, completeBytes)
                 .order(ByteOrder.LITTLE_ENDIAN)
             while (frames.remaining() >= frameBytes) {
@@ -229,7 +251,7 @@ internal class PcmEnvelopeAnalyzer(private val context: Context) {
             if (completeBytes < bytes.size) {
                 pendingBytes = bytes.copyOfRange(completeBytes, bytes.size)
             }
-            return completeBytes / frameBytes
+            return values.subList(valuesBefore, values.size).toList()
         }
 
         fun finish(): List<Double> = values
