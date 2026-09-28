@@ -356,7 +356,7 @@ class _TrackDetailsDialog extends StatelessWidget {
     final hasLyrics = lyricDocument.plainLyrics.trim().isNotEmpty;
     final values = <String, String>{
       '标题': track.title,
-      '艺术家': track.artistNames.join(' / '),
+      '艺术家': track.artistNames.join('/'),
       '专辑': track.album,
       '时长': track.duration.toString().split('.').first,
       '播放次数': '${track.playCount}',

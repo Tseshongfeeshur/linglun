@@ -4,11 +4,11 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.MediaStore
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity() {
+class MainActivity : AudioServiceActivity() {
     private val requestCode = 4101
     private var pendingResult: MethodChannel.Result? = null
 
@@ -17,7 +17,16 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "linglun/android_media_library")
             .setMethodCallHandler { call, result ->
                 if (call.method != "audioPaths") {
-                    result.notImplemented()
+                    if (call.method == "uriForPath") {
+                        val path = call.argument<String>("path")
+                        if (path.isNullOrEmpty()) {
+                            result.success(null)
+                        } else {
+                            queryAudioUri(path, result)
+                        }
+                    } else {
+                        result.notImplemented()
+                    }
                     return@setMethodCallHandler
                 }
                 if (pendingResult != null) {
@@ -76,6 +85,36 @@ class MainActivity : FlutterActivity() {
                 runOnUiThread { result.success(paths) }
             } catch (error: Exception) {
                 runOnUiThread { result.error("media_query", "读取 Android 媒体库失败", error.message) }
+            }
+        }.start()
+    }
+
+    private fun queryAudioUri(path: String, result: MethodChannel.Result) {
+        Thread {
+            try {
+                var uri: String? = null
+                contentResolver.query(
+                    MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                    arrayOf(MediaStore.Audio.Media._ID),
+                    "${MediaStore.Audio.Media.DATA} = ?",
+                    arrayOf(path),
+                    null,
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val id = cursor.getLong(
+                            cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID),
+                        )
+                        uri = MediaStore.Audio.Media.getContentUri(
+                            "external",
+                            id,
+                        ).toString()
+                    }
+                }
+                runOnUiThread { result.success(uri) }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    result.error("media_uri", "查找 Android 媒体 URI 失败", error.message)
+                }
             }
         }.start()
     }

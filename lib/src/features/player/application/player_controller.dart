@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart' hide Track;
 
 import 'dart:async';
@@ -8,6 +10,7 @@ import '../../../core/database/app_database.dart';
 import '../domain/audio_processing.dart';
 import '../domain/playback_background.dart';
 import '../domain/track.dart';
+import 'playback_media_session.dart';
 
 final playerControllerProvider =
     NotifierProvider<PlayerController, PlayerState>(PlayerController.new);
@@ -64,6 +67,9 @@ class PlayerState {
 }
 
 class PlayerController extends Notifier<PlayerState> {
+  static const _androidMediaLibrary = MethodChannel(
+    'linglun/android_media_library',
+  );
   static const _audioSettingsKey = 'audio.processing.v1';
   static const _backgroundSettingsKey = 'visual.playbackBackground.v1';
 
@@ -78,9 +84,28 @@ class PlayerController extends Notifier<PlayerState> {
 
   @override
   PlayerState build() {
+    playbackMediaSession.bind(
+      play: () {
+        if (!state.isPlaying) togglePlay();
+      },
+      pause: () {
+        if (state.isPlaying) togglePlay();
+      },
+      stop: stop,
+      next: skipNext,
+      previous: previous,
+      seek: seek,
+      playQueueIndex: playQueueIndex,
+      setRepeatMode: setRepeatModeByName,
+      setShuffleEnabled: setShuffleEnabled,
+    );
+    listenSelf((_, next) {
+      unawaited(_publishMediaSession(next));
+    });
     ref.onDispose(() {
       _playbackTimer?.cancel();
       _player?.dispose();
+      playbackMediaSession.unbind();
     });
     unawaited(_loadAudioSettings());
     unawaited(_loadBackgroundSettings());
@@ -129,9 +154,12 @@ class PlayerController extends Notifier<PlayerState> {
       final player = _ensurePlayer();
       try {
         await _applyAudioProcessing(track);
-        await player.open(Media(Uri.file(track.path!).toString()));
+        final source = await _playbackSource(track.path!);
+        await player.open(Media(source));
         _startPlaybackSession(track);
-      } on Object {
+      } on Object catch (error, stackTrace) {
+        debugPrint('伶伦：打开音频失败：${track.path}\n$error');
+        debugPrintStack(stackTrace: stackTrace);
         state = state.copyWith(isPlaying: false);
         _stopPlaybackSession();
       }
@@ -213,6 +241,17 @@ class PlayerController extends Notifier<PlayerState> {
     _player?.seek(bounded);
   }
 
+  void stop() {
+    _stopPlaybackSession();
+    unawaited(_player?.stop());
+    state = state.copyWith(isPlaying: false, position: Duration.zero);
+  }
+
+  void playQueueIndex(int index) {
+    if (index < 0 || index >= state.queue.length) return;
+    unawaited(playTrack(state.queue[index]));
+  }
+
   void skipNext() {
     if (state.queue.length < 2) {
       if (state.repeatMode != RepeatMode.off) {
@@ -246,6 +285,15 @@ class PlayerController extends Notifier<PlayerState> {
     }
   }
 
+  void setShuffleEnabled(bool enabled) {
+    if (enabled == state.shuffleEnabled) return;
+    if (enabled) {
+      enableShuffleAndReshuffle();
+    } else {
+      state = state.copyWith(shuffleEnabled: false);
+    }
+  }
+
   /// 开启随机播放时立即重排当前队列，并保持正在播放的曲目为首项。
   void enableShuffleAndReshuffle() {
     if (state.shuffleEnabled) return;
@@ -262,6 +310,14 @@ class PlayerController extends Notifier<PlayerState> {
       RepeatMode.all => RepeatMode.one,
       RepeatMode.one => RepeatMode.off,
     };
+    state = state.copyWith(repeatMode: nextMode);
+  }
+
+  void setRepeatModeByName(String mode) {
+    final nextMode = RepeatMode.values.firstWhere(
+      (item) => item.name == mode,
+      orElse: () => RepeatMode.off,
+    );
     state = state.copyWith(repeatMode: nextMode);
   }
 
@@ -284,6 +340,33 @@ class PlayerController extends Notifier<PlayerState> {
     return _player ??= _createPlayer();
   }
 
+  Future<void> _publishMediaSession(PlayerState next) {
+    return playbackMediaSession.publish(
+      queue: next.queue,
+      currentIndex: next.currentIndex,
+      playing: next.isPlaying,
+      position: next.position,
+      repeatMode: next.repeatMode.name,
+      shuffleEnabled: next.shuffleEnabled,
+    );
+  }
+
+  Future<String> _playbackSource(String path) async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        final uri = await _androidMediaLibrary.invokeMethod<String>(
+          'uriForPath',
+          {'path': path},
+        );
+        if (uri != null && uri.isNotEmpty) return uri;
+      } on Object catch (error, stackTrace) {
+        debugPrint('伶伦：查找 Android 媒体 URI 失败：$path\n$error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
+    return Uri.file(path).toString();
+  }
+
   Player _createPlayer() {
     final player = Player();
     player.stream.playing.listen((playing) {
@@ -299,8 +382,7 @@ class PlayerController extends Notifier<PlayerState> {
     });
     player.stream.error.listen((error) {
       state = state.copyWith(isPlaying: false);
-      // 先停止当前状态，后续接入统一错误提示和日志服务。
-      assert(error.isNotEmpty);
+      debugPrint('伶伦：播放器错误：$error');
     });
     return player;
   }
