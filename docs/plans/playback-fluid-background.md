@@ -2,7 +2,7 @@
 
 ## 状态
 
-已实现第一版，Linux 使用 FFmpeg、Android 使用系统 MediaExtractor/MediaCodec 在扫描阶段生成相同语义的 PCM 低频能量包络。播放页只使用 Isolation 四色程序化背景，未移植 Mesh 或 Pixi。
+已实现第一版，Linux 使用 FFmpeg、Android 使用系统 MediaExtractor/MediaCodec 在播放时按需生成相同语义的 PCM 低频能量包络。播放页只使用 Isolation 四色程序化背景，未移植 Mesh 或 Pixi。
 
 ## 来源与许可证
 
@@ -15,7 +15,7 @@
 
 - `LibraryTracks.coverColor` 保存封面主色。
 - `LibraryTracks.fluidPaletteJson` 保存四种流体颜色。
-- `LibraryTracks.beatEnvelopeJson` 保存扫描阶段生成的低频能量序列。
+- `LibraryTracks.beatEnvelopeJson` 保存首次播放时生成的低频能量序列；扫描只复用未修改文件已有的数据。
 - Linux 将音频解码为单声道 200 Hz `f32le` PCM，Android 使用原生音频解码器输出 PCM；两端都按 50 ms 窗口计算 RMS 与 Peak，并保存为 20 Hz 包络。
 - 数据库 schema 10 增加上述视觉分析字段，损坏数据只会触发视觉回退。
 - 播放页设置使用现有 `AppSettings` 表，键为 `visual.playbackBackground.v1`。
@@ -27,7 +27,8 @@
 - 曲目切换时调色板在约 1 秒内过渡。
 - 渲染缩放改变 shader 实际绘制尺寸；帧率限制 ticker 更新频率；流动速度改变模拟时间推进。
 - 暂停时冻结开启后停止时间推进；关闭时暂停背景保持静态画面。
-- 背景跳动使用扫描阶段的节拍序列，不依赖播放时实时 FFT。
+- 背景跳动使用播放期间按需生成的节拍序列，不依赖播放时实时 FFT。
+- 没有 `BeatEnvelope` 的歌曲先开始播放，再在后台异步分析；分析范围以缓冲进度显示在进度条上，完成后立即驱动背景 Pulse 并增量写入数据库。
 - Android 优先通过 MediaStore 对应的 `content://` URI 分析，URI 不可用时回退到文件路径；分析失败只跳过包络，不影响曲目入库和播放。
 - Shader 初始化失败时降级为静态四色背景，不影响音频播放和歌词显示。
 

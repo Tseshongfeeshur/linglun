@@ -86,6 +86,7 @@ class Track {
     DateTime? lastPlayedAt,
     DateTime? addedAt,
     DateTime? modifiedAt,
+    BeatEnvelope? beatEnvelope,
   }) {
     return Track(
       id: id,
@@ -108,7 +109,7 @@ class Track {
       modifiedAt: modifiedAt ?? this.modifiedAt,
       coverColor: coverColor,
       fluidPalette: fluidPalette,
-      beatEnvelope: beatEnvelope,
+      beatEnvelope: beatEnvelope ?? this.beatEnvelope,
     );
   }
 }

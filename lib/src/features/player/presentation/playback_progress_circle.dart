@@ -14,6 +14,7 @@ class PlaybackProgressCircle extends StatelessWidget {
     required this.progress,
     required this.hovered,
     required this.dragging,
+    this.bufferProgress,
     super.key,
   });
 
@@ -21,6 +22,7 @@ class PlaybackProgressCircle extends StatelessWidget {
   final double progress;
   final bool hovered;
   final bool dragging;
+  final double? bufferProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +45,7 @@ class PlaybackProgressCircle extends StatelessWidget {
               size: const Size.square(playbackRingSize),
               painter: _ProgressPainter(
                 progress: progress,
+                bufferProgress: bufferProgress,
                 hovered: hovered,
                 colorScheme: Theme.of(context).colorScheme,
               ),
@@ -82,11 +85,13 @@ class PlaybackProgressCircle extends StatelessWidget {
 class _ProgressPainter extends CustomPainter {
   const _ProgressPainter({
     required this.progress,
+    required this.bufferProgress,
     required this.hovered,
     required this.colorScheme,
   });
 
   final double progress;
+  final double? bufferProgress;
   final bool hovered;
   final ColorScheme colorScheme;
 
@@ -104,8 +109,23 @@ class _ProgressPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = hovered ? 4.2 : 3.2
       ..strokeCap = StrokeCap.round;
+    final bufferPaint = Paint()
+      ..color = colorScheme.secondary.withAlpha(105)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = hovered ? 3.8 : 3.0
+      ..strokeCap = StrokeCap.round;
 
     canvas.drawArc(bounds, 0, math.pi * 2, false, trackPaint);
+    final buffered = bufferProgress;
+    if (buffered != null && buffered > 0) {
+      canvas.drawArc(
+        bounds,
+        -math.pi / 2,
+        math.pi * 2 * buffered.clamp(0.0, 1.0),
+        false,
+        bufferPaint,
+      );
+    }
     canvas.drawArc(
       bounds,
       -math.pi / 2,
@@ -136,6 +156,7 @@ class _ProgressPainter extends CustomPainter {
   @override
   bool shouldRepaint(_ProgressPainter oldDelegate) =>
       oldDelegate.progress != progress ||
+      oldDelegate.bufferProgress != bufferProgress ||
       oldDelegate.hovered != hovered ||
       oldDelegate.colorScheme != colorScheme;
 }

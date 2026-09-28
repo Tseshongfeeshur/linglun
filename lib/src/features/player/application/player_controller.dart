@@ -10,6 +10,7 @@ import '../../../core/database/app_database.dart';
 import '../domain/audio_processing.dart';
 import '../domain/playback_background.dart';
 import '../domain/track.dart';
+import 'pcm_visual_analyzer.dart';
 import 'playback_media_session.dart';
 
 final playerControllerProvider =
@@ -28,6 +29,7 @@ class PlayerState {
     this.backgroundSettings = const PlaybackBackgroundSettings(),
     this.shuffleEnabled = false,
     this.repeatMode = RepeatMode.off,
+    this.beatAnalysisProgress,
   });
 
   final List<Track> queue;
@@ -38,6 +40,7 @@ class PlayerState {
   final PlaybackBackgroundSettings backgroundSettings;
   final bool shuffleEnabled;
   final RepeatMode repeatMode;
+  final double? beatAnalysisProgress;
 
   bool get normalizationEnabled => audioSettings.normalizationEnabled;
 
@@ -52,6 +55,8 @@ class PlayerState {
     PlaybackBackgroundSettings? backgroundSettings,
     bool? shuffleEnabled,
     RepeatMode? repeatMode,
+    double? beatAnalysisProgress,
+    bool clearBeatAnalysisProgress = false,
   }) {
     return PlayerState(
       queue: queue ?? this.queue,
@@ -62,6 +67,9 @@ class PlayerState {
       backgroundSettings: backgroundSettings ?? this.backgroundSettings,
       shuffleEnabled: shuffleEnabled ?? this.shuffleEnabled,
       repeatMode: repeatMode ?? this.repeatMode,
+      beatAnalysisProgress: clearBeatAnalysisProgress
+          ? null
+          : beatAnalysisProgress ?? this.beatAnalysisProgress,
     );
   }
 }
@@ -81,6 +89,9 @@ class PlayerController extends Notifier<PlayerState> {
   bool _sessionCounted = false;
   final _filterGraphBuilder = const MpvFilterGraphBuilder();
   final _random = math.Random();
+  final _visualAnalyzer = PcmVisualAnalyzer();
+  String? _beatAnalysisRequestId;
+  int _beatAnalysisGeneration = 0;
 
   @override
   PlayerState build() {
@@ -104,6 +115,11 @@ class PlayerController extends Notifier<PlayerState> {
     });
     ref.onDispose(() {
       _playbackTimer?.cancel();
+      final requestId = _beatAnalysisRequestId;
+      if (requestId != null) {
+        unawaited(_visualAnalyzer.cancel(requestId));
+      }
+      _visualAnalyzer.dispose();
       _player?.dispose();
       playbackMediaSession.unbind();
     });
@@ -138,6 +154,7 @@ class PlayerController extends Notifier<PlayerState> {
     final index = state.queue.indexWhere((item) => item.id == track.id);
     if (index == -1) return;
 
+    _cancelBeatAnalysis();
     state = state.copyWith(
       currentIndex: index,
       isPlaying: true,
@@ -157,10 +174,12 @@ class PlayerController extends Notifier<PlayerState> {
         final source = await _playbackSource(track.path!);
         await player.open(Media(source));
         _startPlaybackSession(track);
+        _startBeatAnalysis(track);
       } on Object catch (error, stackTrace) {
         debugPrint('伶伦：打开音频失败：${track.path}\n$error');
         debugPrintStack(stackTrace: stackTrace);
         state = state.copyWith(isPlaying: false);
+        _cancelBeatAnalysis();
         _stopPlaybackSession();
       }
     }
@@ -186,6 +205,7 @@ class PlayerController extends Notifier<PlayerState> {
       queue.insert(0, selected);
       currentIndex = 0;
     }
+    _cancelBeatAnalysis();
     state = state.copyWith(
       queue: queue,
       currentIndex: currentIndex,
@@ -218,6 +238,7 @@ class PlayerController extends Notifier<PlayerState> {
     final currentId = state.currentTrack.id;
     final nextIndex = nextQueue.indexWhere((track) => track.id == currentId);
     if (nextIndex == -1 && _player != null) {
+      _cancelBeatAnalysis();
       _stopPlaybackSession();
       unawaited(_player!.stop());
     }
@@ -242,6 +263,7 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   void stop() {
+    _cancelBeatAnalysis();
     _stopPlaybackSession();
     unawaited(_player?.stop());
     state = state.copyWith(isPlaying: false, position: Duration.zero);
@@ -322,6 +344,7 @@ class PlayerController extends Notifier<PlayerState> {
   }
 
   void _handleTrackCompleted() {
+    _cancelBeatAnalysis();
     _stopPlaybackSession();
     if (state.repeatMode == RepeatMode.one ||
         (state.repeatMode == RepeatMode.all && state.queue.length == 1)) {
@@ -338,6 +361,72 @@ class PlayerController extends Notifier<PlayerState> {
 
   Player _ensurePlayer() {
     return _player ??= _createPlayer();
+  }
+
+  void _startBeatAnalysis(Track track) {
+    if (track.path == null || track.beatEnvelope != null) {
+      state = state.copyWith(clearBeatAnalysisProgress: true);
+      return;
+    }
+    if (track.duration <= Duration.zero) return;
+
+    final requestId = '${track.id}:${++_beatAnalysisGeneration}';
+    _beatAnalysisRequestId = requestId;
+    state = state.copyWith(beatAnalysisProgress: 0);
+    unawaited(_runBeatAnalysis(track, requestId));
+  }
+
+  Future<void> _runBeatAnalysis(Track track, String requestId) async {
+    final envelope = await _visualAnalyzer.analyze(
+      track,
+      requestId: requestId,
+      onProgress: (progress) {
+        if (_beatAnalysisRequestId != requestId) return;
+        state = state.copyWith(beatAnalysisProgress: progress);
+      },
+    );
+    if (_beatAnalysisRequestId != requestId) return;
+    _beatAnalysisRequestId = null;
+    if (envelope == null) {
+      state = state.copyWith(clearBeatAnalysisProgress: true);
+      return;
+    }
+
+    final index = state.queue.indexWhere((item) => item.id == track.id);
+    if (index == -1) {
+      state = state.copyWith(clearBeatAnalysisProgress: true);
+      return;
+    }
+    final currentTrack = state.queue[index];
+    if (currentTrack.path != track.path ||
+        currentTrack.modifiedAt != track.modifiedAt) {
+      state = state.copyWith(clearBeatAnalysisProgress: true);
+      return;
+    }
+    final queue = [...state.queue];
+    queue[index] = queue[index].copyWith(beatEnvelope: envelope);
+    // 先更新内存状态，让背景在分析完成的同一轮状态更新中开始 Pulse；
+    // 数据库写入放在后面，避免磁盘慢写延迟视觉反馈。
+    state = state.copyWith(queue: queue, clearBeatAnalysisProgress: true);
+    try {
+      final database = await sharedLinglunDatabase();
+      await database.updateBeatEnvelope(track.id, envelope.encode());
+    } on Object catch (error, stackTrace) {
+      debugPrint('伶伦：保存 PCM 包络失败：${track.path}\n$error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  void _cancelBeatAnalysis() {
+    final requestId = _beatAnalysisRequestId;
+    _beatAnalysisRequestId = null;
+    _beatAnalysisGeneration++;
+    if (requestId != null) {
+      unawaited(_visualAnalyzer.cancel(requestId));
+    }
+    if (state.beatAnalysisProgress != null) {
+      state = state.copyWith(clearBeatAnalysisProgress: true);
+    }
   }
 
   Future<void> _publishMediaSession(PlayerState next) {

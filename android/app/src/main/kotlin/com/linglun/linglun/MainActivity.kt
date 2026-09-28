@@ -7,22 +7,41 @@ import android.provider.MediaStore
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.util.concurrent.ConcurrentHashMap
 
 class MainActivity : AudioServiceActivity() {
     private val requestCode = 4101
     private var pendingResult: MethodChannel.Result? = null
+    private var mediaLibraryChannel: MethodChannel? = null
+    private val cancelledPcmAnalyses = ConcurrentHashMap.newKeySet<String>()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "linglun/android_media_library")
-            .setMethodCallHandler { call, result ->
+        mediaLibraryChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "linglun/android_media_library",
+        ).also { channel ->
+            channel.setMethodCallHandler { call, result ->
+                if (call.method == "cancelPcmEnvelope") {
+                    val requestId = call.argument<String>("requestId")
+                    if (requestId.isNullOrEmpty()) {
+                        result.success(null)
+                    } else {
+                        cancelledPcmAnalyses.add(requestId)
+                        result.success(null)
+                    }
+                    return@setMethodCallHandler
+                }
                 if (call.method == "analyzePcmEnvelope") {
                     val source = call.argument<String>("path")
                     val durationMs = call.argument<Number>("durationMs")?.toLong() ?: 0L
+                    val requestId = call.argument<String>("requestId")
                     if (source.isNullOrEmpty() || durationMs <= 0L) {
                         result.error("invalid_source", "音频路径或时长为空", null)
+                    } else if (requestId.isNullOrEmpty()) {
+                        result.error("invalid_request", "PCM 分析请求标识为空", null)
                     } else {
-                        analyzePcmEnvelope(source, durationMs, result)
+                        analyzePcmEnvelope(source, durationMs, requestId, result)
                     }
                     return@setMethodCallHandler
                 }
@@ -57,6 +76,7 @@ class MainActivity : AudioServiceActivity() {
                     queryAudioPaths(result)
                 }
             }
+        }
     }
 
     override fun onRequestPermissionsResult(
@@ -132,17 +152,38 @@ class MainActivity : AudioServiceActivity() {
     private fun analyzePcmEnvelope(
         source: String,
         durationMs: Long,
+        requestId: String,
         result: MethodChannel.Result,
     ) {
-        // 解码和分析都在工作线程执行，避免曲库扫描阻塞 Flutter UI 线程。
+        cancelledPcmAnalyses.remove(requestId)
+        // 解码和分析都在工作线程执行，避免播放线程和 Flutter UI 线程被阻塞。
         Thread {
             try {
-                val envelope = PcmEnvelopeAnalyzer(this).analyze(source, durationMs)
+                val envelope = PcmEnvelopeAnalyzer(this).analyze(
+                    source = source,
+                    durationMs = durationMs,
+                    isCancelled = { cancelledPcmAnalyses.contains(requestId) },
+                    onProgress = { progress ->
+                        runOnUiThread {
+                            if (!cancelledPcmAnalyses.contains(requestId)) {
+                                mediaLibraryChannel?.invokeMethod(
+                                    "pcmAnalysisProgress",
+                                    mapOf(
+                                        "requestId" to requestId,
+                                        "progress" to progress,
+                                    ),
+                                )
+                            }
+                        }
+                    },
+                )
                 runOnUiThread { result.success(envelope) }
             } catch (error: Exception) {
                 runOnUiThread {
                     result.error("pcm_analysis", "分析音频 PCM 失败", error.message)
                 }
+            } finally {
+                cancelledPcmAnalyses.remove(requestId)
             }
         }.start()
     }

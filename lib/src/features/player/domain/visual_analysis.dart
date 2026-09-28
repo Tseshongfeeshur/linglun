@@ -30,7 +30,7 @@ class FluidPalette {
   }
 }
 
-/// 扫描阶段生成的低频能量序列。
+/// PCM 分析生成的低频能量序列。
 class BeatEnvelope {
   const BeatEnvelope({
     required this.durationMs,

@@ -1,6 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 import 'package:flutter/services.dart';
@@ -19,7 +17,6 @@ import 'package:audio_metadata_reader/src/metadata/base.dart'
 import '../../player/domain/track.dart';
 import '../../player/domain/lyrics_source.dart';
 import '../../player/domain/lyrics.dart';
-import '../../player/domain/visual_analysis.dart';
 import 'cover_analysis.dart';
 
 const supportedAudioExtensions = {
@@ -38,8 +35,6 @@ const supportedAudioExtensions = {
 
 const _oggExtensions = {'.ogg', '.oga', '.opus'};
 const _opusGranuleRate = 48000;
-const _beatSampleRate = 20;
-const _ffmpegTimeout = Duration(minutes: 2);
 
 typedef ScanProgressCallback = void Function({
   required String path,
@@ -169,9 +164,11 @@ class LibraryScanner {
           : coverBytes == null
           ? null
           : analyzeCover(coverBytes);
+      // PCM 分析会在播放时异步执行，扫描阶段只复用未修改文件已有的结果。
+      // 文件发生变化时清除旧包络，避免新音频沿用不匹配的背景跳动数据。
       final beatEnvelope = canReuseAnalysis
           ? previousTrack?.beatEnvelope
-          : await _analyzeBeat(file, metadata.duration, onProgress: onProgress);
+          : null;
       return Track(
         id: file.path,
         path: file.path,
@@ -206,124 +203,6 @@ class LibraryScanner {
       );
     } on Object {
       // 损坏或暂不支持的文件不应中断整个曲库扫描。
-      return null;
-    }
-  }
-
-  Future<BeatEnvelope?> _analyzeBeat(
-    File file,
-    Duration? duration, {
-    ScanProgressCallback? onProgress,
-  }) async {
-    if (duration == null || duration <= Duration.zero) return null;
-    if (Platform.isAndroid) {
-      return _analyzeAndroidBeat(file, duration, onProgress: onProgress);
-    }
-    try {
-      onProgress?.call(path: file.path, stage: '分析 PCM 节拍数据');
-      final process = await Process.start('ffmpeg', [
-        '-v',
-        'error',
-        '-i',
-        file.path,
-        '-map',
-        '0:a:0',
-        '-ac',
-        '1',
-        '-ar',
-        '200',
-        '-f',
-        'f32le',
-        'pipe:1',
-      ]).timeout(_ffmpegTimeout);
-      final outputFuture = process.stdout.fold<List<int>>(
-        <int>[],
-        (buffer, chunk) => buffer..addAll(chunk),
-      );
-      final errorFuture = process.stderr.drain<void>();
-      final exitCode = await process.exitCode;
-      final output = await outputFuture;
-      await errorFuture;
-      if (exitCode != 0 || output.isEmpty) return null;
-
-      final bytes = Uint8List.fromList(output);
-      final samples = ByteData.sublistView(bytes);
-      const sourceRate = 200;
-      final blockSize = sourceRate ~/ _beatSampleRate;
-      final values = <double>[];
-      final sampleCount = samples.lengthInBytes ~/ 4;
-      for (
-        var offset = 0;
-        offset + blockSize <= sampleCount;
-        offset += blockSize
-      ) {
-        var energy = 0.0;
-        var peak = 0.0;
-        for (var index = 0; index < blockSize; index++) {
-          final sample = samples.getFloat32(
-            (offset + index) * 4,
-            Endian.little,
-          );
-          final magnitude = sample.abs();
-          energy += sample * sample;
-          peak = math.max(peak, magnitude);
-        }
-        final rms = math.sqrt(energy / blockSize);
-        values.add(((rms * .55 + peak * .45) * 2.4).clamp(0.0, 1.0));
-      }
-      if (values.isEmpty) return null;
-      return BeatEnvelope(
-        durationMs: duration.inMilliseconds,
-        sampleRate: _beatSampleRate,
-        values: values,
-      );
-    } on Object {
-      return null;
-    }
-  }
-
-  Future<BeatEnvelope?> _analyzeAndroidBeat(
-    File file,
-    Duration duration, {
-    ScanProgressCallback? onProgress,
-  }) async {
-    try {
-      onProgress?.call(path: file.path, stage: '分析 PCM 节拍数据');
-      var source = file.path;
-      try {
-        final uri = await _androidMediaLibrary.invokeMethod<String>(
-          'uriForPath',
-          <String, Object?>{'path': file.path},
-        );
-        if (uri != null && uri.isNotEmpty) source = uri;
-      } on Object {
-        // URI 查询失败时继续尝试文件路径，兼容可直接访问的共享目录。
-      }
-      final result = await _androidMediaLibrary.invokeMethod<Object?>(
-        'analyzePcmEnvelope',
-        <String, Object?>{
-          'path': source,
-          'durationMs': duration.inMilliseconds,
-        },
-      );
-      if (result is! Map) return null;
-      final values = result['values'];
-      if (values is! List || values.isEmpty) return null;
-      final parsedValues = [
-        for (final value in values)
-          if (value is num) value.toDouble().clamp(0.0, 1.0).toDouble(),
-      ];
-      if (parsedValues.isEmpty) return null;
-      final sampleRate = result['sampleRate'];
-      final durationMs = result['durationMs'];
-      if (sampleRate is! num || durationMs is! num) return null;
-      return BeatEnvelope(
-        durationMs: durationMs.round(),
-        sampleRate: sampleRate.round(),
-        values: parsedValues,
-      );
-    } on Object {
-      // Android 设备缺少对应解码器时，保留歌曲并跳过视觉分析。
       return null;
     }
   }

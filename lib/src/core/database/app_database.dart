@@ -160,6 +160,16 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
+  /// 播放期间完成视觉分析后只更新包络字段，避免重新扫描整张曲库。
+  Future<void> updateBeatEnvelope(String id, String valueJson) async {
+    await (update(libraryTracks)..where((track) => track.id.equals(id))).write(
+      LibraryTracksCompanion(
+        beatEnvelopeJson: Value(valueJson),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   Future<void> recordPlayback(String id, DateTime playedAt) async {
     await transaction(() async {
       await into(

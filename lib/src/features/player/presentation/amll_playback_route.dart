@@ -148,6 +148,7 @@ class _AmllPlaybackRouteTransition extends ConsumerWidget {
                       child: PlaybackProgressCircle(
                         track: state.currentTrack,
                         progress: _routeProgress(state),
+                        bufferProgress: state.beatAnalysisProgress,
                         hovered: false,
                         dragging: false,
                       ),

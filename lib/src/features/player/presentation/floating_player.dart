@@ -518,6 +518,7 @@ class _FloatingCluster extends ConsumerWidget {
                 child: PlaybackProgressCircle(
                   track: track,
                   progress: seekPreviewProgress ?? _progress(state),
+                  bufferProgress: state.beatAnalysisProgress,
                   hovered: hovered,
                   dragging: dragging,
                 ),
