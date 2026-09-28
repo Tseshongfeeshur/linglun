@@ -12,6 +12,9 @@ class PlaybackBackgroundSettingsPage extends ConsumerWidget {
     final settings = ref.watch(
       playerControllerProvider.select((state) => state.backgroundSettings),
     );
+    final debugMode = ref.watch(
+      playerControllerProvider.select((state) => state.debugMode),
+    );
     final controller = ref.read(playerControllerProvider.notifier);
 
     return Column(
@@ -78,6 +81,13 @@ class PlaybackBackgroundSettingsPage extends ConsumerWidget {
                 onChanged: (value) => controller.updateBackgroundSettings(
                   settings.copyWith(followCoverColor: value),
                 ),
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                title: const Text('调试模式'),
+                subtitle: const Text('在播放页显示实时低频能量柱'),
+                value: debugMode,
+                onChanged: controller.updateDebugMode,
               ),
             ],
           ),

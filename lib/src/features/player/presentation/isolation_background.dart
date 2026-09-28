@@ -14,6 +14,7 @@ class IsolationBackground extends StatefulWidget {
     required this.settings,
     required this.isPlaying,
     required this.position,
+    required this.pulseNotifier,
     super.key,
   });
 
@@ -21,6 +22,7 @@ class IsolationBackground extends StatefulWidget {
   final PlaybackBackgroundSettings settings;
   final bool isPlaying;
   final Duration position;
+  final ValueNotifier<double> pulseNotifier;
 
   @override
   State<IsolationBackground> createState() => _IsolationBackgroundState();
@@ -152,6 +154,9 @@ class _IsolationBackgroundState extends State<IsolationBackground>
     final pulse = widget.settings.beatEnabled
         ? widget.track.beatEnvelope?.valueAt(widget.position) ?? 0.0
         : 0.0;
+    if (widget.pulseNotifier.value != pulse) {
+      widget.pulseNotifier.value = pulse;
+    }
     return RepaintBoundary(
       child: CustomPaint(
         painter: _IsolationPainter(

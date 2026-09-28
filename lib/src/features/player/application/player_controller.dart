@@ -30,6 +30,7 @@ class PlayerState {
     this.shuffleEnabled = false,
     this.repeatMode = RepeatMode.off,
     this.beatAnalysisProgress,
+    this.debugMode = false,
   });
 
   final List<Track> queue;
@@ -41,6 +42,7 @@ class PlayerState {
   final bool shuffleEnabled;
   final RepeatMode repeatMode;
   final double? beatAnalysisProgress;
+  final bool debugMode;
 
   bool get normalizationEnabled => audioSettings.normalizationEnabled;
 
@@ -57,6 +59,7 @@ class PlayerState {
     RepeatMode? repeatMode,
     double? beatAnalysisProgress,
     bool clearBeatAnalysisProgress = false,
+    bool? debugMode,
   }) {
     return PlayerState(
       queue: queue ?? this.queue,
@@ -70,6 +73,7 @@ class PlayerState {
       beatAnalysisProgress: clearBeatAnalysisProgress
           ? null
           : beatAnalysisProgress ?? this.beatAnalysisProgress,
+      debugMode: debugMode ?? this.debugMode,
     );
   }
 }
@@ -80,6 +84,7 @@ class PlayerController extends Notifier<PlayerState> {
   );
   static const _audioSettingsKey = 'audio.processing.v1';
   static const _backgroundSettingsKey = 'visual.playbackBackground.v1';
+  static const _debugModeKey = 'app.debugMode.v1';
 
   Player? _player;
   Timer? _playbackTimer;
@@ -125,6 +130,7 @@ class PlayerController extends Notifier<PlayerState> {
     });
     unawaited(_loadAudioSettings());
     unawaited(_loadBackgroundSettings());
+    unawaited(_loadDebugMode());
     return PlayerState(
       queue: demoTracks,
       currentIndex: 0,
@@ -230,6 +236,11 @@ class PlayerController extends Notifier<PlayerState> {
   void updateBackgroundSettings(PlaybackBackgroundSettings settings) {
     state = state.copyWith(backgroundSettings: settings);
     unawaited(_saveBackgroundSettings(settings));
+  }
+
+  void updateDebugMode(bool enabled) {
+    state = state.copyWith(debugMode: enabled);
+    unawaited(_saveDebugMode(enabled));
   }
 
   /// 用曲库扫描结果替换播放队列，同时保留当前播放项（如果仍存在）。
@@ -558,6 +569,26 @@ class PlayerController extends Notifier<PlayerState> {
       await database.saveSetting(_backgroundSettingsKey, settings.encode());
     } on Object {
       // 设置持久化失败时仍保持当前进程内的设置。
+    }
+  }
+
+  Future<void> _loadDebugMode() async {
+    try {
+      final database = await sharedLinglunDatabase();
+      final value = await database.loadSetting(_debugModeKey);
+      if (value == null) return;
+      state = state.copyWith(debugMode: value == 'true');
+    } on Object {
+      // 调试设置读取失败时保持关闭，不能影响正常播放。
+    }
+  }
+
+  Future<void> _saveDebugMode(bool enabled) async {
+    try {
+      final database = await sharedLinglunDatabase();
+      await database.saveSetting(_debugModeKey, enabled.toString());
+    } on Object {
+      // 调试设置保存失败时仍保持当前进程内状态。
     }
   }
 

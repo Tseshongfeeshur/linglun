@@ -195,16 +195,19 @@ class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
   bool _showQueue = false;
   bool _showRemainingTime = false;
   late final ValueNotifier<_LyricSeekRequest> _seekRequest;
+  late final ValueNotifier<double> _pulseNotifier;
 
   @override
   void initState() {
     super.initState();
     _seekRequest = ValueNotifier((generation: 0, position: Duration.zero));
+    _pulseNotifier = ValueNotifier(0);
   }
 
   @override
   void dispose() {
     _seekRequest.dispose();
+    _pulseNotifier.dispose();
     super.dispose();
   }
 
@@ -251,6 +254,7 @@ class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
           settings: widget.state.backgroundSettings,
           isPlaying: widget.state.isPlaying,
           position: widget.state.position,
+          pulseNotifier: _pulseNotifier,
         ),
         SafeArea(
           child: Stack(
@@ -325,6 +329,14 @@ class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
                   iconSize: 20,
                 ),
               ),
+              if (widget.state.debugMode)
+                Positioned(
+                  left: 14,
+                  bottom: 52,
+                  child: IgnorePointer(
+                    child: _DebugPulseBar(pulseNotifier: _pulseNotifier),
+                  ),
+                ),
               Positioned(
                 right: 8,
                 bottom: 8,
@@ -349,6 +361,44 @@ class _AmllPlaybackPageState extends State<AmllPlaybackPage> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DebugPulseBar extends StatelessWidget {
+  const _DebugPulseBar({required this.pulseNotifier});
+
+  final ValueListenable<double> pulseNotifier;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<double>(
+      valueListenable: pulseNotifier,
+      builder: (context, pulse, child) {
+        const maxHeight = 120.0;
+        final height = (pulse.clamp(0.0, 1.0) * maxHeight).toDouble();
+        return SizedBox(
+          width: 10,
+          height: maxHeight,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.secondary,
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.secondary
+                        .withAlpha(90),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: SizedBox(width: 10, height: height),
+            ),
+          ),
+        );
+      },
     );
   }
 }
