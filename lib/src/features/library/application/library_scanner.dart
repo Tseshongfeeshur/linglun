@@ -215,9 +215,10 @@ class LibraryScanner {
     Duration? duration, {
     ScanProgressCallback? onProgress,
   }) async {
-    // Android 暂不内置 ffmpeg，节拍分析留待后续原生音频分析模块接入。
-    if (Platform.isAndroid) return null;
     if (duration == null || duration <= Duration.zero) return null;
+    if (Platform.isAndroid) {
+      return _analyzeAndroidBeat(file, duration, onProgress: onProgress);
+    }
     try {
       onProgress?.call(path: file.path, stage: '分析 PCM 节拍数据');
       final process = await Process.start('ffmpeg', [
@@ -277,6 +278,52 @@ class LibraryScanner {
         values: values,
       );
     } on Object {
+      return null;
+    }
+  }
+
+  Future<BeatEnvelope?> _analyzeAndroidBeat(
+    File file,
+    Duration duration, {
+    ScanProgressCallback? onProgress,
+  }) async {
+    try {
+      onProgress?.call(path: file.path, stage: '分析 PCM 节拍数据');
+      var source = file.path;
+      try {
+        final uri = await _androidMediaLibrary.invokeMethod<String>(
+          'uriForPath',
+          <String, Object?>{'path': file.path},
+        );
+        if (uri != null && uri.isNotEmpty) source = uri;
+      } on Object {
+        // URI 查询失败时继续尝试文件路径，兼容可直接访问的共享目录。
+      }
+      final result = await _androidMediaLibrary.invokeMethod<Object?>(
+        'analyzePcmEnvelope',
+        <String, Object?>{
+          'path': source,
+          'durationMs': duration.inMilliseconds,
+        },
+      );
+      if (result is! Map) return null;
+      final values = result['values'];
+      if (values is! List || values.isEmpty) return null;
+      final parsedValues = [
+        for (final value in values)
+          if (value is num) value.toDouble().clamp(0.0, 1.0).toDouble(),
+      ];
+      if (parsedValues.isEmpty) return null;
+      final sampleRate = result['sampleRate'];
+      final durationMs = result['durationMs'];
+      if (sampleRate is! num || durationMs is! num) return null;
+      return BeatEnvelope(
+        durationMs: durationMs.round(),
+        sampleRate: sampleRate.round(),
+        values: parsedValues,
+      );
+    } on Object {
+      // Android 设备缺少对应解码器时，保留歌曲并跳过视觉分析。
       return null;
     }
   }

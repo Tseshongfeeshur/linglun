@@ -186,7 +186,7 @@ SOFA、动态 Bass 谐波增强和多声道上混不得伪装成已经完成的�
 - 原生 DSP 不可用时必须保证 mpv 基础播放仍可用。
 - 新增 Rust/FFI 构建链前，先完成最小音频块处理验证，再扩大到完整原生播放后端。
 
-## 当前功能状态（2026 年 9 月 26 日）
+## 当前功能状态（2026 年 9 月 28 日）
 
 本节是代码现状清单，优先级高于早期计划中的笼统描述。新增功能或修复问题后，
 应同步更新本节。
@@ -201,6 +201,7 @@ SOFA、动态 Bass 谐波增强和多声道上混不得伪装成已经完成的�
 - 标题、艺术家、专辑、时长、采样率、比特率、曲目号、封面、ReplayGain 和原始标签详情读取；Ogg/Opus 时长按容器粒度位置和 Opus 固定 48 kHz 时钟精确计算，避免输入采样率或 `LENGTH` 标签造成偏差。
 - 内嵌封面优先使用正面封面，曲库列表、专辑列表和艺术家列表使用圆形裁切。
 - 基于 `media_kit/libmpv` 的打开、播放、暂停、切歌和定位；定位输入会限制在有效范围内。
+- Linux 扫描阶段使用 FFmpeg、Android 扫描阶段使用 MediaExtractor/MediaCodec 解码 PCM，并以相同的 50 毫秒 RMS/Peak 算法生成 20 Hz `BeatEnvelope`；Android 优先使用 MediaStore `content://` URI。
 - ReplayGain 曲目增益优先、专辑增益回退、削波保护和可选响度均衡；没有独立应用音量滑块。
 - mpv/libavfilter 基础处理链：预放大、十段参数化 EQ、基础 Bass、Crossfeed 和输出限幅。
 - 音频设置的 JSON 持久化、重置、EQ/Bass/Crossfeed/ReplayGain/限幅控制。
@@ -218,7 +219,7 @@ SOFA、动态 Bass 谐波增强和多声道上混不得伪装成已经完成的�
 - AMLL 专辑封面在播放和暂停时保持相同尺寸；切歌后加载歌词时立即聚焦首句。
 - AMLL 参考来源、0.6.0 版本和 AGPL-3.0-only 许可证边界记录于 `docs/playback-style-sources.md`；Flutter 实现没有复制其代码或资源。
 - 专辑、艺术家和当前播放队列的基础浏览页面；歌曲来源页显示目录类型、扫描状态和曲目数量。
-- 76 项歌词、音频处理、数据库、播放器状态和 Widget 回归测试；截至 2026 年 9 月 26 日，本轮 `dart analyze`、完整 `flutter test` 和 `flutter build linux` 均已通过。Opus 时长回归使用合成 Ogg/Opus 页面验证粒度位置换算。
+- 90 项歌词、音频处理、数据库、播放器状态和 Widget 回归测试；截至 2026 年 9 月 28 日，本轮 `dart analyze`、完整 `flutter test`、`flutter build linux` 和使用 Android Studio JBR 25 的 `:app:assembleDebug` 均已通过。Opus 时长回归使用合成 Ogg/Opus 页面验证粒度位置换算；Android PCM 分析尚未连接真实设备验收。
 
 ### 部分实现或存在边界
 
@@ -230,6 +231,7 @@ SOFA、动态 Bass 谐波增强和多声道上混不得伪装成已经完成的�
 - 随机/循环模式当前为播放会话内状态，没有持久化；音质标签只展示本地文件格式和扫描到的采样率，不代表经验证的 Hi-Res 或空间音频认证。
 - AMLL 播放页样式由 Flutter 独立重写；没有复用其 AGPL 源码或资源。若后续改为复制/改编上游代码，必须重新评估许可证义务。
 - 悬浮播放器已按圆心所在窗口半区决定菜单方向，菜单尺寸按内容自适应；最小窗口、高 DPI、Wayland 多屏和真实鼠标拖动仍需要 Linux 手工验收。
+- Android PCM 分析依赖设备的 MediaExtractor/MediaCodec 解码器；当前仅完成 APK 编译验证，真实 MediaStore URI、设备编解码器差异和扫描耗时仍需要 Android 真机验收。
 - 年度总结目前提供年度总次数和累计次数，不提供年度曲目排名、按年份筛选或听歌时长统计。
 - 当前播放器直接使用 `Player` 和 `NativePlayer`，尚未抽出 `PlaybackEngine`、`PlaybackCoordinator` 和后端切换状态机。
 - `BassEnhancementSettings.harmonics` 已进入统一设置模型，但 mpv 后端只使用基础 Bass 滤镜，尚未实现动态谐波增强。

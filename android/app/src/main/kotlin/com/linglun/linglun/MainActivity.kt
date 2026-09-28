@@ -16,6 +16,16 @@ class MainActivity : AudioServiceActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "linglun/android_media_library")
             .setMethodCallHandler { call, result ->
+                if (call.method == "analyzePcmEnvelope") {
+                    val source = call.argument<String>("path")
+                    val durationMs = call.argument<Number>("durationMs")?.toLong() ?: 0L
+                    if (source.isNullOrEmpty() || durationMs <= 0L) {
+                        result.error("invalid_source", "音频路径或时长为空", null)
+                    } else {
+                        analyzePcmEnvelope(source, durationMs, result)
+                    }
+                    return@setMethodCallHandler
+                }
                 if (call.method != "audioPaths") {
                     if (call.method == "uriForPath") {
                         val path = call.argument<String>("path")
@@ -114,6 +124,24 @@ class MainActivity : AudioServiceActivity() {
             } catch (error: Exception) {
                 runOnUiThread {
                     result.error("media_uri", "查找 Android 媒体 URI 失败", error.message)
+                }
+            }
+        }.start()
+    }
+
+    private fun analyzePcmEnvelope(
+        source: String,
+        durationMs: Long,
+        result: MethodChannel.Result,
+    ) {
+        // 解码和分析都在工作线程执行，避免曲库扫描阻塞 Flutter UI 线程。
+        Thread {
+            try {
+                val envelope = PcmEnvelopeAnalyzer(this).analyze(source, durationMs)
+                runOnUiThread { result.success(envelope) }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    result.error("pcm_analysis", "分析音频 PCM 失败", error.message)
                 }
             }
         }.start()
