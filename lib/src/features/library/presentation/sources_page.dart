@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/library_controller.dart';
 
-/// 展示曲库扫描来源，包括用户添加的目录和 XDG 音乐目录。
+/// 展示曲库扫描来源，包括 Android 媒体库及已添加的目录。
 class SourcesPage extends ConsumerWidget {
   const SourcesPage({super.key});
 
@@ -21,7 +22,22 @@ class SourcesPage extends ConsumerWidget {
               ?.copyWith(color: Colors.white60),
         ),
         const SizedBox(height: 24),
-        if (state.directories.isEmpty)
+        if (defaultTargetPlatform == TargetPlatform.android)
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            leading: const Icon(Icons.library_music_outlined),
+            title: const Text('Android 媒体库'),
+            subtitle: const Text('刷新曲库时读取设备音频；与添加目录中的歌曲自动去重'),
+            trailing: state.isScanning
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check_circle_outline),
+          ),
+        if (state.directories.isEmpty &&
+            defaultTargetPlatform != TargetPlatform.android)
           const Card(
             child: ListTile(
               leading: Icon(Icons.folder_off_outlined),

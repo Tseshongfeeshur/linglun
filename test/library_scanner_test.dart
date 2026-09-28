@@ -17,6 +17,20 @@ void main() {
     expect(tracks.single.duration.inMicroseconds, closeTo(261929188, 1));
     expect(tracks.single.metadata['时长'], '0:04:21.929188');
   });
+
+  test('重叠扫描目录不会重复添加同一个文件', () async {
+    final directory = await Directory.systemTemp.createTemp('linglun-dedup-');
+    addTearDown(() => directory.delete(recursive: true));
+    final file = File('${directory.path}/duplicate.opus');
+    await file.writeAsBytes(_opusFixture());
+    final nested = Directory('${directory.path}/nested');
+    await nested.create();
+
+    final tracks = await LibraryScanner().scan([directory.path, nested.path]);
+
+    expect(tracks, hasLength(1));
+    expect(tracks.single.path, file.absolute.path);
+  });
 }
 
 Uint8List _opusFixture() {

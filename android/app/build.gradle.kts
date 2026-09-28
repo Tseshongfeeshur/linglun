@@ -27,6 +27,11 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // 当前 Android 版本只发布 ARM64 真机包，暂不构建模拟器和 32 位 ABI。
+        ndk {
+            abiFilters += "arm64-v8a"
+        }
     }
 
     buildTypes {

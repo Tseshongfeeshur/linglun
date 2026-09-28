@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as path_util;
 // ignore: implementation_imports
 import 'package:audio_metadata_reader/src/metadata/base.dart'
@@ -62,6 +63,10 @@ class _OggPage {
 
 /// 递归扫描目录并将音频文件转换成应用层的曲目模型。
 class LibraryScanner {
+  static const _androidMediaLibrary = MethodChannel(
+    'linglun/android_media_library',
+  );
+
   Future<List<Track>> scan(
     Iterable<String> rootPaths, {
     Map<String, Track> previousTracks = const {},
@@ -71,24 +76,31 @@ class LibraryScanner {
     final files = <File>[];
     final visited = <String>{};
 
+    if (Platform.isAndroid) {
+      await _addAndroidMediaLibraryFiles(files, visited, onProgress);
+    }
+
     for (final rootPath in rootPaths) {
       final root = Directory(rootPath);
       if (!root.existsSync()) continue;
 
-      await for (final entity in root.list(
-        recursive: true,
-        followLinks: false,
-      )) {
-        if (entity is! File) continue;
-        final extension = _extension(entity.path);
-        if (!supportedAudioExtensions.contains(extension)) continue;
-        final normalizedPath = path_util.normalize(
-          File(entity.path).absolute.path,
-        );
-        if (visited.add(normalizedPath)) {
-          files.add(File(normalizedPath));
-          onProgress?.call(path: normalizedPath, stage: '查找音频文件');
+      try {
+        await for (final entity in root.list(
+          recursive: true,
+          followLinks: false,
+        )) {
+          if (entity is! File) continue;
+          if (!supportedAudioExtensions.contains(_extension(entity.path))) {
+            continue;
+          }
+          final normalizedPath = _normalizeFilePath(entity);
+          if (visited.add(normalizedPath)) {
+            files.add(File(normalizedPath));
+            onProgress?.call(path: normalizedPath, stage: '查找音频文件');
+          }
         }
+      } on FileSystemException {
+        // 单个目录失效或无权访问时，不影响其他目录和媒体库扫描。
       }
     }
 
@@ -203,6 +215,8 @@ class LibraryScanner {
     Duration? duration, {
     ScanProgressCallback? onProgress,
   }) async {
+    // Android 暂不内置 ffmpeg，节拍分析留待后续原生音频分析模块接入。
+    if (Platform.isAndroid) return null;
     if (duration == null || duration <= Duration.zero) return null;
     try {
       onProgress?.call(path: file.path, stage: '分析 PCM 节拍数据');
@@ -264,6 +278,40 @@ class LibraryScanner {
       );
     } on Object {
       return null;
+    }
+  }
+
+  Future<void> _addAndroidMediaLibraryFiles(
+    List<File> files,
+    Set<String> visited,
+    ScanProgressCallback? onProgress,
+  ) async {
+    try {
+      final paths = await _androidMediaLibrary.invokeListMethod<String>(
+        'audioPaths',
+      );
+      for (final rawPath in paths ?? const <String>[]) {
+        if (rawPath.isEmpty ||
+            !supportedAudioExtensions.contains(_extension(rawPath))) {
+          continue;
+        }
+        final file = File(rawPath);
+        if (!file.existsSync()) continue;
+        final normalizedPath = _normalizeFilePath(file);
+        if (!visited.add(normalizedPath)) continue;
+        files.add(File(normalizedPath));
+        onProgress?.call(path: normalizedPath, stage: '读取 Android 媒体库');
+      }
+    } on Object {
+      // 媒体库权限被拒绝或查询失败时，仍继续扫描用户选择的目录。
+    }
+  }
+
+  String _normalizeFilePath(File file) {
+    try {
+      return path_util.normalize(file.absolute.resolveSymbolicLinksSync());
+    } on FileSystemException {
+      return path_util.normalize(file.absolute.path);
     }
   }
 

@@ -169,6 +169,7 @@ class LibraryController extends Notifier<LibraryState> {
   }
 
   List<String> _defaultDirectories() {
+    if (Platform.isAndroid) return const [];
     final home = Platform.environment['HOME'];
     if (home == null || home.isEmpty) return const [];
 
