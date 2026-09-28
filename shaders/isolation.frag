@@ -91,7 +91,7 @@ void main() {
   vec3 top = mix(uColor0, uColor1, horizontal);
   vec3 bottom = mix(uColor2, uColor3, horizontal);
   vec3 color = mix(top, bottom, vertical);
-  color = mix(color, color * (1.0 + uPulse * 0.02), uPulse);
+  color = mix(color, color * (1.0 + uPulse * 0.06), uPulse);
   vec3 linearColor = srgbToLinear(color);
   linearColor = protectHighlights(linearColor);
   color = linearToSrgb(linearColor);
