@@ -3,7 +3,7 @@
 uniform vec2 uSize;
 uniform float uTime;
 uniform float uPulse;
-uniform float uFrameInterval;
+uniform float uPhase;
 uniform vec3 uColor0;
 uniform vec3 uColor1;
 uniform vec3 uColor2;
@@ -34,6 +34,21 @@ vec2 rotatePoint(vec2 point, float angle) {
   float sine = sin(angle);
   float cosine = cos(angle);
   return vec2(point.x * cosine - point.y * sine, point.x * sine + point.y * cosine);
+}
+
+// 对时间轴做三点三角核平均，削弱噪声格之间的尖锐过渡。
+float smoothedDegree(float time, float y) {
+  const float sampleDistance = 0.35;
+  float previous = noise(vec2(
+    time - sampleDistance + uRandom.x,
+    y + uRandom.y
+  ));
+  float current = noise(vec2(time + uRandom.x, y + uRandom.y));
+  float next = noise(vec2(
+    time + sampleDistance + uRandom.x,
+    y + uRandom.y
+  ));
+  return previous * 0.25 + current * 0.5 + next * 0.25;
 }
 
 vec3 srgbToLinear(vec3 color) {
@@ -75,14 +90,12 @@ vec3 protectHighlights(vec3 linearColor) {
 void main() {
   vec2 uv = FlutterFragCoord().xy / uSize;
   vec2 point = uv - 0.5;
-  float quantizedTime = floor(uTime / max(uFrameInterval, 0.0001)) * uFrameInterval;
-  float time = quantizedTime * 0.1;
-  float degree = noise(vec2(time + uRandom.x, point.x * point.y + uRandom.y));
-  float angle = (degree - 0.5) * 6.28318 + uRandom.z;
+  float time = uTime * 0.1;
+  float degree = smoothedDegree(time, point.x * point.y);
+  float angle = (degree - 0.5) * 3.0 + uRandom.z;
   point = rotatePoint(point, angle);
 
-  float pulse = 1.0 + uPulse * 0.12;
-  float speed = time * pulse;
+  float speed = uPhase;
   point.x += sin(point.y * 5.0 + speed) / 24.0;
   point.y += sin(point.x * 7.5 + speed) / 12.0;
 

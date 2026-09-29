@@ -201,7 +201,7 @@ SOFA、动态 Bass 谐波增强和多声道上混不得伪装成已经完成的�
 - 标题、艺术家、专辑、时长、采样率、比特率、曲目号、封面、ReplayGain 和原始标签详情读取；Ogg/Opus 时长按容器粒度位置和 Opus 固定 48 kHz 时钟精确计算，避免输入采样率或 `LENGTH` 标签造成偏差。
 - 内嵌封面优先使用正面封面，曲库列表、专辑列表和艺术家列表使用圆形裁切。
 - 基于 `media_kit/libmpv` 的打开、播放、暂停、切歌和定位；定位输入会限制在有效范围内。
-- 播放时按需生成视觉包络：Linux 使用 FFmpeg、Android 使用 MediaExtractor/MediaCodec 解码 PCM，并以相同的 50 毫秒 RMS/Peak 算法生成 20 Hz `BeatEnvelope`；Android 优先使用 MediaStore `content://` URI。没有包络的歌曲先播放再异步分析，分析范围映射为进度条缓冲进度，完成后立即驱动背景 Pulse 并持久化。
+- 播放时按需生成视觉包络：Linux 使用 FFmpeg、Android 使用 MediaExtractor/MediaCodec 解码 PCM，并以相同的 50 毫秒 RMS/Peak 算法生成 20 Hz `BeatEnvelope`；Android 优先使用 MediaStore `content://` URI。没有包络的歌曲先播放再异步分析，分析范围映射为进度条缓冲进度，完成后立即驱动背景 Pulse 并持久化。Pulse 在 Dart 侧进行约 120 ms 低通并积分连续相位，Isolation shader 使用连续时间、三点时间平滑和受限旋转幅度，避免低频突变闪烁。
 - ReplayGain 曲目增益优先、专辑增益回退、削波保护和可选响度均衡；没有独立应用音量滑块。
 - mpv/libavfilter 基础处理链：预放大、十段参数化 EQ、基础 Bass、Crossfeed 和输出限幅。
 - 音频设置的 JSON 持久化、重置、EQ/Bass/Crossfeed/ReplayGain/限幅控制。
@@ -219,7 +219,7 @@ SOFA、动态 Bass 谐波增强和多声道上混不得伪装成已经完成的�
 - AMLL 专辑封面在播放和暂停时保持相同尺寸；切歌后加载歌词时立即聚焦首句。
 - AMLL 参考来源、0.6.0 版本和 AGPL-3.0-only 许可证边界记录于 `docs/playback-style-sources.md`；Flutter 实现没有复制其代码或资源。
 - 专辑、艺术家和当前播放队列的基础浏览页面；歌曲来源页显示目录类型、扫描状态和曲目数量。
-- 90 项歌词、音频处理、数据库、播放器状态和 Widget 回归测试；截至 2026 年 9 月 28 日，本轮 `dart analyze`、完整 `flutter test`、`flutter build linux` 和使用 Android Studio JBR 25 的 `:app:assembleDebug` 均已通过。Opus 时长回归使用合成 Ogg/Opus 页面验证粒度位置换算；Android PCM 分析尚未连接真实设备验收。
+- 94 项歌词、音频处理、数据库、播放器状态和 Widget 回归测试；截至 2026 年 9 月 29 日，本轮 `dart analyze`、完整 `flutter test`、`flutter build linux` 和使用 Android Studio JBR 25 的 `:app:assembleDebug` 均已通过。`dart analyze` 仍报告临时文件 `amll_playback_page_MODIFIED.dart` 的既有文件名提示；不影响本次修改。Opus 时长回归使用合成 Ogg/Opus 页面验证粒度位置换算；Android PCM 分析尚未连接真实设备验收。
 
 ### 部分实现或存在边界
 

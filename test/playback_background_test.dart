@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:linglun/src/features/player/domain/playback_background.dart';
 import 'package:linglun/src/features/player/domain/visual_analysis.dart';
+import 'package:linglun/src/features/player/presentation/playback_background_motion.dart';
 
 void main() {
   test('背景设置会限制范围并保持版本化 JSON', () {
@@ -63,6 +64,26 @@ void main() {
 
     expect(envelope.isComplete, isTrue);
     expect(envelope.analyzedDurationMs, 1000);
+  });
+
+  test('背景 Pulse 低通收敛且大时间间隔不会造成相位跳跃', () {
+    final motion = PlaybackBackgroundMotion();
+
+    motion.advance(const Duration(seconds: 1), targetPulse: 1, flowSpeed: 1);
+
+    expect(motion.elapsedMilliseconds, 100);
+    expect(motion.pulse, greaterThan(0));
+    expect(motion.pulse, lessThan(1));
+    expect(motion.phase, lessThan(.02));
+
+    final previousPhase = motion.phase;
+    motion.advance(
+      const Duration(milliseconds: 100),
+      targetPulse: 1,
+      flowSpeed: 1,
+    );
+    expect(motion.pulse, greaterThan(0.5));
+    expect(motion.phase - previousPhase, lessThan(.02));
   });
 
   test('四色调色板可以往返 JSON', () {

@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -6,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../domain/playback_background.dart';
 import '../domain/track.dart';
+import 'playback_background_motion.dart';
 
 /// Flutter 版流光背景。
 class IsolationBackground extends StatefulWidget {
@@ -34,7 +34,8 @@ class _IsolationBackgroundState extends State<IsolationBackground>
   late final Ticker _ticker;
   Duration _lastTick = Duration.zero;
   Duration _lastPaint = Duration.zero;
-  double _elapsed = 0;
+  final _motion = PlaybackBackgroundMotion();
+  double _targetPulse = 0;
   FluidPaletteState? _previousPalette;
   FluidPaletteState? _currentPalette;
   DateTime? _paletteChangedAt;
@@ -112,10 +113,11 @@ class _IsolationBackgroundState extends State<IsolationBackground>
     _lastTick = elapsed;
     final frozen = !widget.isPlaying && widget.settings.freezeOnPause;
     if (!frozen) {
-      _elapsed +=
-          delta.inMicroseconds /
-          Duration.microsecondsPerMillisecond *
-          widget.settings.flowSpeed;
+      _motion.advance(
+        delta,
+        targetPulse: _targetPulse,
+        flowSpeed: widget.settings.flowSpeed,
+      );
     }
     final frameInterval = Duration(
       microseconds: (Duration.microsecondsPerSecond / widget.settings.fps)
@@ -151,19 +153,20 @@ class _IsolationBackgroundState extends State<IsolationBackground>
         : ((DateTime.now().difference(_paletteChangedAt!).inMilliseconds) /
                   1000)
               .clamp(0.0, 1.0);
-    final pulse = widget.settings.beatEnabled
+    _targetPulse = widget.settings.beatEnabled
         ? widget.track.beatEnvelope?.valueAt(widget.position) ?? 0.0
         : 0.0;
-    if (widget.pulseNotifier.value != pulse) {
-      widget.pulseNotifier.value = pulse;
+    if (widget.pulseNotifier.value != _motion.pulse) {
+      // 调试柱观察的是实际传给 Shader 的平滑 Pulse，而不是原始包络值。
+      widget.pulseNotifier.value = _motion.pulse;
     }
     return RepaintBoundary(
       child: CustomPaint(
         painter: _IsolationPainter(
           program: _program,
-          elapsed: _elapsed,
-          fps: widget.settings.fps,
-          pulse: pulse,
+          elapsed: _motion.elapsedMilliseconds,
+          phase: _motion.phase,
+          pulse: _motion.pulse,
           previousPalette: _previousPalette,
           palette: _currentPalette!,
           paletteProgress: Curves.easeInOut.transform(transition),
@@ -184,7 +187,7 @@ class _IsolationPainter extends CustomPainter {
   const _IsolationPainter({
     required this.program,
     required this.elapsed,
-    required this.fps,
+    required this.phase,
     required this.pulse,
     required this.previousPalette,
     required this.palette,
@@ -193,7 +196,7 @@ class _IsolationPainter extends CustomPainter {
 
   final ui.FragmentProgram? program;
   final double elapsed;
-  final int fps;
+  final double phase;
   final double pulse;
   final FluidPaletteState? previousPalette;
   final FluidPaletteState palette;
@@ -214,7 +217,7 @@ class _IsolationPainter extends CustomPainter {
     shader.setFloat(uniform++, size.height);
     shader.setFloat(uniform++, elapsed / 1000);
     shader.setFloat(uniform++, pulse);
-    shader.setFloat(uniform++, 1 / math.max(1, fps));
+    shader.setFloat(uniform++, phase);
     for (var index = 0; index < 4; index++) {
       final color = _interpolatedColor(index);
       shader.setFloat(uniform++, color[0]);
@@ -247,7 +250,7 @@ class _IsolationPainter extends CustomPainter {
   bool shouldRepaint(_IsolationPainter oldDelegate) =>
       oldDelegate.program != program ||
       oldDelegate.elapsed != elapsed ||
-      oldDelegate.fps != fps ||
+      oldDelegate.phase != phase ||
       oldDelegate.pulse != pulse ||
       oldDelegate.paletteProgress != paletteProgress ||
       oldDelegate.palette != palette;
