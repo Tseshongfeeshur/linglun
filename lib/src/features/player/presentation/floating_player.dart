@@ -37,7 +37,11 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
   bool _hovered = false;
   bool _dragging = false;
   bool _seeking = false;
+  bool _touchPointerDown = false;
+  bool _touchMenuWasExpandedOnDown = false;
+  bool _touchMenuExpanded = false;
   Timer? _hoverExitTimer;
+  Timer? _touchCollapseTimer;
 
   @override
   void initState() {
@@ -48,6 +52,7 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
   @override
   void dispose() {
     _hoverExitTimer?.cancel();
+    _touchCollapseTimer?.cancel();
     super.dispose();
   }
 
@@ -72,6 +77,7 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
           clipBehavior: Clip.none,
           children: [
             Positioned.fill(
+              key: const ValueKey('floating-player-drag-backdrop'),
               child: IgnorePointer(
                 ignoring: !_dragging,
                 child: AnimatedOpacity(
@@ -84,24 +90,48 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
                 ),
               ),
             ),
+            if (_touchMenuExpanded)
+              Positioned.fill(
+                key: const ValueKey('floating-player-touch-dismiss-layer'),
+                child: Listener(
+                  behavior: HitTestBehavior.opaque,
+                  onPointerDown: (event) {
+                    if (_isTouchPointer(event.kind)) {
+                      _dismissTouchMenu();
+                    }
+                  },
+                  child: const SizedBox.expand(),
+                ),
+              ),
             Positioned.fill(
+              key: const ValueKey('floating-player-cluster'),
               child: _FloatingCluster(
                 position: center,
                 track: track,
                 state: state,
                 hovered: _hovered,
                 dragging: _dragging,
+                touchMenuExpanded: _touchMenuExpanded,
                 seekPreviewProgress: _seekPreviewProgress,
                 showAbove: showAbove,
                 showLeft: showLeft,
                 onHover: _setHovered,
                 onPointerDown: (event) {
+                  _touchPointerDown = _isTouchPointer(event.kind);
                   _pointerDownPosition = event.position;
                   _seeking = _isNearSeekHandle(
                     event.position,
                     center,
                     _progress(state),
                   );
+                  if (_touchPointerDown) {
+                    _touchMenuWasExpandedOnDown = _touchMenuExpanded;
+                    // 触摸在按下时就开始展开，和鼠标进入圆形区域时的时机一致；
+                    // 抬起事件只负责区分“展开菜单”与“进入播放页”。
+                    if (!_seeking && !_touchMenuExpanded) {
+                      _expandTouchMenu();
+                    }
+                  }
                 },
                 onDragStart: (details) {
                   _hoverExitTimer?.cancel();
@@ -113,6 +143,7 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
                   setState(() {
                     _hovered = true;
                     _dragging = true;
+                    if (_touchPointerDown) _touchMenuExpanded = true;
                   });
                 },
                 onDragUpdate: (details) {
@@ -144,6 +175,8 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
                     _seeking = false;
                     _dragging = false;
                     _hovered = true;
+                    _touchPointerDown = false;
+                    _touchMenuWasExpandedOnDown = false;
                   });
                   if (shouldSeek) {
                     ref
@@ -158,9 +191,23 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
                     _seeking = false;
                     _pointerDownPosition = null;
                     _seekPreviewProgress = null;
+                    _touchPointerDown = false;
+                    _touchMenuWasExpandedOnDown = false;
                     return;
                   }
+                  if (_touchPointerDown) {
+                    final wasExpanded = _touchMenuWasExpandedOnDown;
+                    _touchPointerDown = false;
+                    _touchMenuWasExpandedOnDown = false;
+                    if (!wasExpanded) return;
+                  }
                   _openPlaybackPage(context, circleCenter);
+                },
+                onOpenPlaybackPage: () =>
+                    _openPlaybackPage(context, circleCenter),
+                onLongPress: () {
+                  if (!_touchPointerDown) return;
+                  _expandTouchMenu();
                 },
               ),
             ),
@@ -172,7 +219,12 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
 
   void _openPlaybackPage(BuildContext context, Offset localSourceCenter) {
     _hoverExitTimer?.cancel();
-    setState(() => _hovered = false);
+    _touchCollapseTimer?.cancel();
+    setState(() {
+      _hovered = false;
+      _touchMenuExpanded = false;
+      _touchPointerDown = false;
+    });
     final renderBox = context.findRenderObject() as RenderBox;
     final sourceCenter = renderBox.localToGlobal(localSourceCenter);
     unawaited(
@@ -188,12 +240,39 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
   void _setHovered(bool value) {
     _hoverExitTimer?.cancel();
     if (value) {
+      _touchCollapseTimer?.cancel();
       if (!_hovered) setState(() => _hovered = true);
       return;
     }
+    if (_touchMenuExpanded) return;
     // 给光标从圆移动到面板留出时间，避免经过透明间隙时面板立即收回。
     _hoverExitTimer = Timer(const Duration(milliseconds: 180), () {
       if (mounted) setState(() => _hovered = false);
+    });
+  }
+
+  void _dismissTouchMenu() {
+    if (!_touchMenuExpanded || !mounted) return;
+    _hoverExitTimer?.cancel();
+    _touchCollapseTimer?.cancel();
+
+    // 保留拦截层直到收起动画结束。若先移除拦截层，触摸事件会在同一帧
+    // 重新命中下方内容，导致菜单直接消失而没有反向动画。
+    setState(() => _hovered = false);
+    _touchCollapseTimer = Timer(const Duration(milliseconds: 240), () {
+      if (!mounted) return;
+      setState(() => _touchMenuExpanded = false);
+      _touchCollapseTimer = null;
+    });
+  }
+
+  void _expandTouchMenu() {
+    if (!mounted) return;
+    _hoverExitTimer?.cancel();
+    _touchCollapseTimer?.cancel();
+    setState(() {
+      _touchMenuExpanded = true;
+      _hovered = true;
     });
   }
 
@@ -293,6 +372,9 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
         .abs();
     return delta <= .3;
   }
+
+  bool _isTouchPointer(PointerDeviceKind kind) =>
+      kind == PointerDeviceKind.touch || kind == PointerDeviceKind.stylus;
 }
 
 class _FloatingCluster extends ConsumerWidget {
@@ -302,6 +384,7 @@ class _FloatingCluster extends ConsumerWidget {
     required this.state,
     required this.hovered,
     required this.dragging,
+    required this.touchMenuExpanded,
     required this.seekPreviewProgress,
     required this.showAbove,
     required this.showLeft,
@@ -311,6 +394,8 @@ class _FloatingCluster extends ConsumerWidget {
     required this.onDragUpdate,
     required this.onDragEnd,
     required this.onTap,
+    required this.onOpenPlaybackPage,
+    required this.onLongPress,
   });
 
   final Offset position;
@@ -318,6 +403,7 @@ class _FloatingCluster extends ConsumerWidget {
   final PlayerState state;
   final bool hovered;
   final bool dragging;
+  final bool touchMenuExpanded;
   final double? seekPreviewProgress;
   final bool showAbove;
   final bool showLeft;
@@ -327,6 +413,8 @@ class _FloatingCluster extends ConsumerWidget {
   final GestureDragUpdateCallback onDragUpdate;
   final GestureDragEndCallback onDragEnd;
   final VoidCallback onTap;
+  final VoidCallback onOpenPlaybackPage;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -335,65 +423,54 @@ class _FloatingCluster extends ConsumerWidget {
     final lyricPosition = state.position - lyrics.offset;
     final controller = ref.read(playerControllerProvider.notifier);
     final panelsExpanded = hovered || dragging;
-    final bubble = _MorphingGlassBubble(
-      expanded: panelsExpanded,
-      instant: dragging,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            onPressed: controller.previous,
-            tooltip: '上一曲',
-            icon: const Icon(Icons.skip_previous),
-          ),
-          IconButton.filled(
-            onPressed: controller.togglePlay,
-            tooltip: state.isPlaying ? '暂停' : '播放',
-            icon: Icon(state.isPlaying ? Icons.pause : Icons.play_arrow),
-          ),
-          IconButton(
-            onPressed: controller.skipNext,
-            tooltip: '下一曲',
-            icon: const Icon(Icons.skip_next),
-          ),
-        ],
-      ),
+    final bubbleContent = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          onPressed: controller.previous,
+          tooltip: '上一曲',
+          icon: const Icon(Icons.skip_previous),
+        ),
+        IconButton.filled(
+          onPressed: controller.togglePlay,
+          tooltip: state.isPlaying ? '暂停' : '播放',
+          icon: Icon(state.isPlaying ? Icons.pause : Icons.play_arrow),
+        ),
+        IconButton(
+          onPressed: controller.skipNext,
+          tooltip: '下一曲',
+          icon: const Icon(Icons.skip_next),
+        ),
+      ],
     );
-    final info = _MorphingGlassBubble(
-      maxWidth: MediaQuery.sizeOf(context).width * .4,
-      expanded: panelsExpanded,
-      instant: dragging,
-      collapseToHeight: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Column(
-        crossAxisAlignment: showLeft
-            ? CrossAxisAlignment.end
-            : CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (currentLine == null)
-            Text(
-              track.lyrics == null || track.lyrics!.trim().isEmpty
-                  ? '暂无歌词'
-                  : lyrics.timing == LyricsTiming.none
-                  ? '歌词没有时间信息'
-                  : '暂无歌词',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-                fontSize: 14,
-              ),
-            )
-          else ...[
-            _LyricPreviewLine(line: currentLine, position: lyricPosition),
-            if (currentLine.translation != null)
-              _LyricPreviewVariant(text: currentLine.translation!),
-            for (final variant in currentLine.variants)
-              _LyricPreviewVariant(text: variant.text),
-          ],
+    final infoContent = Column(
+      crossAxisAlignment: showLeft
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (currentLine == null)
+          Text(
+            track.lyrics == null || track.lyrics!.trim().isEmpty
+                ? '暂无歌词'
+                : lyrics.timing == LyricsTiming.none
+                ? '歌词没有时间信息'
+                : '暂无歌词',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
+              fontSize: 14,
+            ),
+          )
+        else ...[
+          _LyricPreviewLine(line: currentLine, position: lyricPosition),
+          if (currentLine.translation != null)
+            _LyricPreviewVariant(text: currentLine.translation!),
+          for (final variant in currentLine.variants)
+            _LyricPreviewVariant(text: variant.text),
         ],
-      ),
+      ],
     );
 
     Widget panel(Widget child) {
@@ -446,7 +523,21 @@ class _FloatingCluster extends ConsumerWidget {
       expandedTranslation: showLeft
           ? const Offset(-1, -.5)
           : const Offset(0, -.5),
-      child: panel(Padding(padding: infoOuterPadding, child: info)),
+      childBuilder: (progress) => panel(
+        Padding(
+          padding: infoOuterPadding,
+          child: _MorphingGlassBubble(
+            expansion: progress,
+            maxWidth: MediaQuery.sizeOf(context).width * .4,
+            collapseToHeight: true,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 12,
+            ),
+            child: infoContent,
+          ),
+        ),
+      ),
     );
     final controlMenu = _MenuMotion(
       expanded: panelsExpanded,
@@ -460,7 +551,15 @@ class _FloatingCluster extends ConsumerWidget {
       expandedTranslation: showAbove
           ? const Offset(-.5, -1)
           : const Offset(-.5, 0),
-      child: panel(Padding(padding: controlOuterPadding, child: bubble)),
+      childBuilder: (progress) => panel(
+        Padding(
+          padding: controlOuterPadding,
+          child: _MorphingGlassBubble(
+            expansion: progress,
+            child: bubbleContent,
+          ),
+        ),
+      ),
     );
 
     return Stack(
@@ -510,17 +609,25 @@ class _FloatingCluster extends ConsumerWidget {
               onPointerDown: onPointerDown,
               child: GestureDetector(
                 onTap: dragging ? null : onTap,
+                onLongPress: onLongPress,
                 onPanStart: onDragStart,
                 onPanUpdate: onDragUpdate,
                 onPanEnd: onDragEnd,
                 // 只裁切内部封面。进度环和手柄位于封面外侧，若在这里裁切
                 // 整个组件，手柄经过圆周边缘时会被截断。
-                child: PlaybackProgressCircle(
-                  track: track,
-                  progress: seekPreviewProgress ?? _progress(state),
-                  bufferProgress: state.beatAnalysisProgress,
-                  hovered: hovered,
-                  dragging: dragging,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    PlaybackProgressCircle(
+                      track: track,
+                      progress: seekPreviewProgress ?? _progress(state),
+                      bufferProgress: state.beatAnalysisProgress,
+                      hovered: hovered,
+                      dragging: dragging,
+                      touchMenuExpanded: touchMenuExpanded,
+                      onOpenPlaybackPage: onOpenPlaybackPage,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -543,7 +650,7 @@ class _MenuMotion extends StatefulWidget {
     required this.expandedAnchor,
     required this.collapsedTranslation,
     required this.expandedTranslation,
-    required this.child,
+    required this.childBuilder,
   });
 
   final bool expanded;
@@ -552,7 +659,7 @@ class _MenuMotion extends StatefulWidget {
   final Offset expandedAnchor;
   final Offset collapsedTranslation;
   final Offset expandedTranslation;
-  final Widget child;
+  final Widget Function(double progress) childBuilder;
 
   @override
   State<_MenuMotion> createState() => _MenuMotionState();
@@ -581,7 +688,6 @@ class _MenuMotionState extends State<_MenuMotion>
       _controller.animateTo(
         widget.expanded ? 1 : 0,
         duration: const Duration(milliseconds: 240),
-        curve: Curves.easeInOutCubic,
       );
     }
   }
@@ -596,7 +702,6 @@ class _MenuMotionState extends State<_MenuMotion>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,
-      child: widget.child,
       builder: (context, child) {
         final progress = Curves.easeInOutCubic.transform(_controller.value);
         final anchor = Offset.lerp(
@@ -612,7 +717,10 @@ class _MenuMotionState extends State<_MenuMotion>
         return Positioned(
           left: anchor.dx,
           top: anchor.dy,
-          child: FractionalTranslation(translation: translation, child: child),
+          child: FractionalTranslation(
+            translation: translation,
+            child: widget.childBuilder(progress),
+          ),
         );
       },
     );
@@ -622,16 +730,14 @@ class _MenuMotionState extends State<_MenuMotion>
 class _MorphingGlassBubble extends StatefulWidget {
   const _MorphingGlassBubble({
     required this.child,
-    required this.expanded,
-    required this.instant,
+    required this.expansion,
     this.contentPadding = const EdgeInsets.all(8),
     this.collapseToHeight = false,
     this.maxWidth,
   });
 
   final Widget child;
-  final bool expanded;
-  final bool instant;
+  final double expansion;
   final EdgeInsets contentPadding;
   final bool collapseToHeight;
   final double? maxWidth;
@@ -663,24 +769,24 @@ class _MorphingGlassBubbleState extends State<_MorphingGlassBubble> {
 
   @override
   Widget build(BuildContext context) {
-    final duration = widget.instant
-        ? Duration.zero
-        : const Duration(milliseconds: 240);
     final expandedSize = _expandedSize(context);
     final collapsedSize = math.min(
       widget.collapseToHeight ? expandedSize.height : expandedSize.width,
       _circleSize,
     );
-    final size = widget.expanded ? expandedSize : Size.square(collapsedSize);
+    final expansion = widget.expansion.clamp(0.0, 1.0).toDouble();
+    final size = Size.lerp(
+      Size.square(collapsedSize),
+      expandedSize,
+      expansion,
+    )!;
     final maxContentWidth = math.max(
       1.0,
       (widget.maxWidth ?? expandedSize.width) -
           widget.contentPadding.horizontal,
     );
 
-    return AnimatedContainer(
-      duration: duration,
-      curve: Curves.easeInOutCubic,
+    return Container(
       width: size.width,
       height: size.height,
       alignment: Alignment.center,
@@ -695,7 +801,11 @@ class _MorphingGlassBubbleState extends State<_MorphingGlassBubble> {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: Padding(
-            padding: widget.expanded ? widget.contentPadding : EdgeInsets.zero,
+            padding: EdgeInsets.lerp(
+              EdgeInsets.zero,
+              widget.contentPadding,
+              expansion,
+            )!,
             child: OverflowBox(
               alignment: Alignment.center,
               maxWidth: maxContentWidth,

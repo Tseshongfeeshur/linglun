@@ -800,7 +800,7 @@ class LibraryScanner {
           .whereType<String>()
           .where((item) => item.isNotEmpty)
           .toList();
-      return items.isEmpty ? null : items.join('/');
+      return items.isEmpty ? null : items.join(' / ');
     }
     final text = value.toString().trim();
     return text.isEmpty ? null : text;

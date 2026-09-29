@@ -14,6 +14,8 @@ class PlaybackProgressCircle extends StatelessWidget {
     required this.progress,
     required this.hovered,
     required this.dragging,
+    this.touchMenuExpanded = false,
+    this.onOpenPlaybackPage,
     this.bufferProgress,
     super.key,
   });
@@ -22,6 +24,8 @@ class PlaybackProgressCircle extends StatelessWidget {
   final double progress;
   final bool hovered;
   final bool dragging;
+  final bool touchMenuExpanded;
+  final VoidCallback? onOpenPlaybackPage;
   final double? bufferProgress;
 
   @override
@@ -73,6 +77,43 @@ class PlaybackProgressCircle extends StatelessWidget {
                         ),
                       )
                     : Image.memory(track.coverBytes!, fit: BoxFit.cover),
+              ),
+            ),
+            IgnorePointer(
+              ignoring: !touchMenuExpanded || dragging,
+              child: ClipOval(
+                child: AnimatedOpacity(
+                  opacity: touchMenuExpanded ? 1 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  child: ColoredBox(
+                    color: Colors.black.withAlpha(58),
+                    child: const SizedBox(
+                      width: playbackCircleSize,
+                      height: playbackCircleSize,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            IgnorePointer(
+              ignoring: !touchMenuExpanded || dragging,
+              child: AnimatedOpacity(
+                opacity: touchMenuExpanded ? 1 : 0,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                child: IconButton(
+                  onPressed: onOpenPlaybackPage,
+                  tooltip: '进入播放页',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: playbackCircleSize,
+                    height: playbackCircleSize,
+                  ),
+                  iconSize: 30,
+                  color: Colors.white,
+                  icon: const Icon(Icons.fullscreen),
+                ),
               ),
             ),
           ],

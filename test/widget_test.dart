@@ -109,7 +109,11 @@ void main() {
     final progressFinder = find.byWidgetPredicate(
       (widget) => widget.runtimeType.toString() == 'PlaybackProgressCircle',
     );
+    // 触屏第一次点击只展开悬浮菜单，第二次点击专辑圆才进入播放页。
     await tester.tap(progressFinder);
+    await tester.pump();
+    expect(find.byType(AmllPlaybackPage), findsNothing);
+    await tester.tap(find.byTooltip('进入播放页'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
