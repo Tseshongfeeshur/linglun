@@ -96,7 +96,7 @@ void main() {
   point = rotatePoint(point, angle);
 
   float speed = uPhase;
-  float displacementAmplitude = 1.0 + uPulse * 0.8;
+  float displacementAmplitude = 1.0 + uPulse * 1.2;
   point.x += sin(point.y * 5.0 + speed) / 24.0 * displacementAmplitude;
   point.y += sin(point.x * 7.5 + speed) / 12.0 * displacementAmplitude;
 

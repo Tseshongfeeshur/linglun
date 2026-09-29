@@ -201,7 +201,7 @@ SOFA、动态 Bass 谐波增强和多声道上混不得伪装成已经完成的�
 - 标题、艺术家、专辑、时长、采样率、比特率、曲目号、封面、ReplayGain 和原始标签详情读取；Ogg/Opus 时长按容器粒度位置和 Opus 固定 48 kHz 时钟精确计算，避免输入采样率或 `LENGTH` 标签造成偏差。
 - 内嵌封面优先使用正面封面，曲库列表、专辑列表和艺术家列表使用圆形裁切。
 - 基于 `media_kit/libmpv` 的打开、播放、暂停、切歌和定位；定位输入会限制在有效范围内。
-- 播放时按需生成视觉包络：Linux 使用 FFmpeg、Android 使用 MediaExtractor/MediaCodec 解码 PCM，并以相同的 50 毫秒 RMS/Peak 算法生成 20 Hz `BeatEnvelope`；Android 优先使用 MediaStore `content://` URI。没有包络的歌曲先播放再异步分析，分析范围映射为进度条缓冲进度，完成后立即驱动背景 Pulse 并持久化。Pulse 在 Dart 侧使用 30 ms 快攻、350 ms 慢放和 4.0 倍速度增益积分连续相位，Isolation shader 使用连续时间、三点时间平滑、Pulse 位移/亮度响应和受限旋转幅度，避免音频低频响应消失或突变闪烁。
+- 播放时按需生成视觉包络：Linux 使用 FFmpeg、Android 使用 MediaExtractor/MediaCodec 解码 PCM，并以相同的 50 毫秒 RMS/Peak 算法生成 20 Hz `BeatEnvelope`；Android 优先使用 MediaStore `content://` URI。没有包络的歌曲先播放再异步分析，分析范围映射为进度条缓冲进度，完成后立即驱动背景 Pulse 并持久化。Pulse 在 Dart 侧使用 30 ms 快攻、350 ms 慢放和 4.0 倍速度增益积分连续相位，Isolation shader 使用连续时间、三点时间平滑、1.2 倍 Pulse 位移增益、亮度响应和受限旋转幅度，避免音频低频响应消失或突变闪烁。
 - ReplayGain 曲目增益优先、专辑增益回退、削波保护和可选响度均衡；没有独立应用音量滑块。
 - mpv/libavfilter 基础处理链：预放大、十段参数化 EQ、基础 Bass、Crossfeed 和输出限幅。
 - 音频设置的 JSON 持久化、重置、EQ/Bass/Crossfeed/ReplayGain/限幅控制。
