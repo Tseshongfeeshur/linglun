@@ -66,7 +66,7 @@ void main() {
     expect(envelope.analyzedDurationMs, 1000);
   });
 
-  test('背景 Pulse 低通收敛且大时间间隔不会造成相位跳跃', () {
+  test('背景 Pulse 快攻慢放且大时间间隔不会造成相位跳跃', () {
     final motion = PlaybackBackgroundMotion();
 
     motion.advance(const Duration(seconds: 1), targetPulse: 1, flowSpeed: 1);
@@ -74,16 +74,19 @@ void main() {
     expect(motion.elapsedMilliseconds, 100);
     expect(motion.pulse, greaterThan(0));
     expect(motion.pulse, lessThan(1));
-    expect(motion.phase, lessThan(.02));
+    expect(motion.phase, greaterThan(0));
 
+    final pulseAfterAttack = motion.pulse;
     final previousPhase = motion.phase;
     motion.advance(
       const Duration(milliseconds: 100),
-      targetPulse: 1,
+      targetPulse: 0,
       flowSpeed: 1,
     );
-    expect(motion.pulse, greaterThan(0.5));
-    expect(motion.phase - previousPhase, lessThan(.02));
+    expect(motion.pulse, greaterThan(0));
+    expect(motion.pulse, lessThan(pulseAfterAttack));
+    expect(motion.phase - previousPhase, greaterThan(0));
+    expect(motion.phase - previousPhase, lessThan(.06));
   });
 
   test('四色调色板可以往返 JSON', () {

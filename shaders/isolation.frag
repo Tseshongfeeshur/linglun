@@ -96,8 +96,9 @@ void main() {
   point = rotatePoint(point, angle);
 
   float speed = uPhase;
-  point.x += sin(point.y * 5.0 + speed) / 24.0;
-  point.y += sin(point.x * 7.5 + speed) / 12.0;
+  float displacementAmplitude = 1.0 + uPulse * 0.8;
+  point.x += sin(point.y * 5.0 + speed) / 24.0 * displacementAmplitude;
+  point.y += sin(point.x * 7.5 + speed) / 12.0 * displacementAmplitude;
 
   float horizontal = smoothstep(-0.3, 0.2, point.x);
   float vertical = 1.0 - smoothstep(-0.3, 0.5, point.y);
@@ -107,6 +108,7 @@ void main() {
   color = mix(color, color * (1.0 + uPulse * 0.06), uPulse);
   vec3 linearColor = srgbToLinear(color);
   linearColor = protectHighlights(linearColor);
+  linearColor *= 1.0 + uPulse * 0.25;
   color = linearToSrgb(linearColor);
   color += (hash(FlutterFragCoord().xy + uRandom.xy * 97.0) - 0.5) / 255.0;
   fragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
