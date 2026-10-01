@@ -36,7 +36,8 @@ const _synchronizedLyricScrollDuration = Duration(milliseconds: 480);
 const _minimumInterludeGap = Duration(seconds: 7);
 const _lyricAutoFollowDelay = Duration(seconds: 3);
 const _lyricWheelScrollFactor = 4.0;
-const _lyricReloadFadeDuration = Duration(milliseconds: 200);
+const _lyricReloadFadeOutDuration = Duration(milliseconds: 120);
+const _lyricReloadFadeInDuration = Duration(milliseconds: 180);
 const _compactMetadataTitleFontSize = 24.0;
 const _compactMetadataSecondaryFontSize = 15.0;
 
@@ -704,7 +705,7 @@ class _NarrowPlaybackLayoutState extends State<_NarrowPlaybackLayout> {
                       compact: true,
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 64),
                 ],
               ),
             ),
@@ -1320,8 +1321,8 @@ class RoundedRectSliderThumbShape extends SliderComponentShape {
   final double borderRadius;
 
   const RoundedRectSliderThumbShape({
-    this.thumbWidth = 3, // 手柄宽度
-    this.thumbHeight = 12, // 手柄高度
+    this.thumbWidth = 4, // 手柄宽度
+    this.thumbHeight = 16, // 手柄高度
     this.borderRadius = 9, // 圆角半径
   });
 
@@ -1675,12 +1676,18 @@ class _PlaybackControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mainSize = compact ? 50.0 : 58.0;
-    final sideSize = compact ? 40.0 : 46.0;
+    final mainSize = compact ? 46.0 : 58.0;
+    final sideSize = compact ? 36.0 : 46.0;
+    final buttonPadding = compact ? EdgeInsets.zero : null;
+    final buttonConstraints = compact
+        ? const BoxConstraints.tightFor(width: 48, height: 48)
+        : null;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         IconButton(
+          padding: buttonPadding,
+          constraints: buttonConstraints,
           onPressed: onToggleShuffle,
           tooltip: state.shuffleEnabled ? '关闭随机播放' : '开启随机播放',
           color: state.shuffleEnabled
@@ -1690,28 +1697,28 @@ class _PlaybackControls extends StatelessWidget {
           iconSize: compact ? 19 : 21,
         ),
         IconButton(
+          padding: buttonPadding,
+          constraints: buttonConstraints,
           onPressed: onPrevious,
           tooltip: '上一曲',
           color: Colors.white,
           icon: const Icon(Icons.skip_previous_rounded),
           iconSize: sideSize,
         ),
-        SizedBox.square(
-          dimension: mainSize,
-          child: IconButton.filled(
-            onPressed: onTogglePlay,
-            tooltip: state.isPlaying ? '暂停' : '播放',
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: const Color(0xFF101315),
-            ),
-            icon: Icon(
-              state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              size: mainSize * .62,
-            ),
+        IconButton(
+          padding: buttonPadding,
+          constraints: buttonConstraints,
+          onPressed: onTogglePlay,
+          tooltip: state.isPlaying ? '暂停' : '播放',
+          color: Colors.white,
+          icon: Icon(
+            state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            size: mainSize,
           ),
         ),
         IconButton(
+          padding: buttonPadding,
+          constraints: buttonConstraints,
           onPressed: onNext,
           tooltip: '下一曲',
           color: Colors.white,
@@ -1719,6 +1726,8 @@ class _PlaybackControls extends StatelessWidget {
           iconSize: sideSize,
         ),
         IconButton(
+          padding: buttonPadding,
+          constraints: buttonConstraints,
           onPressed: onCycleRepeat,
           tooltip: switch (state.repeatMode) {
             RepeatMode.off => '开启列表循环',
@@ -1764,6 +1773,8 @@ class _LyricsViewportState extends State<_LyricsViewport>
     with TickerProviderStateMixin {
   late final Ticker _ticker;
   late final AnimationController _lineMotion;
+  late final AnimationController _lyricsReloadOpacity;
+  late final Animation<double> _lyricsReloadFade;
   late final ValueNotifier<Duration> _playhead;
   late LyricsDocument _document;
   final Stopwatch _clock = Stopwatch();
@@ -1808,9 +1819,8 @@ class _LyricsViewportState extends State<_LyricsViewport>
   int _interludeMotionAnchor = -2;
   double _interludeMotionOffset = 0;
   int _scrollAnimationGeneration = 0;
+  int _lyricsReloadGeneration = 0;
   late final VoidCallback _seekGenerationListener;
-  Timer? _lyricsReloadTimer;
-  double _lyricsReloadOpacity = 1;
   final _frameScheduler = _PostFrameScheduler();
 
   @override
@@ -1831,6 +1841,15 @@ class _LyricsViewportState extends State<_LyricsViewport>
       duration: _lyricLineMotionDuration,
       value: 1,
     )..addStatusListener(_handleLineMotionStatusChanged);
+    _lyricsReloadOpacity = AnimationController(
+      vsync: this,
+      duration: _lyricReloadFadeInDuration,
+      reverseDuration: _lyricReloadFadeOutDuration,
+      value: 1,
+    );
+    _lyricsReloadFade = _lyricsReloadOpacity.drive(
+      CurveTween(curve: Curves.easeInOutCubic),
+    );
     _ticker = createTicker(_tick);
     if (widget.state.isPlaying) _clock.start();
     _setPlaying(widget.state.isPlaying);
@@ -1849,34 +1868,18 @@ class _LyricsViewportState extends State<_LyricsViewport>
     final trackChanged = oldWidget.track.id != widget.track.id;
     final playbackChanged = oldWidget.state.isPlaying != widget.state.isPlaying;
     if (trackChanged) {
-      _beginLyricsReload(widget.track.lyricsDocument);
-      _interludeResetPosition = null;
-      _activeIndex = -1;
-      _scrollFocusIndex = -1;
-      _pendingActiveIndex = null;
-      _pendingScrollFocusIndex = null;
-      _activeSyncGeneration++;
-      _hasSyncedInitialFocus = false;
-      _lineMotion.value = 1;
-      _lineScrollDelta = 0;
-      _synchronizeLineMotion = false;
-      _autoFollow.cancel();
-      _synchronizeNextLineMotion = false;
-      _explicitSeekPending = false;
-      _pendingSeekPosition = null;
-      _seekOriginPosition = null;
-      _seekReconciliationTimer?.cancel();
-      _seekReconciliationTimer = null;
-      _visibleInterlude = null;
-      _interludeMotionAnchor = -2;
-      _interludeMotionOffset = 0;
-      _scrollAnimationGeneration++;
-      _keepLyricsUnblurredAfterTouchScroll = false;
-    }
-    if (trackChanged || playbackChanged) {
-      final currentPosition = trackChanged
-          ? widget.state.position
-          : oldWidget.state.isPlaying
+      final currentPosition = widget.state.position;
+      _anchorPosition = currentPosition;
+      _clock
+        ..stop()
+        ..reset();
+      if (widget.state.isPlaying) _clock.start();
+      _playhead.value = currentPosition;
+      unawaited(
+        _beginLyricsReload(widget.track.lyricsDocument, currentPosition),
+      );
+    } else if (playbackChanged) {
+      final currentPosition = oldWidget.state.isPlaying
           ? _anchorPosition + _clock.elapsed
           : _playhead.value;
       _anchorPosition = currentPosition;
@@ -1885,7 +1888,7 @@ class _LyricsViewportState extends State<_LyricsViewport>
         ..reset();
       if (widget.state.isPlaying) _clock.start();
       _playhead.value = currentPosition;
-      if (!trackChanged) _syncActiveLine(currentPosition);
+      _syncActiveLine(currentPosition);
     } else if (oldWidget.state.position != widget.state.position) {
       final reported = widget.state.position;
       final estimated = _estimatedPlayhead;
@@ -1942,36 +1945,68 @@ class _LyricsViewportState extends State<_LyricsViewport>
       ? _anchorPosition + _clock.elapsed
       : _playhead.value;
 
-  void _beginLyricsReload(LyricsDocument nextDocument) {
-    _lyricsReloadTimer?.cancel();
-    // 保留旧文档，先让用户看到旧歌词快速淡出，避免新旧歌词重叠。
-    _lyricsReloadOpacity = 0;
+  Future<void> _beginLyricsReload(
+    LyricsDocument nextDocument,
+    Duration position,
+  ) async {
+    final generation = ++_lyricsReloadGeneration;
     _autoFollow.pause();
     _scrollAnimationGeneration++;
     _lineMotion.stop();
-    _lyricsReloadTimer = Timer(_lyricReloadFadeDuration, () {
-      if (!mounted) return;
-      _lyricsReloadTimer = null;
+    await _lyricsReloadOpacity.reverse();
+    if (!mounted || generation != _lyricsReloadGeneration) return;
+
+    setState(() {
       _document = nextDocument;
       _speakerOrder = _buildSpeakerOrder(_document);
-      _lyricsReloadOpacity = 1;
-      if (_scrollController.hasClients) _scrollController.jumpTo(0);
-      _autoFollow.cancel(clearSuppression: true);
+      // 行高缓存按行索引保存，切歌时必须清空，避免新歌词先沿用旧行距。
+      _lyricRowExtentCache.clear();
+      _listTopPadding = 0;
+      _listBottomPadding = 0;
+      _interludeResetPosition = null;
+      _activeIndex = -1;
+      _scrollFocusIndex = -1;
+      _pendingActiveIndex = null;
+      _pendingScrollFocusIndex = null;
+      _activeSyncGeneration++;
       _hasSyncedInitialFocus = false;
-      _syncActiveLine(_playhead.value);
-      setState(() {});
+      _lineMotion.value = 1;
+      _lineScrollDelta = 0;
+      _synchronizeLineMotion = false;
+      _synchronizeNextLineMotion = false;
+      _explicitSeekPending = false;
+      _pendingSeekPosition = null;
+      _seekOriginPosition = null;
+      _visibleInterlude = null;
+      _interludeMotionAnchor = -2;
+      _interludeMotionOffset = 0;
+      _keepLyricsUnblurredAfterTouchScroll = false;
+    });
+    _seekReconciliationTimer?.cancel();
+    _seekReconciliationTimer = null;
+    _autoFollow.cancel(clearSuppression: true);
+    _setPlaying(widget.state.isPlaying);
+
+    _frameScheduler.schedule('lyrics-reload', () {
+      if (!mounted || generation != _lyricsReloadGeneration) return;
+      if (_scrollController.hasClients) _scrollController.jumpTo(0);
+      _syncActiveLine(position);
+      _frameScheduler.schedule('lyrics-reload-fade-in', () {
+        if (!mounted || generation != _lyricsReloadGeneration) return;
+        unawaited(_lyricsReloadOpacity.forward());
+      });
     });
   }
 
   @override
   void dispose() {
     _autoFollow.dispose();
-    _lyricsReloadTimer?.cancel();
     _seekReconciliationTimer?.cancel();
     _frameScheduler.dispose();
     widget.seekRequest.removeListener(_seekGenerationListener);
     _ticker.dispose();
     _lineMotion.dispose();
+    _lyricsReloadOpacity.dispose();
     _playhead.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -2321,10 +2356,19 @@ class _LyricsViewportState extends State<_LyricsViewport>
       return;
     }
     var precedingExtent = 0.0;
+    var measuredCount = 0;
     for (var lineIndex = 0; lineIndex < index; lineIndex++) {
-      precedingExtent += _cachedLyricRowExtent(lineIndex);
+      final cached = _lyricRowExtentCache[lineIndex];
+      if (cached != null) {
+        precedingExtent += cached;
+        measuredCount++;
+      }
     }
     final extent = _cachedLyricRowExtent(index);
+    if (measuredCount < index) {
+      final estimated = _estimatedLyricRowExtent();
+      precedingExtent += (index - measuredCount) * estimated;
+    }
     final target =
         (precedingExtent +
                 _listTopPadding +
@@ -2333,6 +2377,11 @@ class _LyricsViewportState extends State<_LyricsViewport>
             .clamp(0, maxOffset)
             .toDouble();
     _moveListTo(target, animate: animate, synchronize: synchronize);
+  }
+
+  double _estimatedLyricRowExtent() {
+    final base = _lyricFontSize * 1.2;
+    return base + _lyricFontSize * _lyricVerticalPaddingEm * 2 + 6;
   }
 
   void _moveListTo(
@@ -2534,18 +2583,16 @@ class _LyricsViewportState extends State<_LyricsViewport>
                                       topPadding: _listTopPadding,
                                       bottomPadding: _listBottomPadding,
                                       rowExtent: _cachedLyricRowExtent,
+                                      reloadOpacity: _lyricsReloadFade,
                                       onSeek: _seekToLyric,
                                     )
-                                  : _UntimedLyricsList(document: _document);
-                              return AnimatedOpacity(
-                                opacity: _lyricsReloadOpacity,
-                                duration: _lyricReloadFadeDuration,
-                                curve: Curves.easeOutCubic,
-                                child: NotificationListener<ScrollNotification>(
-                                  onNotification:
-                                      _handleLyricsScrollNotification,
-                                  child: lyrics,
-                                ),
+                                  : _UntimedLyricsList(
+                                      document: _document,
+                                      reloadOpacity: _lyricsReloadFade,
+                                    );
+                              return NotificationListener<ScrollNotification>(
+                                onNotification: _handleLyricsScrollNotification,
+                                child: lyrics,
                               );
                             },
                           ),
@@ -2583,6 +2630,7 @@ class _TimedLyricsList extends StatelessWidget {
     required this.topPadding,
     required this.bottomPadding,
     required this.rowExtent,
+    required this.reloadOpacity,
     required this.onSeek,
   });
 
@@ -2607,6 +2655,7 @@ class _TimedLyricsList extends StatelessWidget {
   final double topPadding;
   final double bottomPadding;
   final double Function(int index) rowExtent;
+  final Animation<double> reloadOpacity;
   final ValueChanged<Duration> onSeek;
 
   @override
@@ -2640,24 +2689,10 @@ class _TimedLyricsList extends StatelessWidget {
     final interludeSpacer = interlude != null
         ? _interludeSpacerExtent(fontSize, MediaQuery.sizeOf(context).height)
         : 0.0;
-    final lineDelays = synchronizeLineMotion && interludeMotionOffset == 0
-        ? List<Duration>.filled(lines.length, Duration.zero)
-        : _calculateLyricLineDelays(lines, activeIndex: lineStaggerIndex);
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-      child: ShaderMask(
-        blendMode: BlendMode.dstIn,
-        shaderCallback: (bounds) => const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            Colors.white,
-            Colors.white,
-            Colors.transparent,
-          ],
-          stops: [0, .12, .88, 1],
-        ).createShader(bounds),
+      child: _LyricsFadeMask(
+        opacity: reloadOpacity,
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -2705,7 +2740,13 @@ class _TimedLyricsList extends StatelessWidget {
                   isHovered: isHovered,
                   fontSize: fontSize,
                   lineMotion: lineMotion,
-                  lineDelay: lineDelays[index],
+                  lineDelay: synchronizeLineMotion && interludeMotionOffset == 0
+                      ? Duration.zero
+                      : _lyricLineDelay(
+                          lines,
+                          index: index,
+                          activeIndex: lineStaggerIndex,
+                        ),
                   lineScrollDelta: lineScrollDelta,
                   lineLayoutDelta: index > interludeMotionAnchor
                       ? interludeMotionOffset
@@ -3013,9 +3054,13 @@ bool _interludeCanDisplay(
 }
 
 class _UntimedLyricsList extends StatelessWidget {
-  const _UntimedLyricsList({required this.document});
+  const _UntimedLyricsList({
+    required this.document,
+    required this.reloadOpacity,
+  });
 
   final LyricsDocument document;
+  final Animation<double> reloadOpacity;
 
   @override
   Widget build(BuildContext context) {
@@ -3024,19 +3069,8 @@ class _UntimedLyricsList extends StatelessWidget {
         : document.lines.map((line) => line.text).toList();
     return ScrollConfiguration(
       behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-      child: ShaderMask(
-        blendMode: BlendMode.dstIn,
-        shaderCallback: (bounds) => const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.transparent,
-            Colors.white,
-            Colors.white,
-            Colors.transparent,
-          ],
-          stops: [0, .12, .88, 1],
-        ).createShader(bounds),
+      child: _LyricsFadeMask(
+        opacity: reloadOpacity,
         child: ListView.separated(
           padding: const EdgeInsets.symmetric(vertical: 20),
           itemCount: lines.length,
@@ -3057,41 +3091,69 @@ class _UntimedLyricsList extends StatelessWidget {
   }
 }
 
-List<Duration> _calculateLyricLineDelays(
+/// 将切歌透明度合并进歌词原有的上下羽化遮罩，避免额外的整区透明度层。
+class _LyricsFadeMask extends StatelessWidget {
+  const _LyricsFadeMask({required this.opacity, required this.child});
+
+  final Animation<double> opacity;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: opacity,
+      child: child,
+      builder: (context, child) {
+        final alpha = (opacity.value.clamp(0.0, 1.0) * 255).round();
+        return ShaderMask(
+          blendMode: BlendMode.dstIn,
+          shaderCallback: (bounds) => LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.transparent,
+              Colors.white.withAlpha(alpha),
+              Colors.white.withAlpha(alpha),
+              Colors.transparent,
+            ],
+            stops: const [0, .12, .88, 1],
+          ).createShader(bounds),
+          child: child,
+        );
+      },
+    );
+  }
+}
+
+Duration _lyricLineDelay(
   List<LyricLine> lines, {
+  required int index,
   required int activeIndex,
 }) {
-  if (lines.isEmpty) return const [];
-
-  // AMLL 只给当前渲染窗口内的行分配错峰延迟。Flutter 的 ListView 会复用
-  // 子树，因此用焦点前后固定的 overscan 行数近似其布局窗口，并保持延迟
-  // 只由行索引决定，避免滚动动画本身改变延迟而产生抖动。
-  final delays = List<Duration>.filled(lines.length, Duration.zero);
+  if (lines.isEmpty) return Duration.zero;
   final focus = activeIndex.clamp(0, lines.length - 1);
   final first = math.max(0, focus - 6);
   final last = math.min(lines.length, focus + 9);
+  if (index < first || index >= last) return Duration.zero;
+
   var delay = Duration.zero;
   var baseDelay = _lyricLineStaggerBaseDelay;
-  for (var index = first; index < last; index++) {
-    delays[index] = delay;
+  Duration? focusDelay;
+  for (var current = first; current < last; current++) {
+    if (current == focus) focusDelay = delay;
+    if (current == index) {
+      final result = delay - (focusDelay ?? Duration.zero);
+      return current < focus ? result - _lyricLineUpperLead : result;
+    }
     delay += baseDelay;
-    if (index >= focus) {
+    if (current >= focus) {
       baseDelay = Duration(
         microseconds: (baseDelay.inMicroseconds / _lyricLineStaggerCompression)
             .round(),
       );
     }
   }
-
-  // AMLL 的延迟是从当前可视窗口顶部累计出来的。Flutter 这里使用 FLIP
-  // 位移，若仍以窗口顶部为零点，活动行会在高亮切换后才开始移动。因此把
-  // 活动行归零，并让上方行带少量负延迟，使它们从第一帧就处于预滚动状态。
-  final focusDelay = delays[focus];
-  for (var index = first; index < last; index++) {
-    delays[index] = delays[index] - focusDelay;
-    if (index < focus) delays[index] -= _lyricLineUpperLead;
-  }
-  return delays;
+  return Duration.zero;
 }
 
 SpringDescription _lyricPositionSpring(List<LyricLine> lines, int activeIndex) {
@@ -3211,10 +3273,6 @@ class _AnimatedLyricRow extends StatelessWidget {
                   onTap: onTap,
                   hoverColor: Colors.transparent,
                   focusColor: Colors.transparent,
-                  splashColor: Theme.of(context).colorScheme.primary
-                      .withValues(alpha: .22),
-                  highlightColor: Theme.of(context).colorScheme.primary
-                      .withValues(alpha: .08),
                   borderRadius: BorderRadius.circular(fontSize * .25),
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(

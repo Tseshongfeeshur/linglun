@@ -22,71 +22,101 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   Widget build(BuildContext context) {
     final libraryState = ref.watch(libraryControllerProvider);
-    return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final portrait = constraints.maxHeight > constraints.maxWidth;
-          final page = _buildPage();
-          final content = portrait
-              ? Stack(
-                  children: [
-                    Positioned.fill(child: page),
-                    Positioned(
-                      left: 8,
-                      right: 8,
-                      bottom: 8,
-                      child: Center(
-                        child: _NavigationRail(
-                          selectedIndex: _selectedIndex,
-                          vertical: false,
-                          onSelected: (index) =>
-                              setState(() => _selectedIndex = index),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= constraints.maxHeight;
+        return Stack(
+          children: [
+            Scaffold(
+              appBar: AppBar(
+                title: Text(_pageTitle),
+                scrolledUnderElevation: 0,
+              ),
+              body: wide
+                  ? Row(
+                      children: [
+                        _buildNavigationRail(context),
+                        const SizedBox(width: 8),
+                        Expanded(child: _buildPage()),
+                      ],
+                    )
+                  : Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _buildPage(),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: _buildBottomNavigationBar(context),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                )
-              : Row(
-                  children: [
-                    const SizedBox(width: 16),
-                    Center(
-                      child: SafeArea(
-                        child: _NavigationRail(
-                          selectedIndex: _selectedIndex,
-                          vertical: true,
-                          onSelected: (index) =>
-                              setState(() => _selectedIndex = index),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(child: page),
-                  ],
-                );
-          return Stack(
-            children: [
-              Positioned.fill(child: content),
-              const Positioned.fill(child: FloatingPlayer()),
-              if (libraryState.isScanning) ...[
-                const Positioned.fill(
-                  child: ModalBarrier(
-                    dismissible: false,
-                    color: Colors.black54,
+            ),
+            const Positioned.fill(child: FloatingPlayer()),
+            if (libraryState.isScanning) ...[
+              const Positioned.fill(
+                child: ModalBarrier(dismissible: false, color: Colors.black54),
+              ),
+              Positioned.fill(
+                child: Center(
+                  child: ScanProgressDialog(
+                    path: libraryState.scanPath,
+                    stage: libraryState.scanStage,
+                    artists: libraryState.scanArtists,
                   ),
                 ),
-                Positioned.fill(
-                  child: Center(
-                    child: ScanProgressDialog(
-                      path: libraryState.scanPath,
-                      stage: libraryState.scanStage,
-                      artists: libraryState.scanArtists,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ],
-          );
-        },
+          ],
+        );
+      },
+    );
+  }
+
+  String get _pageTitle => switch (_selectedIndex) {
+    1 => '专辑',
+    2 => '艺术家',
+    3 => '播放列表',
+    4 => '歌曲来源',
+    5 => '设置',
+    _ => '曲库',
+  };
+
+  Widget _buildNavigationRail(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16, right: 8),
+        child: Center(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: _NavigationRail(
+              selectedIndex: _selectedIndex,
+              vertical: true,
+              onSelected: (index) => setState(() => _selectedIndex = index),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigationBar(BuildContext context) {
+    return SafeArea(
+      minimum: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      child: SizedBox(
+        height: 52,
+        child: Align(
+          alignment: Alignment.center,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: _NavigationRail(
+              selectedIndex: _selectedIndex,
+              vertical: false,
+              onSelected: (index) => setState(() => _selectedIndex = index),
+            ),
+          ),
+        ),
       ),
     );
   }

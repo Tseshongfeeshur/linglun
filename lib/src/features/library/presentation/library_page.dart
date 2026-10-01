@@ -90,8 +90,6 @@ class _LibraryPageState extends ConsumerState<LibraryPage> {
           final title = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('曲库', style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 6),
               Text(
                 '你的本地音乐，从这里开始。',
                 style: Theme.of(context).textTheme.bodyMedium

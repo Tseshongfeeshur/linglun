@@ -117,8 +117,8 @@ void main() {
     final idleThumb =
         tester.widget<SliderTheme>(sliderThemeFinder).data.thumbShape!
             as RoundedRectSliderThumbShape;
-    expect(idleThumb.thumbWidth, 3);
-    expect(idleThumb.thumbHeight, 12);
+    expect(idleThumb.thumbWidth, 4);
+    expect(idleThumb.thumbHeight, 16);
     expect(idleThumb.borderRadius, 9);
     expect(
       tester.widget<SliderTheme>(sliderThemeFinder).data.thumbColor,
@@ -136,8 +136,8 @@ void main() {
     final hoveredThumb =
         tester.widget<SliderTheme>(sliderThemeFinder).data.thumbShape!
             as RoundedRectSliderThumbShape;
-    expect(hoveredThumb.thumbWidth, 3);
-    expect(hoveredThumb.thumbHeight, 12);
+    expect(hoveredThumb.thumbWidth, 4);
+    expect(hoveredThumb.thumbHeight, 16);
     expect(hoveredThumb.borderRadius, 9);
     expect(
       tester.widget<SliderTheme>(sliderThemeFinder).data.thumbColor,

@@ -14,8 +14,6 @@ class SourcesPage extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(28, 26, 28, 40),
       children: [
-        Text('歌曲来源', style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 8),
         Text(
           '曲库会从以下位置读取本地音频文件。',
           style: Theme.of(context).textTheme.bodyMedium

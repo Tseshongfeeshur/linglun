@@ -75,8 +75,6 @@ class _CollectionPage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(28, 26, 28, 40),
       children: [
-        Text(title, style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 8),
         Text(
           hasTracks ? '按 $title 浏览本地音乐。' : emptyText,
           style: Theme.of(context).textTheme.bodyMedium

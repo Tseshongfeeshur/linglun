@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../../core/database/app_database.dart';
 import '../application/player_controller.dart';
@@ -17,6 +19,7 @@ import 'playback_progress_circle.dart';
 const _circleSize = playbackCircleSize;
 const _ringSize = playbackRingSize;
 const _ringInset = (_ringSize - _circleSize) / 2;
+const _positionExtent = 96.0;
 const _panelGap = 12.0;
 const _floatingPositionSettingKey = 'player.floating.position.v1';
 
@@ -56,164 +59,170 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
     super.dispose();
   }
 
+  Offset _toLocal(Offset global) {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return global;
+    return box.globalToLocal(global);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(playerControllerProvider);
     final track = state.currentTrack;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final size = Size(constraints.maxWidth, constraints.maxHeight);
-        final center = _positionForSize(size);
-        final circleCenter =
-            center + const Offset(_circleSize / 2, _circleSize / 2);
-        // 方向只由专辑封面圆心所在的窗口半区决定，不再用菜单尺寸或边距
-        // 参与判断：上半区向下展开，下半区向上展开；左半区向右展开，
-        // 右半区向左展开。圆心位于中线时，控制菜单向下、歌词菜单向左。
-        final showAbove = circleCenter.dy > size.height / 2;
-        final showLeft = circleCenter.dx >= size.width / 2;
+    return Material(
+      type: MaterialType.transparency,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final size = Size(constraints.maxWidth, constraints.maxHeight);
+          final center = _positionForSize(size);
+          final circleCenter =
+              center + const Offset(_circleSize / 2, _circleSize / 2);
+          // 方向只由专辑封面圆心所在的窗口半区决定，不再用菜单尺寸或边距
+          // 参与判断：上半区向下展开，下半区向上展开；左半区向右展开，
+          // 右半区向左展开。圆心位于中线时，控制菜单向下、歌词菜单向左。
+          final showAbove = circleCenter.dy > size.height / 2;
+          final showLeft = circleCenter.dx >= size.width / 2;
 
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned.fill(
-              key: const ValueKey('floating-player-drag-backdrop'),
-              child: IgnorePointer(
-                ignoring: !_dragging,
-                child: AnimatedOpacity(
-                  opacity: _dragging ? 1 : 0,
-                  duration: const Duration(milliseconds: 180),
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              if (_dragging)
+                Positioned.fill(
+                  key: const ValueKey('floating-player-drag-backdrop'),
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                     child: ColoredBox(color: Colors.black.withAlpha(45)),
                   ),
                 ),
-              ),
-            ),
-            if (_touchMenuExpanded)
+              if (_touchMenuExpanded)
+                Positioned.fill(
+                  key: const ValueKey('floating-player-touch-dismiss-layer'),
+                  child: Listener(
+                    behavior: HitTestBehavior.opaque,
+                    onPointerDown: (event) {
+                      if (_isTouchPointer(event.kind)) {
+                        _dismissTouchMenu();
+                      }
+                    },
+                    child: const SizedBox.expand(),
+                  ),
+                ),
               Positioned.fill(
-                key: const ValueKey('floating-player-touch-dismiss-layer'),
-                child: Listener(
-                  behavior: HitTestBehavior.opaque,
+                key: const ValueKey('floating-player-cluster'),
+                child: _FloatingCluster(
+                  position: center,
+                  track: track,
+                  state: state,
+                  hovered: _hovered,
+                  dragging: _dragging,
+                  touchMenuExpanded: _touchMenuExpanded,
+                  seekPreviewProgress: _seekPreviewProgress,
+                  showAbove: showAbove,
+                  showLeft: showLeft,
+                  onHover: _setHovered,
                   onPointerDown: (event) {
-                    if (_isTouchPointer(event.kind)) {
-                      _dismissTouchMenu();
+                    final pointer = _toLocal(event.position);
+                    _touchPointerDown = _isTouchPointer(event.kind);
+                    _pointerDownPosition = pointer;
+                    _seeking = _isNearSeekHandle(
+                      pointer,
+                      circleCenter,
+                      _progress(state),
+                    );
+                    if (_touchPointerDown) {
+                      _touchMenuWasExpandedOnDown = _touchMenuExpanded;
+                      // 触摸在按下时就开始展开，和鼠标进入圆形区域时的时机一致；
+                      // 抬起事件只负责区分“展开菜单”与“进入播放页”。
+                      if (!_seeking && !_touchMenuExpanded) {
+                        _expandTouchMenu();
+                      }
                     }
                   },
-                  child: const SizedBox.expand(),
+                  onDragStart: (details) {
+                    _hoverExitTimer?.cancel();
+                    // 拖拽识别器可能越过触发阈值后才回调，起点必须使用按下位置，
+                    // 避免把进度环手柄误判成封面移动。
+                    _dragStart =
+                        (_pointerDownPosition ?? _toLocal(details.globalPosition)) -
+                        center;
+                    _seekPreviewProgress = _seeking ? _progress(state) : null;
+                    setState(() {
+                      _hovered = true;
+                      _dragging = true;
+                      if (_touchPointerDown) _touchMenuExpanded = true;
+                    });
+                  },
+                  onDragUpdate: (details) {
+                    final pointer = _toLocal(details.globalPosition);
+                    if (_seeking) {
+                      final vector = pointer - circleCenter;
+                      final angle = math.atan2(vector.dy, vector.dx);
+                      final progress =
+                          ((angle + math.pi / 2) / (math.pi * 2)) % 1;
+                      setState(() => _seekPreviewProgress = progress);
+                      return;
+                    }
+                    final position = _clampPosition(
+                      pointer - (_dragStart ?? Offset.zero),
+                      size,
+                    );
+                    setState(() {
+                      _positionFactor = _factorForPosition(position, size);
+                    });
+                  },
+                  onDragEnd: (_) {
+                    _hoverExitTimer?.cancel();
+                    final seekProgress = _seekPreviewProgress;
+                    final shouldSeek = _seeking && seekProgress != null;
+                    final shouldPersist = !_seeking;
+                    setState(() {
+                      _dragStart = null;
+                      _pointerDownPosition = null;
+                      _seekPreviewProgress = null;
+                      _seeking = false;
+                      _dragging = false;
+                      _hovered = true;
+                      _touchPointerDown = false;
+                      _touchMenuWasExpandedOnDown = false;
+                    });
+                    if (shouldSeek) {
+                      ref
+                          .read(playerControllerProvider.notifier)
+                          .seek(track.duration * seekProgress);
+                    } else if (shouldPersist) {
+                      unawaited(_persistFloatingPosition());
+                    }
+                  },
+                  onTap: () {
+                    if (_seeking) {
+                      _seeking = false;
+                      _pointerDownPosition = null;
+                      _seekPreviewProgress = null;
+                      _touchPointerDown = false;
+                      _touchMenuWasExpandedOnDown = false;
+                      return;
+                    }
+                    if (_touchPointerDown) {
+                      final wasExpanded = _touchMenuWasExpandedOnDown;
+                      _touchPointerDown = false;
+                      _touchMenuWasExpandedOnDown = false;
+                      if (!wasExpanded) return;
+                    }
+                    _openPlaybackPage(context, circleCenter);
+                  },
+                  onOpenPlaybackPage: () =>
+                      _openPlaybackPage(context, circleCenter),
+                  onLongPress: () {
+                    if (!_touchPointerDown) return;
+                    _expandTouchMenu();
+                  },
                 ),
               ),
-            Positioned.fill(
-              key: const ValueKey('floating-player-cluster'),
-              child: _FloatingCluster(
-                position: center,
-                track: track,
-                state: state,
-                hovered: _hovered,
-                dragging: _dragging,
-                touchMenuExpanded: _touchMenuExpanded,
-                seekPreviewProgress: _seekPreviewProgress,
-                showAbove: showAbove,
-                showLeft: showLeft,
-                onHover: _setHovered,
-                onPointerDown: (event) {
-                  _touchPointerDown = _isTouchPointer(event.kind);
-                  _pointerDownPosition = event.position;
-                  _seeking = _isNearSeekHandle(
-                    event.position,
-                    center,
-                    _progress(state),
-                  );
-                  if (_touchPointerDown) {
-                    _touchMenuWasExpandedOnDown = _touchMenuExpanded;
-                    // 触摸在按下时就开始展开，和鼠标进入圆形区域时的时机一致；
-                    // 抬起事件只负责区分“展开菜单”与“进入播放页”。
-                    if (!_seeking && !_touchMenuExpanded) {
-                      _expandTouchMenu();
-                    }
-                  }
-                },
-                onDragStart: (details) {
-                  _hoverExitTimer?.cancel();
-                  // 拖拽识别器可能越过触发阈值后才回调，起点必须使用按下位置，
-                  // 避免把进度环手柄误判成封面移动。
-                  _dragStart =
-                      (_pointerDownPosition ?? details.globalPosition) - center;
-                  _seekPreviewProgress = _seeking ? _progress(state) : null;
-                  setState(() {
-                    _hovered = true;
-                    _dragging = true;
-                    if (_touchPointerDown) _touchMenuExpanded = true;
-                  });
-                },
-                onDragUpdate: (details) {
-                  if (_seeking) {
-                    final local = details.globalPosition - center;
-                    final angle = math.atan2(local.dy - 36, local.dx - 36);
-                    final progress =
-                        ((angle + math.pi / 2) / (math.pi * 2)) % 1;
-                    setState(() => _seekPreviewProgress = progress);
-                    return;
-                  }
-                  final position = _clampPosition(
-                    details.globalPosition - (_dragStart ?? Offset.zero),
-                    size,
-                  );
-                  setState(() {
-                    _positionFactor = _factorForPosition(position, size);
-                  });
-                },
-                onDragEnd: (_) {
-                  _hoverExitTimer?.cancel();
-                  final seekProgress = _seekPreviewProgress;
-                  final shouldSeek = _seeking && seekProgress != null;
-                  final shouldPersist = !_seeking;
-                  setState(() {
-                    _dragStart = null;
-                    _pointerDownPosition = null;
-                    _seekPreviewProgress = null;
-                    _seeking = false;
-                    _dragging = false;
-                    _hovered = true;
-                    _touchPointerDown = false;
-                    _touchMenuWasExpandedOnDown = false;
-                  });
-                  if (shouldSeek) {
-                    ref
-                        .read(playerControllerProvider.notifier)
-                        .seek(track.duration * seekProgress);
-                  } else if (shouldPersist) {
-                    unawaited(_persistFloatingPosition());
-                  }
-                },
-                onTap: () {
-                  if (_seeking) {
-                    _seeking = false;
-                    _pointerDownPosition = null;
-                    _seekPreviewProgress = null;
-                    _touchPointerDown = false;
-                    _touchMenuWasExpandedOnDown = false;
-                    return;
-                  }
-                  if (_touchPointerDown) {
-                    final wasExpanded = _touchMenuWasExpandedOnDown;
-                    _touchPointerDown = false;
-                    _touchMenuWasExpandedOnDown = false;
-                    if (!wasExpanded) return;
-                  }
-                  _openPlaybackPage(context, circleCenter);
-                },
-                onOpenPlaybackPage: () =>
-                    _openPlaybackPage(context, circleCenter),
-                onLongPress: () {
-                  if (!_touchPointerDown) return;
-                  _expandTouchMenu();
-                },
-              ),
-            ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -279,8 +288,8 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
   Offset _clampPosition(Offset position, Size size) {
     final minimum = Offset(_ringInset + 8, _ringInset + 8);
     final maximum = Offset(
-      math.max(minimum.dx, size.width - 96),
-      math.max(minimum.dy, size.height - 96),
+      math.max(minimum.dx, size.width - _positionExtent),
+      math.max(minimum.dy, size.height - _positionExtent),
     );
     return Offset(
       position.dx.clamp(minimum.dx, maximum.dx).toDouble(),
@@ -291,8 +300,8 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
   Offset _positionForSize(Size size) {
     final minimum = Offset(_ringInset + 8, _ringInset + 8);
     final maximum = Offset(
-      math.max(minimum.dx, size.width - 96),
-      math.max(minimum.dy, size.height - 96),
+      math.max(minimum.dx, size.width - _positionExtent),
+      math.max(minimum.dy, size.height - _positionExtent),
     );
     return Offset(
       lerpDouble(minimum.dx, maximum.dx, _positionFactor.dx)!,
@@ -303,8 +312,8 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
   Offset _factorForPosition(Offset position, Size size) {
     final minimum = Offset(_ringInset + 8, _ringInset + 8);
     final maximum = Offset(
-      math.max(minimum.dx, size.width - 96),
-      math.max(minimum.dy, size.height - 96),
+      math.max(minimum.dx, size.width - _positionExtent),
+      math.max(minimum.dy, size.height - _positionExtent),
     );
     final xRange = maximum.dx - minimum.dx;
     final yRange = maximum.dy - minimum.dy;
@@ -322,7 +331,7 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
     try {
       final database = await sharedLinglunDatabase();
       final value = await database.loadSetting(_floatingPositionSettingKey);
-      if (!mounted || value == null) return;
+      if (!mounted || value == null || _dragging) return;
       final decoded = jsonDecode(value);
       if (decoded is! Map) return;
       final x = (decoded['x'] as num?)?.toDouble();
@@ -352,13 +361,12 @@ class _FloatingPlayerState extends ConsumerState<FloatingPlayer> {
   }
 
   bool _isNearSeekHandle(
-    Offset globalPosition,
-    Offset circlePosition,
+    Offset localPointer,
+    Offset circleCenter,
     double progress,
   ) {
     if (!_hovered) return false;
-    final local = globalPosition - circlePosition;
-    final vector = local - const Offset(36, 36);
+    final vector = localPointer - circleCenter;
     final radius = vector.distance;
     if (radius < 35 || radius > 53) return false;
 
@@ -461,10 +469,17 @@ class _FloatingCluster extends ConsumerWidget {
             style: TextStyle(
               color: Theme.of(context).colorScheme.primary,
               fontSize: 14,
+              height: 1,
+              decoration: TextDecoration.none,
             ),
+            textHeightBehavior: _floatingLyricTextHeightBehavior,
           )
         else ...[
-          _LyricPreviewLine(line: currentLine, position: lyricPosition),
+          _LyricPreviewLine(
+            line: currentLine,
+            position: lyricPosition,
+            animate: panelsExpanded && state.isPlaying,
+          ),
           if (currentLine.translation != null)
             _LyricPreviewVariant(text: currentLine.translation!),
           for (final variant in currentLine.variants)
@@ -862,10 +877,15 @@ class _BubbleSizeReporterRenderObject extends RenderProxyBox {
 }
 
 class _LyricPreviewLine extends StatelessWidget {
-  const _LyricPreviewLine({required this.line, required this.position});
+  const _LyricPreviewLine({
+    required this.line,
+    required this.position,
+    required this.animate,
+  });
 
   final LyricLine line;
   final Duration position;
+  final bool animate;
 
   @override
   Widget build(BuildContext context) {
@@ -880,7 +900,9 @@ class _LyricPreviewLine extends StatelessWidget {
           height: 1,
           fontWeight: FontWeight.w400,
           wordSpacing: 1,
+          decoration: TextDecoration.none,
         ),
+        textHeightBehavior: _floatingLyricTextHeightBehavior,
       );
     }
 
@@ -888,6 +910,7 @@ class _LyricPreviewLine extends StatelessWidget {
       text: line.text,
       words: line.words,
       position: position,
+      animate: animate,
       fontSize: 15,
       baseAlpha: .35,
       highlightAlpha: .95,
@@ -906,17 +929,30 @@ class _LyricPreviewVariant extends StatelessWidget {
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(color: Colors.white54, fontSize: 14, height: 1),
+      style: const TextStyle(
+        color: Colors.white54,
+        fontSize: 14,
+        height: 1,
+        decoration: TextDecoration.none,
+      ),
+      textHeightBehavior: _floatingLyricTextHeightBehavior,
     );
   }
 }
 
-/// 浮动歌词菜单的轻量逐字高亮：只改变颜色和右侧羽化，不改变排版。
-class _SimpleKaraokeText extends StatelessWidget {
+const _floatingLyricTextHeightBehavior = TextHeightBehavior(
+  // 两端都参与行高分配，单行歌词放进气泡后才能按完整行框垂直居中。
+  applyHeightToFirstAscent: true,
+  applyHeightToLastDescent: true,
+);
+
+/// 浮动歌词菜单的轻量逐字高亮：缓存排版结果，动画帧只更新绘制进度。
+class _SimpleKaraokeText extends StatefulWidget {
   const _SimpleKaraokeText({
     required this.text,
     required this.words,
     required this.position,
+    required this.animate,
     required this.fontSize,
     required this.baseAlpha,
     required this.highlightAlpha,
@@ -925,92 +961,217 @@ class _SimpleKaraokeText extends StatelessWidget {
   final String text;
   final List<LyricWord> words;
   final Duration position;
+  final bool animate;
   final double fontSize;
   final double baseAlpha;
   final double highlightAlpha;
 
   @override
+  State<_SimpleKaraokeText> createState() => _SimpleKaraokeTextState();
+}
+
+class _SimpleKaraokeTextState extends State<_SimpleKaraokeText>
+    with SingleTickerProviderStateMixin {
+  _SimpleKaraokeLayout? _layout;
+  Object? _layoutSignature;
+  late final Ticker _ticker;
+  late final ValueNotifier<Duration> _visualPosition;
+  final Stopwatch _clock = Stopwatch();
+  late Duration _anchorPosition;
+
+  @override
+  void initState() {
+    super.initState();
+    _anchorPosition = widget.position;
+    _visualPosition = ValueNotifier(widget.position);
+    _ticker = createTicker(_tick);
+    _syncTicker();
+  }
+
+  @override
+  void didUpdateWidget(covariant _SimpleKaraokeText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final lyricChanged =
+        oldWidget.text != widget.text || oldWidget.words != widget.words;
+    if (lyricChanged || oldWidget.position != widget.position) {
+      _anchorPosition = widget.position;
+      _clock
+        ..stop()
+        ..reset();
+      if (widget.animate) _clock.start();
+      _visualPosition.value = widget.position;
+    }
+    _syncTicker();
+  }
+
+  void _syncTicker() {
+    if (widget.animate) {
+      if (!_clock.isRunning) _clock.start();
+      if (!_ticker.isActive) _ticker.start();
+    } else {
+      _clock.stop();
+      if (_ticker.isActive) _ticker.stop();
+      _visualPosition.value = widget.position;
+    }
+  }
+
+  void _tick(Duration _) {
+    final position = _anchorPosition + _clock.elapsed;
+    if (_visualPosition.value != position) _visualPosition.value = position;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _layoutSignature = null;
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    _visualPosition.dispose();
+    _layout?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final style = TextStyle(
-      color: Colors.white,
-      fontSize: fontSize,
+      color: Theme.of(context).colorScheme.primary,
+      fontSize: widget.fontSize,
       height: 1,
       fontWeight: FontWeight(480),
+      decoration: TextDecoration.none,
     );
-    return CustomPaint(
-      painter: _SimpleKaraokePainter(
-        text: text,
-        words: words,
-        position: position,
+    final signature = Object.hashAll([
+      widget.text,
+      widget.words,
+      style,
+      widget.baseAlpha,
+      widget.highlightAlpha,
+      Directionality.of(context),
+      Localizations.maybeLocaleOf(context),
+      MediaQuery.textScalerOf(context),
+    ]);
+    if (_layoutSignature != signature) {
+      _layout?.dispose();
+      _layout = _SimpleKaraokeLayout(
+        text: widget.text,
+        words: widget.words,
         style: style,
-        baseAlpha: baseAlpha,
-        highlightAlpha: highlightAlpha,
-      ),
-      child: Text(
-        text,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: style.copyWith(color: Colors.transparent),
+        baseAlpha: widget.baseAlpha,
+        highlightAlpha: widget.highlightAlpha,
+        textDirection: Directionality.of(context),
+        locale: Localizations.maybeLocaleOf(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      );
+      _layoutSignature = signature;
+    }
+    final layout = _layout!;
+    return Semantics(
+      label: widget.text,
+      child: RepaintBoundary(
+        child: CustomPaint(
+          painter: _SimpleKaraokePainter(
+            layout: layout,
+            words: widget.words,
+            positionListenable: _visualPosition,
+          ),
+          child: SizedBox(width: layout.width, height: layout.height),
+        ),
       ),
     );
   }
 }
 
+class _SimpleKaraokeLayout {
+  _SimpleKaraokeLayout({
+    required String text,
+    required List<LyricWord> words,
+    required TextStyle style,
+    required double baseAlpha,
+    required double highlightAlpha,
+    required TextDirection textDirection,
+    required Locale? locale,
+    required TextScaler textScaler,
+  }) : basePainter = TextPainter(
+         text: TextSpan(
+           text: text,
+           style: style.copyWith(
+             color: (style.color ?? Colors.white).withAlpha(
+               (baseAlpha.clamp(0.0, 1.0) * 255).round(),
+             ),
+           ),
+         ),
+         textDirection: textDirection,
+         textAlign: TextAlign.start,
+         locale: locale,
+         textScaler: textScaler,
+         textHeightBehavior: _floatingLyricTextHeightBehavior,
+         maxLines: 1,
+       )..layout(),
+       brightPainter = TextPainter(
+         text: TextSpan(
+           text: text,
+           style: style.copyWith(
+             color: (style.color ?? Colors.white).withAlpha(
+               (highlightAlpha.clamp(0.0, 1.0) * 255).round(),
+             ),
+           ),
+         ),
+         textDirection: textDirection,
+         textAlign: TextAlign.start,
+         locale: locale,
+         textScaler: textScaler,
+         textHeightBehavior: _floatingLyricTextHeightBehavior,
+         maxLines: 1,
+       )..layout(),
+       ranges = _simpleKaraokeWordRanges(text, words) {
+    boxes = [
+      for (final range in ranges)
+        basePainter.getBoxesForSelection(
+          TextSelection(baseOffset: range.$1, extentOffset: range.$2),
+        ),
+    ];
+  }
+
+  final TextPainter basePainter;
+  final TextPainter brightPainter;
+  final List<(int, int)> ranges;
+  late final List<List<TextBox>> boxes;
+
+  double get width => basePainter.width;
+  double get height => basePainter.height;
+
+  void dispose() {
+    basePainter.dispose();
+    brightPainter.dispose();
+  }
+}
+
 class _SimpleKaraokePainter extends CustomPainter {
   _SimpleKaraokePainter({
-    required this.text,
+    required this.layout,
     required this.words,
-    required this.position,
-    required this.style,
-    required this.baseAlpha,
-    required this.highlightAlpha,
-  }) : _ranges = _simpleKaraokeWordRanges(text, words);
+    required this.positionListenable,
+  }) : super(repaint: positionListenable);
 
-  final String text;
+  final _SimpleKaraokeLayout layout;
   final List<LyricWord> words;
-  final Duration position;
-  final TextStyle style;
-  final double baseAlpha;
-  final double highlightAlpha;
-  final List<(int, int)> _ranges;
+  final ValueListenable<Duration> positionListenable;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
-    final painter = TextPainter(
-      text: TextSpan(text: text, style: style),
-      textDirection: TextDirection.ltr,
-      textAlign: TextAlign.start,
-      maxLines: 1,
-      ellipsis: '…',
-    )..layout(maxWidth: size.width);
-    final brightPainter = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: style.copyWith(color: Colors.white),
-      ),
-      textDirection: TextDirection.ltr,
-      textAlign: TextAlign.start,
-      maxLines: 1,
-      ellipsis: '…',
-    )..layout(maxWidth: size.width);
-
-    final base = baseAlpha.clamp(0.0, 1.0);
-    if (base < 1) {
-      canvas.saveLayer(
-        Offset.zero & size,
-        Paint()..color = Colors.white.withAlpha((base * 255).round()),
-      );
-    }
-    painter.paint(canvas, Offset.zero);
-    if (base < 1) canvas.restore();
+    final completedPath = Path();
+    final partialBoxes = <(Rect, double)>[];
+    var focusX = 0.0;
+    final position = positionListenable.value;
 
     for (var index = 0; index < words.length; index++) {
-      final range = index < _ranges.length ? _ranges[index] : (0, 0);
-      if (range.$2 <= range.$1) continue;
-      final boxes = painter.getBoxesForSelection(
-        TextSelection(baseOffset: range.$1, extentOffset: range.$2),
-      );
+      final boxes = index < layout.boxes.length
+          ? layout.boxes[index]
+          : const <TextBox>[];
       if (boxes.isEmpty) continue;
 
       final word = words[index];
@@ -1024,65 +1185,76 @@ class _SimpleKaraokePainter extends CustomPainter {
           ? (position >= word.start ? 1.0 : 0.0)
           : ((position - word.start).inMicroseconds / duration.inMicroseconds)
                 .clamp(0.0, 1.0);
-      if (progress <= 0) continue;
-
+      final firstRect = boxes.first.toRect();
+      final lastRect = boxes.last.toRect();
+      if (progress <= 0) break;
+      focusX = lerpDouble(firstRect.left, lastRect.right, progress)!;
       for (final box in boxes) {
         final rect = box.toRect();
         if (rect.isEmpty) continue;
         if (progress >= 1) {
-          canvas.save();
-          canvas.clipRect(rect);
-          brightPainter.paint(canvas, Offset.zero);
-          canvas.restore();
+          completedPath.addRect(rect);
           continue;
         }
-
-        final feather = math.min(.45, rect.height * .6 / rect.width);
-        final leadingStop = (progress - feather / 2).clamp(0.0, 1.0);
-        final trailingStop = (progress + feather / 2).clamp(0.0, 1.0);
-        final shader = LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: const [
-            Colors.white,
-            Colors.white,
-            Colors.transparent,
-            Colors.transparent,
-          ],
-          stops: [0, leadingStop, trailingStop, 1],
-        ).createShader(rect);
-
-        canvas.saveLayer(
-          rect,
-          Paint()
-            ..color = Colors.white.withAlpha(
-              (highlightAlpha.clamp(0.0, 1.0) * 255).round(),
-            ),
-        );
-        canvas.clipRect(rect);
-        brightPainter.paint(canvas, Offset.zero);
-        canvas.drawRect(
-          rect,
-          Paint()
-            ..shader = shader
-            ..blendMode = BlendMode.dstIn,
-        );
-        canvas.restore();
+        partialBoxes.add((rect, progress));
       }
+      if (progress < 1) break;
     }
 
-    painter.dispose();
-    brightPainter.dispose();
+    final maxScroll = math.max(0.0, layout.width - size.width);
+    final scrollOffset = (focusX - size.width / 2)
+        .clamp(0.0, maxScroll)
+        .toDouble();
+    canvas
+      ..save()
+      ..clipRect(Offset.zero & size)
+      ..translate(-scrollOffset, 0);
+    layout.basePainter.paint(canvas, Offset.zero);
+    if (!completedPath.getBounds().isEmpty) {
+      canvas
+        ..save()
+        ..clipPath(completedPath);
+      layout.brightPainter.paint(canvas, Offset.zero);
+      canvas.restore();
+    }
+    for (final partial in partialBoxes) {
+      final rect = partial.$1;
+      final progress = partial.$2;
+      final feather = rect.width <= 0
+          ? 0.0
+          : math.min(.45, rect.height * .6 / rect.width);
+      final leadingStop = (progress - feather / 2).clamp(0.0, 1.0);
+      final trailingStop = (progress + feather / 2).clamp(0.0, 1.0);
+      final shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: const [
+          Colors.white,
+          Colors.white,
+          Colors.transparent,
+          Colors.transparent,
+        ],
+        stops: [0, leadingStop, trailingStop, 1],
+      ).createShader(rect);
+      canvas.saveLayer(rect, Paint());
+      canvas.clipRect(rect);
+      layout.brightPainter.paint(canvas, Offset.zero);
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = shader
+          ..blendMode = BlendMode.dstIn,
+      );
+      canvas.restore();
+    }
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant _SimpleKaraokePainter oldDelegate) =>
-      oldDelegate.text != text ||
+      oldDelegate.layout != layout ||
       oldDelegate.words != words ||
-      oldDelegate.position != position ||
-      oldDelegate.style != style ||
-      oldDelegate.baseAlpha != baseAlpha ||
-      oldDelegate.highlightAlpha != highlightAlpha;
+      oldDelegate.positionListenable != positionListenable;
 }
 
 List<(int, int)> _simpleKaraokeWordRanges(String text, List<LyricWord> words) {
@@ -1105,11 +1277,23 @@ LyricsDocument _lyricsDocument(Track track) {
 LyricLine? _currentLyric(LyricsDocument document, Duration position) {
   if (!document.hasTimestamps) return null;
   final adjusted = position - document.offset;
-  LyricLine? current;
-  for (final line in document.lines) {
-    if (line.start <= adjusted) current = line;
+  var low = 0;
+  var high = document.lines.length - 1;
+  var result = -1;
+  while (low <= high) {
+    final middle = low + ((high - low) >> 1);
+    if (document.lines[middle].start <= adjusted) {
+      result = middle;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
   }
-  return current;
+  if (result < 0) return null;
+  final line = document.lines[result];
+  final adjustedEnd = line.end;
+  if (adjustedEnd != null && adjusted >= adjustedEnd) return null;
+  return line;
 }
 
 double _progress(PlayerState state) {

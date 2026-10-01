@@ -4,6 +4,8 @@ import 'lyrics.dart';
 import 'lyrics_source.dart';
 import 'visual_analysis.dart';
 
+final Map<int, LyricsDocument> _lyricsDocumentCache = <int, LyricsDocument>{};
+
 /// 曲库中最小的可播放单元。
 class Track {
   const Track({
@@ -63,6 +65,27 @@ class Track {
 
   /// 统一的歌词文档，供各个界面直接消费，避免渲染层重复解析原始文本。
   LyricsDocument get lyricsDocument {
+    var cacheKey = Object.hash(
+      id,
+      modifiedAt,
+      lyrics,
+      lyricsFormat,
+      lyricsSources.length,
+    );
+    for (final source in lyricsSources) {
+      cacheKey = Object.hash(
+        cacheKey,
+        source.content,
+        source.kind,
+        source.extension,
+        source.tagName,
+        source.language,
+        source.role,
+      );
+    }
+    final cached = _lyricsDocumentCache[cacheKey];
+    if (cached != null) return cached;
+
     final sources = lyricsSources.isEmpty && lyrics != null
         ? [
             LyricsSource(
@@ -72,7 +95,10 @@ class Track {
             ),
           ]
         : lyricsSources;
-    return parseLyricsSources(sources);
+    final document = parseLyricsSources(sources);
+    if (_lyricsDocumentCache.length >= 64) _lyricsDocumentCache.clear();
+    _lyricsDocumentCache[cacheKey] = document;
+    return document;
   }
 
   Track copyWith({
