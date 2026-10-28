@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:linglun/utils/window_info.dart';
 
@@ -6,7 +6,7 @@ import 'package:linglun/frame/page_model.dart';
 
 import 'package:linglun/pages/album_lib.dart';
 import 'package:linglun/pages/artist_lib.dart';
-import 'package:linglun/pages/music_lib.dart';
+import 'package:linglun/pages/music_lib/music_lib.dart';
 import 'package:linglun/pages/music_sources.dart';
 import 'package:linglun/pages/playlist.dart';
 import 'package:linglun/pages/settings.dart';
@@ -21,12 +21,12 @@ class Frame extends StatefulWidget {
 class _FrameState extends State<Frame> {
   int pageIndex = 0;
   final List<PageModel> pages = [
-    const MusicLib(),
-    const AlbumLib(),
-    const ArtistLib(),
-    const Playlist(),
-    const MusicSources(),
-    const Settings(),
+    MusicLib(),
+    AlbumLib(),
+    ArtistLib(),
+    Playlist(),
+    MusicSources(),
+    Settings(),
   ];
 
   @override
@@ -57,10 +57,14 @@ class _FrameState extends State<Frame> {
           child: Scaffold(
             backgroundColor: Theme.of(context).colorScheme.surface,
             appBar: AppBar(
-              title: Text(pages[pageIndex].title),
+              title: Text(
+                pages[pageIndex].title,
+                style: TextStyle(overflow: TextOverflow.fade),
+              ),
               actions: pages[pageIndex].appBarActions,
             ),
             body: pages[pageIndex] as Widget,
+            floatingActionButton: pages[pageIndex].fab,
             bottomNavigationBar: context.isLandscape
                 ? null
                 : NavigationBar(

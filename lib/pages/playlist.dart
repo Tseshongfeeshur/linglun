@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:linglun/frame/page_model.dart';
 
@@ -15,7 +15,10 @@ class Playlist extends StatelessWidget implements PageModel {
   IconData get selectedIcon => Icons.queue_music;
 
   @override
-  List<Widget> get appBarActions => [];
+  List<Widget>? get appBarActions => null;
+
+  @override
+  FloatingActionButton? get fab => null;
 
   @override
   Widget build(BuildContext context) {

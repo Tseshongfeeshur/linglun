@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:linglun/frame/page_model.dart';
 
@@ -15,7 +15,15 @@ class MusicSources extends StatelessWidget implements PageModel {
   IconData get selectedIcon => Icons.folder_special;
 
   @override
-  List<Widget> get appBarActions => [];
+  List<Widget>? get appBarActions => null;
+
+  @override
+  FloatingActionButton get fab => FloatingActionButton.extended(
+    onPressed: () {},
+    isExtended: true,
+    icon: Icon(Icons.refresh),
+    label: Text('刷新曲库'),
+  );
 
   @override
   Widget build(BuildContext context) {
