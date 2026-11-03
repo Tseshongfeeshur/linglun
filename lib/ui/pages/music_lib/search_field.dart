@@ -1,9 +1,7 @@
-import 'dart:math';
-
 import 'package:material_ui/material_ui.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:linglun/utils/window_info.dart';
+import 'package:linglun/ui/utils/window_info.dart';
 
 class SearchField extends StatefulWidget {
   final TextEditingController controller;

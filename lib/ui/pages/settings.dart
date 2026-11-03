@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'package:linglun/frame/page_model.dart';
+import 'package:linglun/ui/frame/page_model.dart';
 
 class Settings extends StatelessWidget implements PageModel {
   const Settings({super.key});
@@ -15,13 +15,10 @@ class Settings extends StatelessWidget implements PageModel {
   IconData get selectedIcon => Icons.settings;
 
   @override
-  List<Widget>? get appBarActions => null;
-
-  @override
-  FloatingActionButton? get fab => null;
-
-  @override
   Widget build(BuildContext context) {
-    return Center(child: Text('Settings'));
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(child: Text('Settings')),
+    );
   }
 }

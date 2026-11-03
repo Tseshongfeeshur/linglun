@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'package:linglun/frame/page_model.dart';
+import 'package:linglun/ui/frame/page_model.dart';
 
 class Playlist extends StatelessWidget implements PageModel {
   const Playlist({super.key});
@@ -15,13 +15,10 @@ class Playlist extends StatelessWidget implements PageModel {
   IconData get selectedIcon => Icons.queue_music;
 
   @override
-  List<Widget>? get appBarActions => null;
-
-  @override
-  FloatingActionButton? get fab => null;
-
-  @override
   Widget build(BuildContext context) {
-    return Center(child: Text('Playlist'));
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(child: Text('Playlist')),
+    );
   }
 }

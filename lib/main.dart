@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'package:linglun/frame/frame.dart';
+import 'package:linglun/ui/frame/frame.dart';
 
 void main() {
   runApp(const MainApp());

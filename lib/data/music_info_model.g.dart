@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'music_info.dart';
+part of 'music_info_model.dart';
 
 // **************************************************************************
 // IsarCollectionGenerator
@@ -20,7 +20,7 @@ const MusicInfoSchema = CollectionSchema(
     r'addTime': PropertySchema(
       id: 0,
       name: r'addTime',
-      type: IsarType.long,
+      type: IsarType.dateTime,
     ),
     r'album': PropertySchema(
       id: 1,
@@ -32,29 +32,39 @@ const MusicInfoSchema = CollectionSchema(
       name: r'artists',
       type: IsarType.stringList,
     ),
-    r'duration': PropertySchema(
+    r'durationMs': PropertySchema(
       id: 3,
-      name: r'duration',
+      name: r'durationMs',
       type: IsarType.long,
     ),
-    r'frequency': PropertySchema(
+    r'editTime': PropertySchema(
       id: 4,
-      name: r'frequency',
-      type: IsarType.long,
+      name: r'editTime',
+      type: IsarType.dateTime,
     ),
     r'path': PropertySchema(
       id: 5,
       name: r'path',
       type: IsarType.string,
     ),
-    r'size': PropertySchema(
+    r'playCount': PropertySchema(
       id: 6,
-      name: r'size',
+      name: r'playCount',
+      type: IsarType.long,
+    ),
+    r'sizeBytes': PropertySchema(
+      id: 7,
+      name: r'sizeBytes',
       type: IsarType.long,
     ),
     r'title': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'title',
+      type: IsarType.string,
+    ),
+    r'titleInLatin': PropertySchema(
+      id: 9,
+      name: r'titleInLatin',
       type: IsarType.string,
     )
   },
@@ -88,6 +98,7 @@ int _musicInfoEstimateSize(
   }
   bytesCount += 3 + object.path.length * 3;
   bytesCount += 3 + object.title.length * 3;
+  bytesCount += 3 + object.titleInLatin.length * 3;
   return bytesCount;
 }
 
@@ -97,14 +108,16 @@ void _musicInfoSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeLong(offsets[0], object.addTime);
+  writer.writeDateTime(offsets[0], object.addTime);
   writer.writeString(offsets[1], object.album);
   writer.writeStringList(offsets[2], object.artists);
-  writer.writeLong(offsets[3], object.duration);
-  writer.writeLong(offsets[4], object.frequency);
+  writer.writeLong(offsets[3], object.durationMs);
+  writer.writeDateTime(offsets[4], object.editTime);
   writer.writeString(offsets[5], object.path);
-  writer.writeLong(offsets[6], object.size);
-  writer.writeString(offsets[7], object.title);
+  writer.writeLong(offsets[6], object.playCount);
+  writer.writeLong(offsets[7], object.sizeBytes);
+  writer.writeString(offsets[8], object.title);
+  writer.writeString(offsets[9], object.titleInLatin);
 }
 
 MusicInfo _musicInfoDeserialize(
@@ -114,14 +127,17 @@ MusicInfo _musicInfoDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = MusicInfo(
-    addTime: reader.readLong(offsets[0]),
+    addTime: reader.readDateTime(offsets[0]),
     album: reader.readString(offsets[1]),
     artists: reader.readStringList(offsets[2]) ?? [],
-    duration: reader.readLong(offsets[3]),
-    frequency: reader.readLong(offsets[4]),
+    durationMs: reader.readLong(offsets[3]),
+    editTime: reader.readDateTime(offsets[4]),
+    id: id,
     path: reader.readString(offsets[5]),
-    size: reader.readLong(offsets[6]),
-    title: reader.readString(offsets[7]),
+    playCount: reader.readLong(offsets[6]),
+    sizeBytes: reader.readLong(offsets[7]),
+    title: reader.readString(offsets[8]),
+    titleInLatin: reader.readString(offsets[9]),
   );
   return object;
 }
@@ -134,7 +150,7 @@ P _musicInfoDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 1:
       return (reader.readString(offset)) as P;
     case 2:
@@ -142,12 +158,16 @@ P _musicInfoDeserializeProp<P>(
     case 3:
       return (reader.readLong(offset)) as P;
     case 4:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 5:
       return (reader.readString(offset)) as P;
     case 6:
       return (reader.readLong(offset)) as P;
     case 7:
+      return (reader.readLong(offset)) as P;
+    case 8:
+      return (reader.readString(offset)) as P;
+    case 9:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -162,7 +182,9 @@ List<IsarLinkBase<dynamic>> _musicInfoGetLinks(MusicInfo object) {
   return [];
 }
 
-void _musicInfoAttach(IsarCollection<dynamic> col, Id id, MusicInfo object) {}
+void _musicInfoAttach(IsarCollection<dynamic> col, Id id, MusicInfo object) {
+  object.id = id;
+}
 
 extension MusicInfoQueryWhereSort
     on QueryBuilder<MusicInfo, MusicInfo, QWhere> {
@@ -244,7 +266,7 @@ extension MusicInfoQueryWhere
 extension MusicInfoQueryFilter
     on QueryBuilder<MusicInfo, MusicInfo, QFilterCondition> {
   QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> addTimeEqualTo(
-      int value) {
+      DateTime value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'addTime',
@@ -254,7 +276,7 @@ extension MusicInfoQueryFilter
   }
 
   QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> addTimeGreaterThan(
-    int value, {
+    DateTime value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
@@ -267,7 +289,7 @@ extension MusicInfoQueryFilter
   }
 
   QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> addTimeLessThan(
-    int value, {
+    DateTime value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
@@ -280,8 +302,8 @@ extension MusicInfoQueryFilter
   }
 
   QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> addTimeBetween(
-    int lower,
-    int upper, {
+    DateTime lower,
+    DateTime upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
@@ -650,43 +672,44 @@ extension MusicInfoQueryFilter
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> durationEqualTo(
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> durationMsEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'duration',
+        property: r'durationMs',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> durationGreaterThan(
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      durationMsGreaterThan(
     int value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         include: include,
-        property: r'duration',
+        property: r'durationMs',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> durationLessThan(
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> durationMsLessThan(
     int value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.lessThan(
         include: include,
-        property: r'duration',
+        property: r'durationMs',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> durationBetween(
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> durationMsBetween(
     int lower,
     int upper, {
     bool includeLower = true,
@@ -694,7 +717,7 @@ extension MusicInfoQueryFilter
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
-        property: r'duration',
+        property: r'durationMs',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -703,52 +726,51 @@ extension MusicInfoQueryFilter
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> frequencyEqualTo(
-      int value) {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> editTimeEqualTo(
+      DateTime value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'frequency',
+        property: r'editTime',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
-      frequencyGreaterThan(
-    int value, {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> editTimeGreaterThan(
+    DateTime value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         include: include,
-        property: r'frequency',
+        property: r'editTime',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> frequencyLessThan(
-    int value, {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> editTimeLessThan(
+    DateTime value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.lessThan(
         include: include,
-        property: r'frequency',
+        property: r'editTime',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> frequencyBetween(
-    int lower,
-    int upper, {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> editTimeBetween(
+    DateTime lower,
+    DateTime upper, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
-        property: r'frequency',
+        property: r'editTime',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -940,43 +962,44 @@ extension MusicInfoQueryFilter
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> sizeEqualTo(
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> playCountEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'size',
+        property: r'playCount',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> sizeGreaterThan(
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      playCountGreaterThan(
     int value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         include: include,
-        property: r'size',
+        property: r'playCount',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> sizeLessThan(
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> playCountLessThan(
     int value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.lessThan(
         include: include,
-        property: r'size',
+        property: r'playCount',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> sizeBetween(
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> playCountBetween(
     int lower,
     int upper, {
     bool includeLower = true,
@@ -984,7 +1007,61 @@ extension MusicInfoQueryFilter
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
-        property: r'size',
+        property: r'playCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> sizeBytesEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sizeBytes',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      sizeBytesGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'sizeBytes',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> sizeBytesLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'sizeBytes',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> sizeBytesBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'sizeBytes',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -1122,6 +1199,141 @@ extension MusicInfoQueryFilter
       ));
     });
   }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> titleInLatinEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'titleInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      titleInLatinGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'titleInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      titleInLatinLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'titleInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> titleInLatinBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'titleInLatin',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      titleInLatinStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'titleInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      titleInLatinEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'titleInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      titleInLatinContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'titleInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> titleInLatinMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'titleInLatin',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      titleInLatinIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'titleInLatin',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      titleInLatinIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'titleInLatin',
+        value: '',
+      ));
+    });
+  }
 }
 
 extension MusicInfoQueryObject
@@ -1155,27 +1367,27 @@ extension MusicInfoQuerySortBy on QueryBuilder<MusicInfo, MusicInfo, QSortBy> {
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByDuration() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByDurationMs() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'duration', Sort.asc);
+      return query.addSortBy(r'durationMs', Sort.asc);
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByDurationDesc() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByDurationMsDesc() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'duration', Sort.desc);
+      return query.addSortBy(r'durationMs', Sort.desc);
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByFrequency() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByEditTime() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'frequency', Sort.asc);
+      return query.addSortBy(r'editTime', Sort.asc);
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByFrequencyDesc() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByEditTimeDesc() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'frequency', Sort.desc);
+      return query.addSortBy(r'editTime', Sort.desc);
     });
   }
 
@@ -1191,15 +1403,27 @@ extension MusicInfoQuerySortBy on QueryBuilder<MusicInfo, MusicInfo, QSortBy> {
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortBySize() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByPlayCount() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'size', Sort.asc);
+      return query.addSortBy(r'playCount', Sort.asc);
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortBySizeDesc() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByPlayCountDesc() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'size', Sort.desc);
+      return query.addSortBy(r'playCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortBySizeBytes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sizeBytes', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortBySizeBytesDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sizeBytes', Sort.desc);
     });
   }
 
@@ -1212,6 +1436,18 @@ extension MusicInfoQuerySortBy on QueryBuilder<MusicInfo, MusicInfo, QSortBy> {
   QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByTitleDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'title', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByTitleInLatin() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'titleInLatin', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByTitleInLatinDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'titleInLatin', Sort.desc);
     });
   }
 }
@@ -1242,27 +1478,27 @@ extension MusicInfoQuerySortThenBy
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByDuration() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByDurationMs() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'duration', Sort.asc);
+      return query.addSortBy(r'durationMs', Sort.asc);
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByDurationDesc() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByDurationMsDesc() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'duration', Sort.desc);
+      return query.addSortBy(r'durationMs', Sort.desc);
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByFrequency() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByEditTime() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'frequency', Sort.asc);
+      return query.addSortBy(r'editTime', Sort.asc);
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByFrequencyDesc() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByEditTimeDesc() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'frequency', Sort.desc);
+      return query.addSortBy(r'editTime', Sort.desc);
     });
   }
 
@@ -1290,15 +1526,27 @@ extension MusicInfoQuerySortThenBy
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenBySize() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByPlayCount() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'size', Sort.asc);
+      return query.addSortBy(r'playCount', Sort.asc);
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenBySizeDesc() {
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByPlayCountDesc() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'size', Sort.desc);
+      return query.addSortBy(r'playCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenBySizeBytes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sizeBytes', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenBySizeBytesDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sizeBytes', Sort.desc);
     });
   }
 
@@ -1311,6 +1559,18 @@ extension MusicInfoQuerySortThenBy
   QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByTitleDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'title', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByTitleInLatin() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'titleInLatin', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByTitleInLatinDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'titleInLatin', Sort.desc);
     });
   }
 }
@@ -1336,15 +1596,15 @@ extension MusicInfoQueryWhereDistinct
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByDuration() {
+  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByDurationMs() {
     return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'duration');
+      return query.addDistinctBy(r'durationMs');
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByFrequency() {
+  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByEditTime() {
     return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'frequency');
+      return query.addDistinctBy(r'editTime');
     });
   }
 
@@ -1355,9 +1615,15 @@ extension MusicInfoQueryWhereDistinct
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctBySize() {
+  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByPlayCount() {
     return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'size');
+      return query.addDistinctBy(r'playCount');
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctBySizeBytes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'sizeBytes');
     });
   }
 
@@ -1365,6 +1631,13 @@ extension MusicInfoQueryWhereDistinct
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'title', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByTitleInLatin(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'titleInLatin', caseSensitive: caseSensitive);
     });
   }
 }
@@ -1377,7 +1650,7 @@ extension MusicInfoQueryProperty
     });
   }
 
-  QueryBuilder<MusicInfo, int, QQueryOperations> addTimeProperty() {
+  QueryBuilder<MusicInfo, DateTime, QQueryOperations> addTimeProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'addTime');
     });
@@ -1395,15 +1668,15 @@ extension MusicInfoQueryProperty
     });
   }
 
-  QueryBuilder<MusicInfo, int, QQueryOperations> durationProperty() {
+  QueryBuilder<MusicInfo, int, QQueryOperations> durationMsProperty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'duration');
+      return query.addPropertyName(r'durationMs');
     });
   }
 
-  QueryBuilder<MusicInfo, int, QQueryOperations> frequencyProperty() {
+  QueryBuilder<MusicInfo, DateTime, QQueryOperations> editTimeProperty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'frequency');
+      return query.addPropertyName(r'editTime');
     });
   }
 
@@ -1413,15 +1686,27 @@ extension MusicInfoQueryProperty
     });
   }
 
-  QueryBuilder<MusicInfo, int, QQueryOperations> sizeProperty() {
+  QueryBuilder<MusicInfo, int, QQueryOperations> playCountProperty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'size');
+      return query.addPropertyName(r'playCount');
+    });
+  }
+
+  QueryBuilder<MusicInfo, int, QQueryOperations> sizeBytesProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'sizeBytes');
     });
   }
 
   QueryBuilder<MusicInfo, String, QQueryOperations> titleProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'title');
+    });
+  }
+
+  QueryBuilder<MusicInfo, String, QQueryOperations> titleInLatinProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'titleInLatin');
     });
   }
 }

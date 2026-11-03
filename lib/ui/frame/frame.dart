@@ -1,15 +1,15 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'package:linglun/utils/window_info.dart';
+import 'package:linglun/ui/utils/window_info.dart';
 
-import 'package:linglun/frame/page_model.dart';
+import 'package:linglun/ui/frame/page_model.dart';
 
-import 'package:linglun/pages/album_lib.dart';
-import 'package:linglun/pages/artist_lib.dart';
-import 'package:linglun/pages/music_lib/music_lib.dart';
-import 'package:linglun/pages/music_sources.dart';
-import 'package:linglun/pages/playlist.dart';
-import 'package:linglun/pages/settings.dart';
+import 'package:linglun/ui/pages/album_lib.dart';
+import 'package:linglun/ui/pages/artist_lib.dart';
+import 'package:linglun/ui/pages/music_lib/music_lib.dart';
+import 'package:linglun/ui/pages/music_sources.dart';
+import 'package:linglun/ui/pages/playlist.dart';
+import 'package:linglun/ui/pages/settings.dart';
 
 class Frame extends StatefulWidget {
   const Frame({super.key});
@@ -56,15 +56,7 @@ class _FrameState extends State<Frame> {
         Expanded(
           child: Scaffold(
             backgroundColor: Theme.of(context).colorScheme.surface,
-            appBar: AppBar(
-              title: Text(
-                pages[pageIndex].title,
-                style: TextStyle(overflow: TextOverflow.fade),
-              ),
-              actions: pages[pageIndex].appBarActions,
-            ),
             body: pages[pageIndex] as Widget,
-            floatingActionButton: pages[pageIndex].fab,
             bottomNavigationBar: context.isLandscape
                 ? null
                 : NavigationBar(
