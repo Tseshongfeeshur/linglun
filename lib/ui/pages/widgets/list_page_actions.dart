@@ -1,7 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
+
 import 'package:linglun/ui/utils/window_info.dart';
+import 'package:linglun/ui/pages/music_lib/music_sort.dart';
 
 class ListPageActions extends StatefulWidget {
   const ListPageActions({super.key});
@@ -15,6 +17,9 @@ class _ListPageActionsState extends State<ListPageActions> {
   late FocusNode searchBarFocusNode;
   final double searchBarPadding = 8;
   bool isSearchBarExtended = false;
+
+  MusicSort _sortSelected = MusicSort.titleInLatin;
+  bool _sortInDescending = false;
 
   void updateExtendedState() => setState(
     () => isSearchBarExtended =
@@ -57,11 +62,40 @@ class _ListPageActionsState extends State<ListPageActions> {
           children: [
             Collapsible(
               progress: animationProgress,
-              child: PopupMenuButton(
-                // initialValue: ,
-                // onSelected: ,
+              child: PopupMenuButton<MusicSort>(
+                popUpAnimationStyle: AnimationStyle(
+                  curve: Curves.easeInOutCubic,
+                  reverseCurve: Curves.easeInOutCubic,
+                  reverseDuration: 140.ms,
+                ),
+                onSelected: (value) => setState(() {
+                  if (_sortSelected == value) {
+                    _sortInDescending = !_sortInDescending;
+                  } else {
+                    _sortInDescending = false;
+                    _sortSelected = value;
+                  }
+                }),
+                initialValue: _sortSelected,
                 itemBuilder: (context) => [
-                  PopupMenuItem(child: CheckedPopupMenuItem()),
+                  for (final item in MusicSort.values)
+                    PopupMenuItem(
+                      value: item,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            item == _sortSelected
+                                ? (_sortInDescending
+                                      ? Icons.arrow_downward
+                                      : Icons.arrow_upward)
+                                : item.icon,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(item.label),
+                        ],
+                      ),
+                    ),
                 ],
                 tooltip: '排序依据',
                 icon: const Icon(Icons.sort),

@@ -32,7 +32,6 @@ class _MusicLibState extends State<MusicLib> {
       album: '爱若琉璃',
       albumInLatin: '爱若琉璃'.toLatin(),
       path: '/home/ryan/Music/favorate/爱若琉璃 - 周深.opus',
-      pathInLatin: '/home/ryan/Music/favorate/爱若琉璃 - 周深.opus'.toLatin(),
       sizeBytes: 6309258,
       durationMs: 207360,
       playCount: 18,
@@ -47,8 +46,6 @@ class _MusicLibState extends State<MusicLib> {
       album: 'folklore (deluxe version)',
       albumInLatin: 'folklore (deluxe version)'.toLatin(),
       path: '/home/ryan/Music/favorate/august - Taylor Swift.opus',
-      pathInLatin: '/home/ryan/Music/favorate/august - Taylor Swift.opus'
-          .toLatin(),
       sizeBytes: 8612326,
       durationMs: 261922,
       playCount: 12,
@@ -63,8 +60,6 @@ class _MusicLibState extends State<MusicLib> {
       album: 'すずめ feat.十明',
       albumInLatin: 'すずめ feat.十明'.toLatin(),
       path: '/home/ryan/Music/favorate/すずめ feat.十明 - RADWIMPS; 十明.opus',
-      pathInLatin: '/home/ryan/Music/favorate/すずめ feat.十明 - RADWIMPS; 十明.opus'
-          .toLatin(),
       sizeBytes: 7490068,
       durationMs: 236390,
       playCount: 7,

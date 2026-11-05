@@ -57,28 +57,23 @@ const MusicInfoSchema = CollectionSchema(
       name: r'path',
       type: IsarType.string,
     ),
-    r'pathInLatin': PropertySchema(
-      id: 8,
-      name: r'pathInLatin',
-      type: IsarType.string,
-    ),
     r'playCount': PropertySchema(
-      id: 9,
+      id: 8,
       name: r'playCount',
       type: IsarType.long,
     ),
     r'sizeBytes': PropertySchema(
-      id: 10,
+      id: 9,
       name: r'sizeBytes',
       type: IsarType.long,
     ),
     r'title': PropertySchema(
-      id: 11,
+      id: 10,
       name: r'title',
       type: IsarType.string,
     ),
     r'titleInLatin': PropertySchema(
-      id: 12,
+      id: 11,
       name: r'titleInLatin',
       type: IsarType.string,
     )
@@ -114,7 +109,6 @@ int _musicInfoEstimateSize(
   }
   bytesCount += 3 + object.artistsInLatin.length * 3;
   bytesCount += 3 + object.path.length * 3;
-  bytesCount += 3 + object.pathInLatin.length * 3;
   bytesCount += 3 + object.title.length * 3;
   bytesCount += 3 + object.titleInLatin.length * 3;
   return bytesCount;
@@ -134,11 +128,10 @@ void _musicInfoSerialize(
   writer.writeLong(offsets[5], object.durationMs);
   writer.writeDateTime(offsets[6], object.editTime);
   writer.writeString(offsets[7], object.path);
-  writer.writeString(offsets[8], object.pathInLatin);
-  writer.writeLong(offsets[9], object.playCount);
-  writer.writeLong(offsets[10], object.sizeBytes);
-  writer.writeString(offsets[11], object.title);
-  writer.writeString(offsets[12], object.titleInLatin);
+  writer.writeLong(offsets[8], object.playCount);
+  writer.writeLong(offsets[9], object.sizeBytes);
+  writer.writeString(offsets[10], object.title);
+  writer.writeString(offsets[11], object.titleInLatin);
 }
 
 MusicInfo _musicInfoDeserialize(
@@ -157,11 +150,10 @@ MusicInfo _musicInfoDeserialize(
     editTime: reader.readDateTime(offsets[6]),
     id: id,
     path: reader.readString(offsets[7]),
-    pathInLatin: reader.readString(offsets[8]),
-    playCount: reader.readLong(offsets[9]),
-    sizeBytes: reader.readLong(offsets[10]),
-    title: reader.readString(offsets[11]),
-    titleInLatin: reader.readString(offsets[12]),
+    playCount: reader.readLong(offsets[8]),
+    sizeBytes: reader.readLong(offsets[9]),
+    title: reader.readString(offsets[10]),
+    titleInLatin: reader.readString(offsets[11]),
   );
   return object;
 }
@@ -190,14 +182,12 @@ P _musicInfoDeserializeProp<P>(
     case 7:
       return (reader.readString(offset)) as P;
     case 8:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 9:
       return (reader.readLong(offset)) as P;
     case 10:
-      return (reader.readLong(offset)) as P;
-    case 11:
       return (reader.readString(offset)) as P;
-    case 12:
+    case 11:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1263,140 +1253,6 @@ extension MusicInfoQueryFilter
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinEqualTo(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'pathInLatin',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
-      pathInLatinGreaterThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'pathInLatin',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinLessThan(
-    String value, {
-    bool include = false,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'pathInLatin',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinBetween(
-    String lower,
-    String upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'pathInLatin',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
-      pathInLatinStartsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.startsWith(
-        property: r'pathInLatin',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinEndsWith(
-    String value, {
-    bool caseSensitive = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.endsWith(
-        property: r'pathInLatin',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinContains(
-      String value,
-      {bool caseSensitive = true}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.contains(
-        property: r'pathInLatin',
-        value: value,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinMatches(
-      String pattern,
-      {bool caseSensitive = true}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.matches(
-        property: r'pathInLatin',
-        wildcard: pattern,
-        caseSensitive: caseSensitive,
-      ));
-    });
-  }
-
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
-      pathInLatinIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'pathInLatin',
-        value: '',
-      ));
-    });
-  }
-
-  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
-      pathInLatinIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        property: r'pathInLatin',
-        value: '',
-      ));
-    });
-  }
-
   QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> playCountEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
@@ -1862,18 +1718,6 @@ extension MusicInfoQuerySortBy on QueryBuilder<MusicInfo, MusicInfo, QSortBy> {
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByPathInLatin() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'pathInLatin', Sort.asc);
-    });
-  }
-
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByPathInLatinDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'pathInLatin', Sort.desc);
-    });
-  }
-
   QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByPlayCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'playCount', Sort.asc);
@@ -2021,18 +1865,6 @@ extension MusicInfoQuerySortThenBy
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByPathInLatin() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'pathInLatin', Sort.asc);
-    });
-  }
-
-  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByPathInLatinDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'pathInLatin', Sort.desc);
-    });
-  }
-
   QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByPlayCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'playCount', Sort.asc);
@@ -2137,13 +1969,6 @@ extension MusicInfoQueryWhereDistinct
     });
   }
 
-  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByPathInLatin(
-      {bool caseSensitive = true}) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'pathInLatin', caseSensitive: caseSensitive);
-    });
-  }
-
   QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByPlayCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'playCount');
@@ -2224,12 +2049,6 @@ extension MusicInfoQueryProperty
   QueryBuilder<MusicInfo, String, QQueryOperations> pathProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'path');
-    });
-  }
-
-  QueryBuilder<MusicInfo, String, QQueryOperations> pathInLatinProperty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'pathInLatin');
     });
   }
 

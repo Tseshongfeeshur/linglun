@@ -1,5 +1,3 @@
-import 'package:linglun/data/utils/string.dart';
-
 import 'package:isar/isar.dart';
 
 part 'music_info_model.g.dart';
@@ -18,7 +16,6 @@ class MusicInfo {
   String albumInLatin;
 
   String path;
-  String pathInLatin;
 
   int sizeBytes;
   int durationMs;
@@ -35,7 +32,6 @@ class MusicInfo {
     required this.album,
     required this.albumInLatin,
     required this.path,
-    required this.pathInLatin,
     required this.sizeBytes,
     required this.durationMs,
     required this.playCount,
