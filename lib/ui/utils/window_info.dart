@@ -1,12 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 
-extension WindowInfo on BuildContext {
+extension WindowInfoUtils on BuildContext {
   /// 当前窗口的逻辑像素尺寸
-  Size get screenSize => MediaQuery.sizeOf(this);
-
-  /// 窗口比例是否为横屏
-  bool get isLandscape => screenSize.width > screenSize.height;
+  Size get windowSize => MediaQuery.sizeOf(this);
 
   /// 窗口尺寸是否为宽屏
-  bool get isWideScreen => screenSize.width > 600;
+  bool get isWideScreen => windowSize.width >= 600;
 }

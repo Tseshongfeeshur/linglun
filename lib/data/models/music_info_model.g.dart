@@ -27,43 +27,58 @@ const MusicInfoSchema = CollectionSchema(
       name: r'album',
       type: IsarType.string,
     ),
-    r'artists': PropertySchema(
+    r'albumInLatin': PropertySchema(
       id: 2,
+      name: r'albumInLatin',
+      type: IsarType.string,
+    ),
+    r'artists': PropertySchema(
+      id: 3,
       name: r'artists',
       type: IsarType.stringList,
     ),
+    r'artistsInLatin': PropertySchema(
+      id: 4,
+      name: r'artistsInLatin',
+      type: IsarType.string,
+    ),
     r'durationMs': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'durationMs',
       type: IsarType.long,
     ),
     r'editTime': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'editTime',
       type: IsarType.dateTime,
     ),
     r'path': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'path',
       type: IsarType.string,
     ),
+    r'pathInLatin': PropertySchema(
+      id: 8,
+      name: r'pathInLatin',
+      type: IsarType.string,
+    ),
     r'playCount': PropertySchema(
-      id: 6,
+      id: 9,
       name: r'playCount',
       type: IsarType.long,
     ),
     r'sizeBytes': PropertySchema(
-      id: 7,
+      id: 10,
       name: r'sizeBytes',
       type: IsarType.long,
     ),
     r'title': PropertySchema(
-      id: 8,
+      id: 11,
       name: r'title',
       type: IsarType.string,
     ),
     r'titleInLatin': PropertySchema(
-      id: 9,
+      id: 12,
       name: r'titleInLatin',
       type: IsarType.string,
     )
@@ -89,6 +104,7 @@ int _musicInfoEstimateSize(
 ) {
   var bytesCount = offsets.last;
   bytesCount += 3 + object.album.length * 3;
+  bytesCount += 3 + object.albumInLatin.length * 3;
   bytesCount += 3 + object.artists.length * 3;
   {
     for (var i = 0; i < object.artists.length; i++) {
@@ -96,7 +112,9 @@ int _musicInfoEstimateSize(
       bytesCount += value.length * 3;
     }
   }
+  bytesCount += 3 + object.artistsInLatin.length * 3;
   bytesCount += 3 + object.path.length * 3;
+  bytesCount += 3 + object.pathInLatin.length * 3;
   bytesCount += 3 + object.title.length * 3;
   bytesCount += 3 + object.titleInLatin.length * 3;
   return bytesCount;
@@ -110,14 +128,17 @@ void _musicInfoSerialize(
 ) {
   writer.writeDateTime(offsets[0], object.addTime);
   writer.writeString(offsets[1], object.album);
-  writer.writeStringList(offsets[2], object.artists);
-  writer.writeLong(offsets[3], object.durationMs);
-  writer.writeDateTime(offsets[4], object.editTime);
-  writer.writeString(offsets[5], object.path);
-  writer.writeLong(offsets[6], object.playCount);
-  writer.writeLong(offsets[7], object.sizeBytes);
-  writer.writeString(offsets[8], object.title);
-  writer.writeString(offsets[9], object.titleInLatin);
+  writer.writeString(offsets[2], object.albumInLatin);
+  writer.writeStringList(offsets[3], object.artists);
+  writer.writeString(offsets[4], object.artistsInLatin);
+  writer.writeLong(offsets[5], object.durationMs);
+  writer.writeDateTime(offsets[6], object.editTime);
+  writer.writeString(offsets[7], object.path);
+  writer.writeString(offsets[8], object.pathInLatin);
+  writer.writeLong(offsets[9], object.playCount);
+  writer.writeLong(offsets[10], object.sizeBytes);
+  writer.writeString(offsets[11], object.title);
+  writer.writeString(offsets[12], object.titleInLatin);
 }
 
 MusicInfo _musicInfoDeserialize(
@@ -129,16 +150,19 @@ MusicInfo _musicInfoDeserialize(
   final object = MusicInfo(
     addTime: reader.readDateTime(offsets[0]),
     album: reader.readString(offsets[1]),
-    artists: reader.readStringList(offsets[2]) ?? [],
-    durationMs: reader.readLong(offsets[3]),
-    editTime: reader.readDateTime(offsets[4]),
+    artists: reader.readStringList(offsets[3]) ?? [],
+    durationMs: reader.readLong(offsets[5]),
+    editTime: reader.readDateTime(offsets[6]),
     id: id,
-    path: reader.readString(offsets[5]),
-    playCount: reader.readLong(offsets[6]),
-    sizeBytes: reader.readLong(offsets[7]),
-    title: reader.readString(offsets[8]),
-    titleInLatin: reader.readString(offsets[9]),
+    path: reader.readString(offsets[7]),
+    playCount: reader.readLong(offsets[9]),
+    sizeBytes: reader.readLong(offsets[10]),
+    title: reader.readString(offsets[11]),
   );
+  object.albumInLatin = reader.readString(offsets[2]);
+  object.artistsInLatin = reader.readString(offsets[4]);
+  object.pathInLatin = reader.readString(offsets[8]);
+  object.titleInLatin = reader.readString(offsets[12]);
   return object;
 }
 
@@ -154,20 +178,26 @@ P _musicInfoDeserializeProp<P>(
     case 1:
       return (reader.readString(offset)) as P;
     case 2:
-      return (reader.readStringList(offset) ?? []) as P;
-    case 3:
-      return (reader.readLong(offset)) as P;
-    case 4:
-      return (reader.readDateTime(offset)) as P;
-    case 5:
       return (reader.readString(offset)) as P;
+    case 3:
+      return (reader.readStringList(offset) ?? []) as P;
+    case 4:
+      return (reader.readString(offset)) as P;
+    case 5:
+      return (reader.readLong(offset)) as P;
     case 6:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 7:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 8:
       return (reader.readString(offset)) as P;
     case 9:
+      return (reader.readLong(offset)) as P;
+    case 10:
+      return (reader.readLong(offset)) as P;
+    case 11:
+      return (reader.readString(offset)) as P;
+    case 12:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -448,6 +478,141 @@ extension MusicInfoQueryFilter
     });
   }
 
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> albumInLatinEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'albumInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      albumInLatinGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'albumInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      albumInLatinLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'albumInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> albumInLatinBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'albumInLatin',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      albumInLatinStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'albumInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      albumInLatinEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'albumInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      albumInLatinContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'albumInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> albumInLatinMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'albumInLatin',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      albumInLatinIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'albumInLatin',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      albumInLatinIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'albumInLatin',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
       artistsElementEqualTo(
     String value, {
@@ -669,6 +834,142 @@ extension MusicInfoQueryFilter
         upper,
         includeUpper,
       );
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      artistsInLatinEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'artistsInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      artistsInLatinGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'artistsInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      artistsInLatinLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'artistsInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      artistsInLatinBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'artistsInLatin',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      artistsInLatinStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'artistsInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      artistsInLatinEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'artistsInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      artistsInLatinContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'artistsInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      artistsInLatinMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'artistsInLatin',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      artistsInLatinIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'artistsInLatin',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      artistsInLatinIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'artistsInLatin',
+        value: '',
+      ));
     });
   }
 
@@ -957,6 +1258,140 @@ extension MusicInfoQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'path',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'pathInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      pathInLatinGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'pathInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'pathInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'pathInLatin',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      pathInLatinStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'pathInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'pathInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'pathInLatin',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition> pathInLatinMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'pathInLatin',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      pathInLatinIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'pathInLatin',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterFilterCondition>
+      pathInLatinIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'pathInLatin',
         value: '',
       ));
     });
@@ -1367,6 +1802,30 @@ extension MusicInfoQuerySortBy on QueryBuilder<MusicInfo, MusicInfo, QSortBy> {
     });
   }
 
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByAlbumInLatin() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'albumInLatin', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByAlbumInLatinDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'albumInLatin', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByArtistsInLatin() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'artistsInLatin', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByArtistsInLatinDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'artistsInLatin', Sort.desc);
+    });
+  }
+
   QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByDurationMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'durationMs', Sort.asc);
@@ -1400,6 +1859,18 @@ extension MusicInfoQuerySortBy on QueryBuilder<MusicInfo, MusicInfo, QSortBy> {
   QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByPathDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'path', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByPathInLatin() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pathInLatin', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> sortByPathInLatinDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pathInLatin', Sort.desc);
     });
   }
 
@@ -1478,6 +1949,30 @@ extension MusicInfoQuerySortThenBy
     });
   }
 
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByAlbumInLatin() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'albumInLatin', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByAlbumInLatinDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'albumInLatin', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByArtistsInLatin() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'artistsInLatin', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByArtistsInLatinDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'artistsInLatin', Sort.desc);
+    });
+  }
+
   QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByDurationMs() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'durationMs', Sort.asc);
@@ -1523,6 +2018,18 @@ extension MusicInfoQuerySortThenBy
   QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByPathDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'path', Sort.desc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByPathInLatin() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pathInLatin', Sort.asc);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterSortBy> thenByPathInLatinDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'pathInLatin', Sort.desc);
     });
   }
 
@@ -1590,9 +2097,24 @@ extension MusicInfoQueryWhereDistinct
     });
   }
 
+  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByAlbumInLatin(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'albumInLatin', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByArtists() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'artists');
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByArtistsInLatin(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'artistsInLatin',
+          caseSensitive: caseSensitive);
     });
   }
 
@@ -1612,6 +2134,13 @@ extension MusicInfoQueryWhereDistinct
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'path', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QDistinct> distinctByPathInLatin(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'pathInLatin', caseSensitive: caseSensitive);
     });
   }
 
@@ -1662,9 +2191,21 @@ extension MusicInfoQueryProperty
     });
   }
 
+  QueryBuilder<MusicInfo, String, QQueryOperations> albumInLatinProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'albumInLatin');
+    });
+  }
+
   QueryBuilder<MusicInfo, List<String>, QQueryOperations> artistsProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'artists');
+    });
+  }
+
+  QueryBuilder<MusicInfo, String, QQueryOperations> artistsInLatinProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'artistsInLatin');
     });
   }
 
@@ -1683,6 +2224,12 @@ extension MusicInfoQueryProperty
   QueryBuilder<MusicInfo, String, QQueryOperations> pathProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'path');
+    });
+  }
+
+  QueryBuilder<MusicInfo, String, QQueryOperations> pathInLatinProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'pathInLatin');
     });
   }
 

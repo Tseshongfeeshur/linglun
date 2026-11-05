@@ -1,4 +1,4 @@
-import 'package:linglun/data/music_info_model.dart';
+import 'package:linglun/data/models/music_info_model.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:linglun/ui/frame/page_model.dart';
@@ -22,12 +22,26 @@ class MusicLib extends StatefulWidget implements PageModel {
 }
 
 class _MusicLibState extends State<MusicLib> {
-  final TextEditingController controller = TextEditingController();
+  late TextEditingController searchBarController;
+  late FocusNode searchBarFocusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    searchBarController = TextEditingController();
+    searchBarFocusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    searchBarFocusNode.dispose();
+    searchBarController.dispose();
+    super.dispose();
+  }
 
   final List<MusicInfo> testlist = [
     MusicInfo(
       title: '爱若琉璃',
-      titleInLatin: 'Ai Ruo Liuli',
       artists: ['周深'],
       album: '爱若琉璃',
       path: '/home/ryan/Music/favorate/爱若琉璃 - 周深.opus',
@@ -39,7 +53,6 @@ class _MusicLibState extends State<MusicLib> {
     ),
     MusicInfo(
       title: 'august',
-      titleInLatin: 'august',
       artists: ['Taylor Swift'],
       album: 'folklore (deluxe version)',
       path: '/home/ryan/Music/favorate/august - Taylor Swift.opus',
@@ -51,10 +64,20 @@ class _MusicLibState extends State<MusicLib> {
     ),
     MusicInfo(
       title: 'すずめ feat.十明',
-      titleInLatin: 'Suzume feat. Toaka',
       artists: ['RADWIMPS', '十明'],
       album: 'すずめ feat.十明',
       path: '/home/ryan/Music/favorate/すずめ feat.十明 - RADWIMPS; 十明.opus',
+      sizeBytes: 7490068,
+      durationMs: 236390,
+      playCount: 7,
+      addTime: DateTime(2026, 7, 8, 23, 26),
+      editTime: DateTime(2026, 7, 5, 22, 10),
+    ),
+    MusicInfo(
+      title: '안녕 hello',
+      artists: [''],
+      album: '',
+      path: '',
       sizeBytes: 7490068,
       durationMs: 236390,
       playCount: 7,
@@ -69,7 +92,6 @@ class _MusicLibState extends State<MusicLib> {
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
-          SizedBox(width: 4),
           PopupMenuButton(
             itemBuilder: (context) => [
               PopupMenuItem(
@@ -82,17 +104,40 @@ class _MusicLibState extends State<MusicLib> {
             tooltip: '排序依据',
             icon: const Icon(Icons.sort),
           ),
-          SizedBox(width: 6),
           IconButton(
             onPressed: () {},
             icon: const Icon(Icons.check_box_outlined),
           ),
-          SizedBox(width: 2),
-          SearchField(controller: controller),
-          SizedBox(width: 4),
+          SearchField(
+            controller: searchBarController,
+            focusNode: searchBarFocusNode,
+          ),
         ],
       ),
-      body: Center(child: Text('MusicLib')),
+      body: ListView(
+        children: List.generate(
+          testlist.length,
+          ((index) => ListTile(
+            leading: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.music_note,
+                  color: Theme.of(context).colorScheme.surface,
+                ),
+              ),
+            ),
+            title: Text(testlist[index].title),
+            subtitle: Text(testlist[index].titleInLatin),
+            onTap: () {},
+          )),
+        ),
+      ),
     );
   }
 }
