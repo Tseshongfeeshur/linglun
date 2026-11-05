@@ -3,7 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'package:linglun/ui/frame/page_model.dart';
 
-import 'package:linglun/ui/pages/music_lib/search_field.dart';
+import 'package:linglun/ui/pages/widgets/list_page_actions.dart';
 
 class MusicLib extends StatefulWidget implements PageModel {
   const MusicLib({super.key});
@@ -22,23 +22,6 @@ class MusicLib extends StatefulWidget implements PageModel {
 }
 
 class _MusicLibState extends State<MusicLib> {
-  late TextEditingController searchBarController;
-  late FocusNode searchBarFocusNode;
-
-  @override
-  void initState() {
-    super.initState();
-    searchBarController = TextEditingController();
-    searchBarFocusNode = FocusNode();
-  }
-
-  @override
-  void dispose() {
-    searchBarFocusNode.dispose();
-    searchBarController.dispose();
-    super.dispose();
-  }
-
   final List<MusicInfo> testlist = [
     MusicInfo(
       title: '爱若琉璃',
@@ -90,29 +73,11 @@ class _MusicLibState extends State<MusicLib> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
-        actions: [
-          PopupMenuButton(
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                child: ListTile(
-                  leading: Icon(Icons.title),
-                  title: Text('data'),
-                ),
-              ),
-            ],
-            tooltip: '排序依据',
-            icon: const Icon(Icons.sort),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.check_box_outlined),
-          ),
-          SearchField(
-            controller: searchBarController,
-            focusNode: searchBarFocusNode,
-          ),
-        ],
+        title: Text(
+          widget.title,
+          style: TextStyle(overflow: TextOverflow.fade),
+        ),
+        actions: [ListPageActions()],
       ),
       body: ListView(
         children: List.generate(
