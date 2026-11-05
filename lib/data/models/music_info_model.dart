@@ -9,16 +9,16 @@ class MusicInfo {
   Id id = Isar.autoIncrement;
 
   String title;
-  late String titleInLatin;
+  String titleInLatin;
 
   List<String> artists;
-  late String artistsInLatin;
+  String artistsInLatin;
 
   String album;
-  late String albumInLatin;
+  String albumInLatin;
 
   String path;
-  late String pathInLatin;
+  String pathInLatin;
 
   int sizeBytes;
   int durationMs;
@@ -29,20 +29,19 @@ class MusicInfo {
   MusicInfo({
     this.id = Isar.autoIncrement,
     required this.title,
+    required this.titleInLatin,
     required this.artists,
+    required this.artistsInLatin,
     required this.album,
+    required this.albumInLatin,
     required this.path,
+    required this.pathInLatin,
     required this.sizeBytes,
     required this.durationMs,
     required this.playCount,
     required this.addTime,
     required this.editTime,
-  }) {
-    titleInLatin = title.toLatin();
-    artistsInLatin = artists.join().toLatin();
-    albumInLatin = album.toLatin();
-    pathInLatin = path.toLatin();
-  }
+  });
 
   // 面向业务的 Duration Getter，Isar 会忽略
   @Ignore()

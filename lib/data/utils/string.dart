@@ -1,6 +1,8 @@
 import 'package:romanize/romanize.dart';
 import 'package:diacritic/diacritic.dart';
 
+Future<void>? _romanizeInit;
+
 final _symbol = RegExp(r'[^\p{L}\p{N}\s]', unicode: true);
 
 final _invalid = RegExp(r'[^a-z0-9\s]', unicode: true);
@@ -8,7 +10,8 @@ final _spaces = RegExp(r'\s+');
 
 // final _multiSharp = RegExp(r'#(\s*#)+');
 
-Future<void> initRomanize() => TextRomanizer.ensureInitialized();
+Future<void> initRomanize() =>
+    _romanizeInit ??= TextRomanizer.ensureInitialized();
 
 extension StringUtils on String {
   /// 转换前需要执行 `await initRomanize();`

@@ -150,19 +150,19 @@ MusicInfo _musicInfoDeserialize(
   final object = MusicInfo(
     addTime: reader.readDateTime(offsets[0]),
     album: reader.readString(offsets[1]),
+    albumInLatin: reader.readString(offsets[2]),
     artists: reader.readStringList(offsets[3]) ?? [],
+    artistsInLatin: reader.readString(offsets[4]),
     durationMs: reader.readLong(offsets[5]),
     editTime: reader.readDateTime(offsets[6]),
     id: id,
     path: reader.readString(offsets[7]),
+    pathInLatin: reader.readString(offsets[8]),
     playCount: reader.readLong(offsets[9]),
     sizeBytes: reader.readLong(offsets[10]),
     title: reader.readString(offsets[11]),
+    titleInLatin: reader.readString(offsets[12]),
   );
-  object.albumInLatin = reader.readString(offsets[2]);
-  object.artistsInLatin = reader.readString(offsets[4]);
-  object.pathInLatin = reader.readString(offsets[8]);
-  object.titleInLatin = reader.readString(offsets[12]);
   return object;
 }
 

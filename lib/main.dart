@@ -1,8 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'package:linglun/data/utils/string.dart';
+
 import 'package:linglun/ui/frame/frame.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  initRomanize();
   runApp(const MainApp());
 }
 
