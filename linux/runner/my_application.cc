@@ -159,10 +159,10 @@
 
 // ---- Tunables -------------------------------------------------------------
 #define APP_TITLE "linglun"
-#define DEFAULT_WIDTH 1280
-#define DEFAULT_HEIGHT 720
+#define DEFAULT_WIDTH 840
+#define DEFAULT_HEIGHT 600
 #define MIN_WIDTH 300
-#define MIN_HEIGHT 480
+#define MIN_HEIGHT 400
 // ---------------------------------------------------------------------------
 
 struct _MyApplication {
