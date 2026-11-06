@@ -152,7 +152,7 @@ class _SearchFieldState extends State<SearchField> {
       child: Container(
         width:
             40 +
-            (context.isWideScreen
+            (context.isTablet
                     ? 240
                     : (context.windowSize.width - widget.searchBarPadding * 2) -
                           40) *
@@ -226,7 +226,7 @@ class Collapsible extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visible = context.isWideScreen ? 1.0 : (1 - progress).clamp(0.0, 1.0);
+    final visible = context.isTablet ? 1.0 : (1 - progress).clamp(0.0, 1.0);
     return ClipRect(
       child: Align(
         alignment: Alignment.centerLeft,

@@ -33,7 +33,7 @@ class _FrameState extends State<Frame> {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        context.isWideScreen
+        context.isTablet
             ? NavigationRail(
                 selectedIndex: pageIndex,
                 backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
@@ -57,7 +57,7 @@ class _FrameState extends State<Frame> {
           child: Scaffold(
             backgroundColor: Theme.of(context).colorScheme.surface,
             body: pages[pageIndex] as Widget,
-            bottomNavigationBar: context.isWideScreen
+            bottomNavigationBar: context.isTablet
                 ? null
                 : NavigationBar(
                     selectedIndex: pageIndex,
