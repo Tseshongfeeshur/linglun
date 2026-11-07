@@ -5,17 +5,22 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:linglun/ui/utils/window_info.dart';
 import 'package:linglun/ui/pages/music_lib/music_sort.dart';
 
-class ListPageActions extends StatefulWidget {
-  final MusicSort sortMethod;
-  final Function onSortChanged;
+class SortConfig {
+  final MusicSort method;
   final bool descending;
-  final Function onDescendingChanged;
+  const SortConfig(this.method, this.descending);
+
+  SortConfig copyWith({MusicSort? method, bool? descending}) =>
+      SortConfig(method ?? MusicSort.titleInLatin, descending ?? false);
+}
+
+class ListPageActions extends StatefulWidget {
+  final SortConfig sortConfig;
+  final Function onSortChanged;
   const ListPageActions({
     super.key,
-    required this.sortMethod,
+    required this.sortConfig,
     required this.onSortChanged,
-    required this.descending,
-    required this.onDescendingChanged,
   });
 
   @override
@@ -76,13 +81,22 @@ class _ListPageActionsState extends State<ListPageActions> {
                   reverseDuration: 140.ms,
                 ),
                 onSelected: (value) => setState(() {
-                  if (widget.sortMethod == value) {
-                    widget.onDescendingChanged();
+                  if (widget.sortConfig.method == value) {
+                    widget.onSortChanged(
+                      widget.sortConfig.copyWith(
+                        descending: !widget.sortConfig.descending,
+                      ),
+                    );
                   } else {
-                    widget.onSortChanged(value);
+                    widget.onSortChanged(
+                      widget.sortConfig.copyWith(
+                        method: value,
+                        descending: false,
+                      ),
+                    );
                   }
                 }),
-                initialValue: widget.sortMethod,
+                initialValue: widget.sortConfig.method,
                 itemBuilder: (context) => [
                   for (final item in MusicSort.values)
                     PopupMenuItem(
@@ -91,8 +105,8 @@ class _ListPageActionsState extends State<ListPageActions> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            item == widget.sortMethod
-                                ? (widget.descending
+                            item == widget.sortConfig.method
+                                ? (widget.sortConfig.descending
                                       ? Icons.arrow_downward
                                       : Icons.arrow_upward)
                                 : item.icon,

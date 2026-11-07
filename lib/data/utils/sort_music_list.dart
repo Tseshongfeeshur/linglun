@@ -1,13 +1,10 @@
 import 'package:linglun/data/models/music_info_model.dart';
 import 'package:linglun/ui/pages/music_lib/music_sort.dart';
+import 'package:linglun/ui/pages/widgets/list_page_actions.dart';
 
-List<MusicInfo> sortMusicList(
-  List<MusicInfo> list,
-  MusicSort sort,
-  bool descending,
-) {
+List<MusicInfo> sortMusicList(List<MusicInfo> list, SortConfig sortConfig) {
   final result = [...list];
-  switch (sort) {
+  switch (sortConfig.method) {
     case MusicSort.titleInLatin:
       result.sort((a, b) => a.titleInLatin.compareTo(b.titleInLatin));
     case MusicSort.artistsInLatin:
@@ -30,5 +27,5 @@ List<MusicInfo> sortMusicList(
       result.sort((a, b) => a.editTime.compareTo(b.editTime));
   }
 
-  return descending ? result.reversed.toList() : result;
+  return sortConfig.descending ? result.reversed.toList() : result;
 }

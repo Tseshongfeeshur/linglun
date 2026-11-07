@@ -28,11 +28,9 @@ class MusicLib extends StatefulWidget implements PageModel {
 }
 
 class _MusicLibState extends State<MusicLib> {
-  MusicSort sortMethod = MusicSort.titleInLatin;
-  bool descending = false;
+  SortConfig sortConfig = SortConfig(MusicSort.titleInLatin, false);
   List<MusicInfo> musicList = getMusicList();
-  List<MusicInfo> get sortedMusicList =>
-      sortMusicList(musicList, sortMethod, descending);
+  List<MusicInfo> get sortedMusicList => sortMusicList(musicList, sortConfig);
 
   @override
   Widget build(BuildContext context) {
@@ -44,13 +42,10 @@ class _MusicLibState extends State<MusicLib> {
         ),
         actions: [
           ListPageActions(
-            sortMethod: sortMethod,
+            sortConfig: sortConfig,
             onSortChanged: (value) => setState(() {
-              sortMethod = value;
-              descending = false;
+              sortConfig = value;
             }),
-            descending: descending,
-            onDescendingChanged: () => setState(() => descending = !descending),
           ),
         ],
       ),
