@@ -1,7 +1,7 @@
 import 'package:linglun/data/models/music_info_model.dart';
-import 'package:linglun/data/utils/string.dart';
+import 'package:linglun/data/utils/string_to_latin.dart';
 
-List<MusicInfo> generateTestMusicList() {
+List<MusicInfo> getMusicList() {
   final data =
       <
         ({

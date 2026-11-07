@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'package:linglun/data/utils/string.dart';
+import 'package:linglun/data/utils/string_to_latin.dart';
 
 import 'package:linglun/ui/frame/frame.dart';
 

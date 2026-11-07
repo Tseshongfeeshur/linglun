@@ -83,7 +83,125 @@ const MusicInfoSchema = CollectionSchema(
   deserialize: _musicInfoDeserialize,
   deserializeProp: _musicInfoDeserializeProp,
   idName: r'id',
-  indexes: {},
+  indexes: {
+    r'titleInLatin': IndexSchema(
+      id: -3868518101669599461,
+      name: r'titleInLatin',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'titleInLatin',
+          type: IndexType.hash,
+          caseSensitive: true,
+        )
+      ],
+    ),
+    r'artistsInLatin': IndexSchema(
+      id: 6166231989447488965,
+      name: r'artistsInLatin',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'artistsInLatin',
+          type: IndexType.hash,
+          caseSensitive: true,
+        )
+      ],
+    ),
+    r'albumInLatin': IndexSchema(
+      id: 1819815896752898479,
+      name: r'albumInLatin',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'albumInLatin',
+          type: IndexType.hash,
+          caseSensitive: true,
+        )
+      ],
+    ),
+    r'path': IndexSchema(
+      id: 8756705481922369689,
+      name: r'path',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'path',
+          type: IndexType.hash,
+          caseSensitive: true,
+        )
+      ],
+    ),
+    r'sizeBytes': IndexSchema(
+      id: 3709657484106027790,
+      name: r'sizeBytes',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'sizeBytes',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    ),
+    r'durationMs': IndexSchema(
+      id: -3632149205198405195,
+      name: r'durationMs',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'durationMs',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    ),
+    r'playCount': IndexSchema(
+      id: -4991726430503965029,
+      name: r'playCount',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'playCount',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    ),
+    r'addTime': IndexSchema(
+      id: -6746818279610909434,
+      name: r'addTime',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'addTime',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    ),
+    r'editTime': IndexSchema(
+      id: -1867508070495637554,
+      name: r'editTime',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'editTime',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    )
+  },
   links: {},
   embeddedSchemas: {},
   getId: _musicInfoGetId,
@@ -148,13 +266,13 @@ MusicInfo _musicInfoDeserialize(
     artistsInLatin: reader.readString(offsets[4]),
     durationMs: reader.readLong(offsets[5]),
     editTime: reader.readDateTime(offsets[6]),
-    id: id,
     path: reader.readString(offsets[7]),
     playCount: reader.readLong(offsets[8]),
     sizeBytes: reader.readLong(offsets[9]),
     title: reader.readString(offsets[10]),
     titleInLatin: reader.readString(offsets[11]),
   );
+  object.id = id;
   return object;
 }
 
@@ -211,6 +329,46 @@ extension MusicInfoQueryWhereSort
   QueryBuilder<MusicInfo, MusicInfo, QAfterWhere> anyId() {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(const IdWhereClause.any());
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhere> anySizeBytes() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'sizeBytes'),
+      );
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhere> anyDurationMs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'durationMs'),
+      );
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhere> anyPlayCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'playCount'),
+      );
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhere> anyAddTime() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'addTime'),
+      );
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhere> anyEditTime() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'editTime'),
+      );
     });
   }
 }
@@ -277,6 +435,636 @@ extension MusicInfoQueryWhere
         lower: lowerId,
         includeLower: includeLower,
         upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> titleInLatinEqualTo(
+      String titleInLatin) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'titleInLatin',
+        value: [titleInLatin],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> titleInLatinNotEqualTo(
+      String titleInLatin) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'titleInLatin',
+              lower: [],
+              upper: [titleInLatin],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'titleInLatin',
+              lower: [titleInLatin],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'titleInLatin',
+              lower: [titleInLatin],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'titleInLatin',
+              lower: [],
+              upper: [titleInLatin],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> artistsInLatinEqualTo(
+      String artistsInLatin) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'artistsInLatin',
+        value: [artistsInLatin],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause>
+      artistsInLatinNotEqualTo(String artistsInLatin) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'artistsInLatin',
+              lower: [],
+              upper: [artistsInLatin],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'artistsInLatin',
+              lower: [artistsInLatin],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'artistsInLatin',
+              lower: [artistsInLatin],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'artistsInLatin',
+              lower: [],
+              upper: [artistsInLatin],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> albumInLatinEqualTo(
+      String albumInLatin) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'albumInLatin',
+        value: [albumInLatin],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> albumInLatinNotEqualTo(
+      String albumInLatin) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'albumInLatin',
+              lower: [],
+              upper: [albumInLatin],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'albumInLatin',
+              lower: [albumInLatin],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'albumInLatin',
+              lower: [albumInLatin],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'albumInLatin',
+              lower: [],
+              upper: [albumInLatin],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> pathEqualTo(
+      String path) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'path',
+        value: [path],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> pathNotEqualTo(
+      String path) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'path',
+              lower: [],
+              upper: [path],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'path',
+              lower: [path],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'path',
+              lower: [path],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'path',
+              lower: [],
+              upper: [path],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> sizeBytesEqualTo(
+      int sizeBytes) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'sizeBytes',
+        value: [sizeBytes],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> sizeBytesNotEqualTo(
+      int sizeBytes) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sizeBytes',
+              lower: [],
+              upper: [sizeBytes],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sizeBytes',
+              lower: [sizeBytes],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sizeBytes',
+              lower: [sizeBytes],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'sizeBytes',
+              lower: [],
+              upper: [sizeBytes],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> sizeBytesGreaterThan(
+    int sizeBytes, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'sizeBytes',
+        lower: [sizeBytes],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> sizeBytesLessThan(
+    int sizeBytes, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'sizeBytes',
+        lower: [],
+        upper: [sizeBytes],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> sizeBytesBetween(
+    int lowerSizeBytes,
+    int upperSizeBytes, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'sizeBytes',
+        lower: [lowerSizeBytes],
+        includeLower: includeLower,
+        upper: [upperSizeBytes],
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> durationMsEqualTo(
+      int durationMs) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'durationMs',
+        value: [durationMs],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> durationMsNotEqualTo(
+      int durationMs) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'durationMs',
+              lower: [],
+              upper: [durationMs],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'durationMs',
+              lower: [durationMs],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'durationMs',
+              lower: [durationMs],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'durationMs',
+              lower: [],
+              upper: [durationMs],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> durationMsGreaterThan(
+    int durationMs, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'durationMs',
+        lower: [durationMs],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> durationMsLessThan(
+    int durationMs, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'durationMs',
+        lower: [],
+        upper: [durationMs],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> durationMsBetween(
+    int lowerDurationMs,
+    int upperDurationMs, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'durationMs',
+        lower: [lowerDurationMs],
+        includeLower: includeLower,
+        upper: [upperDurationMs],
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> playCountEqualTo(
+      int playCount) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'playCount',
+        value: [playCount],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> playCountNotEqualTo(
+      int playCount) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'playCount',
+              lower: [],
+              upper: [playCount],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'playCount',
+              lower: [playCount],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'playCount',
+              lower: [playCount],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'playCount',
+              lower: [],
+              upper: [playCount],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> playCountGreaterThan(
+    int playCount, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'playCount',
+        lower: [playCount],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> playCountLessThan(
+    int playCount, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'playCount',
+        lower: [],
+        upper: [playCount],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> playCountBetween(
+    int lowerPlayCount,
+    int upperPlayCount, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'playCount',
+        lower: [lowerPlayCount],
+        includeLower: includeLower,
+        upper: [upperPlayCount],
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> addTimeEqualTo(
+      DateTime addTime) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'addTime',
+        value: [addTime],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> addTimeNotEqualTo(
+      DateTime addTime) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'addTime',
+              lower: [],
+              upper: [addTime],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'addTime',
+              lower: [addTime],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'addTime',
+              lower: [addTime],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'addTime',
+              lower: [],
+              upper: [addTime],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> addTimeGreaterThan(
+    DateTime addTime, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'addTime',
+        lower: [addTime],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> addTimeLessThan(
+    DateTime addTime, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'addTime',
+        lower: [],
+        upper: [addTime],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> addTimeBetween(
+    DateTime lowerAddTime,
+    DateTime upperAddTime, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'addTime',
+        lower: [lowerAddTime],
+        includeLower: includeLower,
+        upper: [upperAddTime],
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> editTimeEqualTo(
+      DateTime editTime) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'editTime',
+        value: [editTime],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> editTimeNotEqualTo(
+      DateTime editTime) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'editTime',
+              lower: [],
+              upper: [editTime],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'editTime',
+              lower: [editTime],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'editTime',
+              lower: [editTime],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'editTime',
+              lower: [],
+              upper: [editTime],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> editTimeGreaterThan(
+    DateTime editTime, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'editTime',
+        lower: [editTime],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> editTimeLessThan(
+    DateTime editTime, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'editTime',
+        lower: [],
+        upper: [editTime],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<MusicInfo, MusicInfo, QAfterWhereClause> editTimeBetween(
+    DateTime lowerEditTime,
+    DateTime upperEditTime, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'editTime',
+        lower: [lowerEditTime],
+        includeLower: includeLower,
+        upper: [upperEditTime],
         includeUpper: includeUpper,
       ));
     });

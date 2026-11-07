@@ -7,24 +7,32 @@ class MusicInfo {
   Id id = Isar.autoIncrement;
 
   String title;
+  @Index()
   String titleInLatin;
 
   List<String> artists;
+  @Index()
   String artistsInLatin;
 
   String album;
+  @Index()
   String albumInLatin;
 
+  @Index()
   String path;
 
+  @Index()
   int sizeBytes;
+  @Index()
   int durationMs;
+  @Index()
   int playCount;
+  @Index()
   DateTime addTime;
+  @Index()
   DateTime editTime;
 
   MusicInfo({
-    this.id = Isar.autoIncrement,
     required this.title,
     required this.titleInLatin,
     required this.artists,

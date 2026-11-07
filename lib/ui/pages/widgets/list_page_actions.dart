@@ -6,7 +6,17 @@ import 'package:linglun/ui/utils/window_info.dart';
 import 'package:linglun/ui/pages/music_lib/music_sort.dart';
 
 class ListPageActions extends StatefulWidget {
-  const ListPageActions({super.key});
+  final MusicSort sortMethod;
+  final Function onSortChanged;
+  final bool descending;
+  final Function onDescendingChanged;
+  const ListPageActions({
+    super.key,
+    required this.sortMethod,
+    required this.onSortChanged,
+    required this.descending,
+    required this.onDescendingChanged,
+  });
 
   @override
   State<ListPageActions> createState() => _ListPageActionsState();
@@ -17,9 +27,6 @@ class _ListPageActionsState extends State<ListPageActions> {
   late FocusNode searchBarFocusNode;
   final double searchBarPadding = 8;
   bool isSearchBarExtended = false;
-
-  MusicSort _sortSelected = MusicSort.titleInLatin;
-  bool _sortInDescending = false;
 
   void updateExtendedState() => setState(
     () => isSearchBarExtended =
@@ -69,14 +76,13 @@ class _ListPageActionsState extends State<ListPageActions> {
                   reverseDuration: 140.ms,
                 ),
                 onSelected: (value) => setState(() {
-                  if (_sortSelected == value) {
-                    _sortInDescending = !_sortInDescending;
+                  if (widget.sortMethod == value) {
+                    widget.onDescendingChanged();
                   } else {
-                    _sortInDescending = false;
-                    _sortSelected = value;
+                    widget.onSortChanged(value);
                   }
                 }),
-                initialValue: _sortSelected,
+                initialValue: widget.sortMethod,
                 itemBuilder: (context) => [
                   for (final item in MusicSort.values)
                     PopupMenuItem(
@@ -85,8 +91,8 @@ class _ListPageActionsState extends State<ListPageActions> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            item == _sortSelected
-                                ? (_sortInDescending
+                            item == widget.sortMethod
+                                ? (widget.descending
                                       ? Icons.arrow_downward
                                       : Icons.arrow_upward)
                                 : item.icon,
