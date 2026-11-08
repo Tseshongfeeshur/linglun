@@ -3,20 +3,11 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:linglun/ui/utils/window_info.dart';
-import 'package:linglun/ui/pages/music_lib/music_sort.dart';
-
-class SortConfig {
-  final MusicSort method;
-  final bool descending;
-  const SortConfig(this.method, this.descending);
-
-  SortConfig copyWith({MusicSort? method, bool? descending}) =>
-      SortConfig(method ?? MusicSort.titleInLatin, descending ?? false);
-}
+import 'package:linglun/data/utils/music_sort.dart';
 
 class ListPageActions extends StatefulWidget {
   final SortConfig sortConfig;
-  final Function onSortChanged;
+  final ValueChanged<SortConfig> onSortChanged;
   const ListPageActions({
     super.key,
     required this.sortConfig,
@@ -80,7 +71,7 @@ class _ListPageActionsState extends State<ListPageActions> {
                   reverseCurve: Curves.easeInOutCubic,
                   reverseDuration: 140.ms,
                 ),
-                onSelected: (value) => setState(() {
+                onSelected: (value) {
                   if (widget.sortConfig.method == value) {
                     widget.onSortChanged(
                       widget.sortConfig.copyWith(
@@ -95,7 +86,7 @@ class _ListPageActionsState extends State<ListPageActions> {
                       ),
                     );
                   }
-                }),
+                },
                 initialValue: widget.sortConfig.method,
                 itemBuilder: (context) => [
                   for (final item in MusicSort.values)
