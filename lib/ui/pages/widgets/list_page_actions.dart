@@ -49,6 +49,12 @@ class _ListPageActionsState extends State<ListPageActions> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final base = 48.0;
+    final adj = theme.visualDensity.baseSizeAdjustment;
+    print('${adj.dx} ${adj.dy}');
+    final buttonSize = Size(base + adj.dx, base + adj.dy);
+
     return Animate(target: isSearchBarExtended ? 1 : 0).custom(
       duration: 200.ms,
       curve: Curves.easeInOutCubic,
@@ -67,8 +73,8 @@ class _ListPageActionsState extends State<ListPageActions> {
               progress: animationProgress,
               child: PopupMenuButton<MusicSort>(
                 style: IconButton.styleFrom(
-                  minimumSize: const Size(48, 48),
-                  maximumSize: const Size(48, 48),
+                  minimumSize: buttonSize,
+                  maximumSize: buttonSize,
                 ),
                 popUpAnimationStyle: AnimationStyle(
                   curve: Curves.easeInOutCubic,
@@ -122,12 +128,13 @@ class _ListPageActionsState extends State<ListPageActions> {
                 onPressed: () {},
                 icon: const Icon(Icons.check_box_outlined),
                 style: IconButton.styleFrom(
-                  minimumSize: const Size(48, 48),
-                  maximumSize: const Size(48, 48),
+                  minimumSize: buttonSize,
+                  maximumSize: buttonSize,
                 ),
               ),
             ),
             SearchField(
+              buttonSize: buttonSize,
               controller: searchBarController,
               focusNode: searchBarFocusNode,
               searchBarPadding: searchBarPadding,
@@ -142,6 +149,7 @@ class _ListPageActionsState extends State<ListPageActions> {
 }
 
 class SearchField extends StatefulWidget {
+  final Size buttonSize;
   final TextEditingController controller;
   final FocusNode focusNode;
   final double searchBarPadding;
@@ -150,6 +158,7 @@ class SearchField extends StatefulWidget {
 
   const SearchField({
     super.key,
+    required this.buttonSize,
     required this.controller,
     required this.focusNode,
     required this.searchBarPadding,
@@ -170,11 +179,11 @@ class _SearchFieldState extends State<SearchField> {
       groupId: _groupId,
       child: Container(
         width:
-            48 +
+            widget.buttonSize.width +
             (context.isTablet
                     ? 240
                     : (context.windowSize.width - widget.searchBarPadding * 2) -
-                          48) *
+                          widget.buttonSize.width) *
                 widget.animationProgress,
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
@@ -190,12 +199,14 @@ class _SearchFieldState extends State<SearchField> {
               onPressed: () => widget.focusNode.requestFocus(),
               icon: Icon(Icons.search),
               style: IconButton.styleFrom(
-                minimumSize: const Size(48, 48),
-                maximumSize: const Size(48, 48),
+                minimumSize: widget.buttonSize,
+                maximumSize: widget.buttonSize,
               ),
             ),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 48),
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.buttonSize.width,
+              ),
               child: TextField(
                 groupId: _groupId,
                 controller: widget.controller,
@@ -230,8 +241,8 @@ class _SearchFieldState extends State<SearchField> {
                     },
                     icon: Icon(Icons.clear),
                     style: IconButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      maximumSize: const Size(48, 48),
+                      minimumSize: widget.buttonSize,
+                      maximumSize: widget.buttonSize,
                     ),
                   ),
                 ),
