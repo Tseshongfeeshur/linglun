@@ -14,12 +14,10 @@ void showMusicInfoBottomSheet(
 ) => showModalBottomSheet(
   context: context,
   showDragHandle: true,
-  useSafeArea: true,
   builder: (context) => SingleChildScrollView(
-    child: Padding(
-      padding: const EdgeInsets.only(left: 24, right: 24),
+    child: SafeArea(
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.only(left: 24, right: 24, bottom: 18),
         child: RichText(
           text: TextSpan(
             style: TextStyle(

@@ -26,9 +26,17 @@ Future<String?> showLetterSelectingDialog(
           children: [
             SizedBox(
               width:
-                  (context.isTablet
-                      ? 6
-                      : (context.windowSize.width < 320 ? 3 : 4)) *
+                  (() {
+                    if (context.windowSize.width >= 600) {
+                      return 6;
+                    } else if (context.windowSize.width >= 368) {
+                      return 5;
+                    } else if (context.windowSize.width >= 320) {
+                      return 4;
+                    } else {
+                      return 3;
+                    }
+                  })() *
                   (48),
               child: Wrap(
                 children: [
