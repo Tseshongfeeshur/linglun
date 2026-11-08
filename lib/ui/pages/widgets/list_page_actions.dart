@@ -66,6 +66,10 @@ class _ListPageActionsState extends State<ListPageActions> {
             Collapsible(
               progress: animationProgress,
               child: PopupMenuButton<MusicSort>(
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  maximumSize: const Size(48, 48),
+                ),
                 popUpAnimationStyle: AnimationStyle(
                   curve: Curves.easeInOutCubic,
                   reverseCurve: Curves.easeInOutCubic,
@@ -117,6 +121,10 @@ class _ListPageActionsState extends State<ListPageActions> {
               child: IconButton(
                 onPressed: () {},
                 icon: const Icon(Icons.check_box_outlined),
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  maximumSize: const Size(48, 48),
+                ),
               ),
             ),
             SearchField(
@@ -162,11 +170,11 @@ class _SearchFieldState extends State<SearchField> {
       groupId: _groupId,
       child: Container(
         width:
-            40 +
+            48 +
             (context.isTablet
                     ? 240
                     : (context.windowSize.width - widget.searchBarPadding * 2) -
-                          40) *
+                          48) *
                 widget.animationProgress,
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
@@ -181,9 +189,13 @@ class _SearchFieldState extends State<SearchField> {
             IconButton(
               onPressed: () => widget.focusNode.requestFocus(),
               icon: Icon(Icons.search),
+              style: IconButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                maximumSize: const Size(48, 48),
+              ),
             ),
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
+              padding: EdgeInsets.symmetric(horizontal: 48),
               child: TextField(
                 groupId: _groupId,
                 controller: widget.controller,
@@ -198,7 +210,6 @@ class _SearchFieldState extends State<SearchField> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   border: InputBorder.none,
-                  isDense: true,
                 ),
               ),
             ),
@@ -218,6 +229,10 @@ class _SearchFieldState extends State<SearchField> {
                       }
                     },
                     icon: Icon(Icons.clear),
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      maximumSize: const Size(48, 48),
+                    ),
                   ),
                 ),
               ),
