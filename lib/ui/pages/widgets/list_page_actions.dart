@@ -52,7 +52,6 @@ class _ListPageActionsState extends State<ListPageActions> {
     final theme = Theme.of(context);
     final base = 48.0;
     final adj = theme.visualDensity.baseSizeAdjustment;
-    print('${adj.dx} ${adj.dy}');
     final buttonSize = Size(base + adj.dx, base + adj.dy);
 
     return Animate(target: isSearchBarExtended ? 1 : 0).custom(
