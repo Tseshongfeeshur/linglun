@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "linglun" "\0"
+            VALUE "FileDescription", "伶伦" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "linglun" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
             VALUE "OriginalFilename", "linglun.exe" "\0"
-            VALUE "ProductName", "linglun" "\0"
+            VALUE "ProductName", "伶伦" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

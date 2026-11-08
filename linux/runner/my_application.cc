@@ -158,7 +158,7 @@
 #include "flutter/generated_plugin_registrant.h"
 
 // ---- Tunables -------------------------------------------------------------
-#define APP_TITLE "linglun"
+#define APP_TITLE "伶伦"
 #define DEFAULT_WIDTH 840
 #define DEFAULT_HEIGHT 600
 #define MIN_WIDTH 300

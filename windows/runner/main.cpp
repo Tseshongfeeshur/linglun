@@ -138,7 +138,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   Win32Window::Point origin(0, 0);
   Win32Window::Size size(kDefaultWidth, kDefaultHeight);
   GetCenteredPlacement(&origin, &size);
-  if (!window.Create(L"linglun", origin, size)) {
+  if (!window.Create(L"伶伦", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
