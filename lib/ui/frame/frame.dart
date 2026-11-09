@@ -6,8 +6,8 @@ import 'package:linglun/ui/frame/page_model.dart';
 
 import 'package:linglun/ui/pages/album_lib.dart';
 import 'package:linglun/ui/pages/artist_lib.dart';
-import 'package:linglun/ui/pages/music_lib/music_lib.dart';
-import 'package:linglun/ui/pages/music_sources.dart';
+import 'package:linglun/ui/pages/track_lib/track_lib.dart';
+import 'package:linglun/ui/pages/track_sources.dart';
 import 'package:linglun/ui/pages/playlist.dart';
 import 'package:linglun/ui/pages/settings.dart';
 
@@ -21,11 +21,11 @@ class Frame extends StatefulWidget {
 class _FrameState extends State<Frame> {
   int pageIndex = 0;
   final List<PageModel> pages = [
-    MusicLib(),
+    TrackLib(),
     AlbumLib(),
     ArtistLib(),
     Playlist(),
-    MusicSources(),
+    TrackSources(),
     Settings(),
   ];
 

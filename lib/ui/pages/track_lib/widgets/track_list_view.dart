@@ -4,12 +4,12 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:linglun/ui/utils/show_music_info_bottom_sheet.dart';
 import 'package:linglun/ui/utils/show_letter_selecting_dialog.dart';
 
-import 'package:linglun/data/models/music_info_model.dart';
+import 'package:linglun/data/models/track_info_model.dart';
 
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class MusicListView extends StatefulWidget {
-  final Map<String, List<MusicInfo>> groupedMusicList;
+  final Map<String, List<TrackInfo>> groupedMusicList;
   final bool hasGroups;
 
   const MusicListView({
@@ -29,7 +29,7 @@ class _MusicListViewState extends State<MusicListView> {
   Widget build(BuildContext context) {
     if (widget.hasGroups) {
       final List<String> keys = widget.groupedMusicList.keys.toList();
-      List<List<MusicInfo>> valuesList = widget.groupedMusicList.values
+      List<List<TrackInfo>> valuesList = widget.groupedMusicList.values
           .toList();
 
       List<int> keyIndexList = [];
@@ -46,7 +46,7 @@ class _MusicListViewState extends State<MusicListView> {
         itemCount: items.length,
         itemBuilder: (context, index) {
           switch (items[index]) {
-            case MusicInfo musicInfo:
+            case TrackInfo musicInfo:
               return MusicListItem(musicInfo: musicInfo);
             case String letter:
               return MusicListGroupHead(
@@ -73,7 +73,7 @@ class _MusicListViewState extends State<MusicListView> {
 
 class MusicListGroupHead extends StatelessWidget {
   final String letter;
-  final Map<String, List<MusicInfo>> groupedMusicList;
+  final Map<String, List<TrackInfo>> groupedMusicList;
   final ItemScrollController itemScrollController;
   final List<int> keyIndexList;
 
@@ -123,7 +123,7 @@ class MusicListGroupHead extends StatelessWidget {
 class MusicListItem extends StatelessWidget {
   const MusicListItem({super.key, required this.musicInfo});
 
-  final MusicInfo musicInfo;
+  final TrackInfo musicInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +153,7 @@ class MusicListItem extends StatelessWidget {
         style: TextStyle(overflow: TextOverflow.ellipsis),
       ),
       onTap: () {
-        showMusicInfoBottomSheet(context, musicInfo);
+        showTrackInfoBottomSheet(context, musicInfo);
       },
     );
   }

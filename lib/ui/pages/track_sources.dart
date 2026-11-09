@@ -2,8 +2,8 @@ import 'package:material_ui/material_ui.dart';
 
 import 'package:linglun/ui/frame/page_model.dart';
 
-class MusicSources extends StatelessWidget implements PageModel {
-  const MusicSources({super.key});
+class TrackSources extends StatelessWidget implements PageModel {
+  const TrackSources({super.key});
 
   @override
   String get title => '歌曲来源';

@@ -1,10 +1,10 @@
-import 'package:linglun/data/models/music_info_model.dart';
+import 'package:linglun/data/models/track_info_model.dart';
 import 'package:linglun/ui/utils/window_info.dart';
 import 'package:material_ui/material_ui.dart';
 
 Future<String?> showLetterSelectingDialog(
   BuildContext context,
-  Map<String, List<MusicInfo>> groupedMusicList,
+  Map<String, List<TrackInfo>> groupedTrackList,
   String currentLetter,
 ) async {
   List<String> allLetters = [
@@ -44,7 +44,7 @@ Future<String?> showLetterSelectingDialog(
                     _LetterCell(
                       letter: letter,
                       isCurrent: letter == currentLetter,
-                      isValid: groupedMusicList.containsKey(letter),
+                      isValid: groupedTrackList.containsKey(letter),
                     ),
                 ],
               ),

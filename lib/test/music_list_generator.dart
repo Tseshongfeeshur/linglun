@@ -1,7 +1,7 @@
-import 'package:linglun/data/models/music_info_model.dart';
+import 'package:linglun/data/models/track_info_model.dart';
 import 'package:linglun/data/utils/string_to_latin.dart';
 
-List<MusicInfo> getMusicList() {
+List<TrackInfo> getTrackList() {
   final data =
       <
         ({
@@ -238,7 +238,7 @@ List<MusicInfo> getMusicList() {
       ];
 
   return data.map((item) {
-    return MusicInfo(
+    return TrackInfo(
       title: item.title,
       titleInLatin: item.titleInLatin,
       artists: item.artists,
@@ -251,6 +251,7 @@ List<MusicInfo> getMusicList() {
       playCount: item.playCount,
       addTime: item.addTime,
       editTime: item.editTime,
+      trackGainUpdated: false,
     );
   }).toList();
 }

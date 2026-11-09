@@ -3,7 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:linglun/ui/utils/window_info.dart';
-import 'package:linglun/data/utils/music_sort.dart';
+import 'package:linglun/data/utils/track_sort.dart';
 
 class ListPageActions extends StatefulWidget {
   final SortConfig sortConfig;
@@ -70,7 +70,7 @@ class _ListPageActionsState extends State<ListPageActions> {
           children: [
             Collapsible(
               progress: animationProgress,
-              child: PopupMenuButton<MusicSort>(
+              child: PopupMenuButton<TrackSort>(
                 style: IconButton.styleFrom(
                   minimumSize: buttonSize,
                   maximumSize: buttonSize,
@@ -98,7 +98,7 @@ class _ListPageActionsState extends State<ListPageActions> {
                 },
                 initialValue: widget.sortConfig.method,
                 itemBuilder: (context) => [
-                  for (final item in MusicSort.values)
+                  for (final item in TrackSort.values)
                     PopupMenuItem(
                       value: item,
                       child: Row(
@@ -220,6 +220,7 @@ class _SearchFieldState extends State<SearchField> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   border: InputBorder.none,
+                  isDense: true,
                 ),
               ),
             ),
