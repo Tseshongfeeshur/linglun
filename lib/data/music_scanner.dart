@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
 import 'package:haudiotagger/haudiotagger.dart';
@@ -9,12 +10,34 @@ import 'package:linglun/data/models/track_info_model.dart';
 import 'package:linglun/data/utils/string_to_latin.dart';
 import 'package:linglun/data/utils/artist_splitter.dart';
 
-class MusicScanner {
+sealed class ScanEvent {}
+
+class TracksDiscovered {
+  final List<String> paths;
+  final List<String> errorPaths;
+  TracksDiscovered({required this.paths, required this.errorPaths});
+}
+
+class TrackScanned extends ScanEvent {
+  final TrackInfo track;
+  TrackScanned({required this.track});
+}
+
+class TrackScannedError extends ScanEvent {
+  final String path;
+  final String detail;
+  TrackScannedError({required this.path, required this.detail});
+}
+
+class TrackScannedFinish extends ScanEvent {
+  final List<TrackInfo> tracks;
+  TrackScannedFinish({required this.tracks});
+}
+
+class TrackScanner {
   static const extensions = {'.mp3', '.flac', '.m4a', '.ogg', '.opus', '.wav'};
 
-  Future<({List<String> paths, List<String> errorPaths})> discover(
-    List<String> rootPaths,
-  ) async {
+  Future<TracksDiscovered> discover(List<String> rootPaths) async {
     final Set<String> paths = {};
     final List<String> errorPaths = [];
 
@@ -39,15 +62,11 @@ class MusicScanner {
       }
     }
 
-    return (paths: paths.toList(), errorPaths: errorPaths);
+    return TracksDiscovered(paths: paths.toList(), errorPaths: errorPaths);
   }
 
-  Future<({List<TrackInfo> tracks, Map<String, String> errorFiles})> scan(
-    List<String> paths,
-  ) async {
+  Stream<ScanEvent> scan(List<String> paths) async* {
     List<TrackInfo> tracks = [];
-    Map<String, String> errorFiles = {};
-
     for (final String path in paths) {
       final File file = File(path);
       FileStat? stat;
@@ -61,7 +80,7 @@ class MusicScanner {
         tag = await Haudiotagger.read(file.path);
         // prop = await Haudiotagger.readProperties(file.path);
       } catch (e) {
-        errorFiles.addAll({file.path: e.toString()});
+        yield TrackScannedError(path: file.path, detail: e.toString());
         continue;
       }
 
@@ -81,56 +100,71 @@ class MusicScanner {
         return str;
       })();
 
-      tracks.add(
-        TrackInfo(
-          title: title,
-          titleInLatin: title.toLatin(),
-          artists: artists,
-          artistsInLatin: tag?.trackArtist?.toLatin() ?? '#',
-          album: album,
-          albumInLatin: tag?.album?.toLatin() ?? '#',
-          path: path,
-          sizeBytes: stat.size,
-          durationMs: 1000 * (tag?.duration ?? 0),
-          // durationMs: prop.duration?.inMilliseconds ?? 0,
-          trackGainUpdated: false,
-          editTime: stat.modified,
-          playCount: 0,
-          addTime: DateTime.now(),
-        ),
+      final track = TrackInfo(
+        title: title,
+        titleInLatin: title.toLatin(),
+        artists: artists,
+        artistsInLatin: tag?.trackArtist?.toLatin() ?? '#',
+        album: album,
+        albumInLatin: tag?.album?.toLatin() ?? '#',
+        path: path,
+        sizeBytes: stat.size,
+        durationMs: 1000 * (tag?.duration ?? 0),
+        // durationMs: prop.duration?.inMilliseconds ?? 0,
+        trackGainUpdated: false,
+        editTime: stat.modified,
+        playCount: 0,
+        addTime: DateTime.now(),
       );
+      tracks.add(track);
+      yield TrackScanned(track: track);
     }
-
-    return (tracks: tracks, errorFiles: errorFiles);
+    yield TrackScannedFinish(tracks: tracks);
   }
 }
 
 Future<int> main() async {
   if (Platform.isLinux) {
-    MusicScanner musicScanner = MusicScanner();
+    TrackScanner trackScanner = TrackScanner();
 
     final String musicPath = await getPlatformMusicPath();
 
     final stopwatch = Stopwatch()..start();
 
-    final discoverResult = await musicScanner.discover([musicPath]);
-    final trackToScan = discoverResult.paths;
-    final discoverErr = discoverResult.errorPaths;
+    final discoverResult = await trackScanner.discover([musicPath]);
+    final tracksToScan = discoverResult.paths;
+    final tracksDiscoverErr = discoverResult.errorPaths;
 
-    final scanResult = await musicScanner.scan(trackToScan);
-    final tracks = scanResult.tracks;
-    final scanErr = scanResult.errorFiles;
+    int scannedCounter = 0;
+    final scanStream = trackScanner.scan(tracksToScan);
+    scanStream.listen((data) {
+      switch (data) {
+        case TrackScanned():
+          scannedCounter++;
+          print(
+            'Scanned: ${data.track.title}, $scannedCounter/${tracksToScan.length}',
+          );
+        case TrackScannedError():
+          scannedCounter++;
+          print(
+            'ScanError: ${data.path}, Detail: ${data.detail}, $scannedCounter/${tracksToScan.length}',
+          );
+        case TrackScannedFinish():
+          stopwatch.stop();
+          print(
+            'ScanningFinish: $scannedCounter/${tracksToScan.length}, Time: ${stopwatch.elapsed}',
+          );
+      }
+    });
 
-    stopwatch.stop();
-
-    for (final item in tracks) {
-      print(
-        '${item.title}, ${item.artists}, ${item.album}, ${item.path}, ${item.sizeBytes}, ${item.durationMs.ms}\n',
-      );
-    }
-    print(discoverErr);
-    print(scanErr);
-    print(stopwatch.elapsed);
+    // for (final item in tracks) {
+    //   print(
+    //     '${item.title}, ${item.artists}, ${item.album}, ${item.path}, ${item.sizeBytes}, ${item.durationMs.ms}\n',
+    //   );
+    // }
+    // print(tracksDiscoverErr);
+    // print(scanErr);
+    // print(stopwatch.elapsed);
   }
   return 0;
 }
