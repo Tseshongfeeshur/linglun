@@ -53,10 +53,7 @@ Future<String?> showLetterSelectingDialog(
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text('取消'),
-        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text('取消')),
       ],
     )),
   );
@@ -80,7 +77,7 @@ class _LetterCell extends StatelessWidget {
       width: 48,
       height: 48,
       child: Padding(
-        padding: const EdgeInsets.all(4), // 视觉圆 40，点击区域 48，和 IconButton 一致
+        padding: const EdgeInsets.all(4),
         child: Container(
           decoration: BoxDecoration(
             color: isCurrent ? scheme.primary : null,

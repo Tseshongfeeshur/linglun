@@ -1,23 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'package:linglun/ui/frame/page_model.dart';
-
-class ArtistLib extends StatelessWidget implements PageModel {
+class ArtistLib extends StatelessWidget {
   const ArtistLib({super.key});
-
-  @override
-  String get title => '艺术家';
-
-  @override
-  IconData get icon => Icons.person_outline;
-
-  @override
-  IconData get selectedIcon => Icons.person;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(title: Text('艺术家')),
       body: Center(child: Text('ArtistLib')),
     );
   }

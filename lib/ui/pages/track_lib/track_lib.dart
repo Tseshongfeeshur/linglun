@@ -1,26 +1,16 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'package:linglun/ui/utils/window_info.dart';
-import 'package:linglun/ui/frame/page_model.dart';
 import 'package:linglun/data/utils/track_sort.dart';
 import 'package:linglun/ui/pages/widgets/list_page_actions.dart';
 import 'package:linglun/ui/pages/track_lib/widgets/track_list_view.dart';
 
 import 'package:linglun/data/models/track_info_model.dart';
 
-import 'package:linglun/test/music_list_generator.dart';
+import 'package:linglun/test/track_list_generator.dart';
 
-class TrackLib extends StatefulWidget implements PageModel {
+class TrackLib extends StatefulWidget {
   const TrackLib({super.key});
-
-  @override
-  String get title => '曲库';
-
-  @override
-  IconData get icon => Icons.library_music_outlined;
-
-  @override
-  IconData get selectedIcon => Icons.library_music;
 
   @override
   State<TrackLib> createState() => _TrackLibState();
@@ -45,10 +35,7 @@ class _TrackLibState extends State<TrackLib> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.title,
-          style: TextStyle(overflow: TextOverflow.fade),
-        ),
+        title: Text('曲库', style: TextStyle(overflow: TextOverflow.fade)),
         actions: [
           ListPageActions(
             sortConfig: sortConfig,

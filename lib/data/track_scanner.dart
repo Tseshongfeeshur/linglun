@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:path/path.dart' as p;
 import 'package:haudiotagger/haudiotagger.dart';
@@ -72,13 +72,9 @@ class TrackScanner {
       FileStat? stat;
       Tag? tag;
 
-      // TODO: 此操作是否保留
-      // AudioProperties? prop;
-
       try {
         stat = await file.stat();
         tag = await Haudiotagger.read(file.path);
-        // prop = await Haudiotagger.readProperties(file.path);
       } catch (e) {
         yield TrackScannedError(path: file.path, detail: e.toString());
         continue;
@@ -104,13 +100,12 @@ class TrackScanner {
         title: title,
         titleInLatin: title.toLatin(),
         artists: artists,
-        artistsInLatin: tag?.trackArtist?.toLatin() ?? '#',
+        artistsInLatin: artists?.join('/').toLatin() ?? '#',
         album: album,
-        albumInLatin: tag?.album?.toLatin() ?? '#',
+        albumInLatin: album?.toLatin() ?? '#',
         path: path,
         sizeBytes: stat.size,
         durationMs: 1000 * (tag?.duration ?? 0),
-        // durationMs: prop.duration?.inMilliseconds ?? 0,
         trackGainUpdated: false,
         editTime: stat.modified,
         playCount: 0,
@@ -135,19 +130,24 @@ Future<int> main() async {
     final tracksToScan = discoverResult.paths;
     final tracksDiscoverErr = discoverResult.errorPaths;
 
+    print(
+      'Discovered ${tracksToScan.length} paths, ${discoverResult.errorPaths.length} errors',
+    );
+
     int scannedCounter = 0;
     final scanStream = trackScanner.scan(tracksToScan);
-    scanStream.listen((data) {
-      switch (data) {
+
+    await for (final ScanEvent event in scanStream) {
+      switch (event) {
         case TrackScanned():
           scannedCounter++;
           print(
-            'Scanned: ${data.track.title}, $scannedCounter/${tracksToScan.length}',
+            'Scanned $scannedCounter/${tracksToScan.length}: ${event.track.title} - ${event.track.artists} ${event.track.durationMs.ms}',
           );
         case TrackScannedError():
           scannedCounter++;
           print(
-            'ScanError: ${data.path}, Detail: ${data.detail}, $scannedCounter/${tracksToScan.length}',
+            'Scanned $scannedCounter/${tracksToScan.length} Error: ${event.path}, Detail: ${event.detail}',
           );
         case TrackScannedFinish():
           stopwatch.stop();
@@ -155,16 +155,7 @@ Future<int> main() async {
             'ScanningFinish: $scannedCounter/${tracksToScan.length}, Time: ${stopwatch.elapsed}',
           );
       }
-    });
-
-    // for (final item in tracks) {
-    //   print(
-    //     '${item.title}, ${item.artists}, ${item.album}, ${item.path}, ${item.sizeBytes}, ${item.durationMs.ms}\n',
-    //   );
-    // }
-    // print(tracksDiscoverErr);
-    // print(scanErr);
-    // print(stopwatch.elapsed);
+    }
   }
   return 0;
 }
