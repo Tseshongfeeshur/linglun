@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "top.ryanyuan.linglun"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
