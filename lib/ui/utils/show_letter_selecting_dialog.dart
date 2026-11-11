@@ -57,26 +57,22 @@ class _LetterCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return SizedBox(
-      width: 48,
-      height: 48,
-      child: Container(
-        decoration: BoxDecoration(
-          color: isCurrent ? scheme.primary : null,
-          shape: BoxShape.circle,
-        ),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: isValid ? () => Navigator.of(context).pop(letter) : null,
-          child: Center(
-            child: Text(
-              letter,
-              style: TextStyle(
-                color: isCurrent
-                    ? scheme.onPrimary
-                    : (isValid ? null : scheme.onSurface.withAlpha(100)),
-                fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
-              ),
+    return Container(
+      decoration: BoxDecoration(
+        color: isCurrent ? scheme.primary : null,
+        shape: BoxShape.circle,
+      ),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: isValid ? () => Navigator.of(context).pop(letter) : null,
+        child: Center(
+          child: Text(
+            letter,
+            style: TextStyle(
+              color: isCurrent
+                  ? scheme.onPrimary
+                  : (isValid ? null : scheme.onSurface.withAlpha(100)),
+              fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
         ),

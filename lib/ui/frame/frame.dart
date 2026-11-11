@@ -1,3 +1,5 @@
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:linglun/ui/pages/widgets/reveal_icon.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:linglun/ui/frame/page_info.dart';
@@ -18,6 +20,8 @@ class Frame extends StatefulWidget {
 
 class _FrameState extends State<Frame> {
   int pageIndex = 0;
+  void onPageSwitched(int index) => setState(() => pageIndex = index);
+
   final List<PageInfo> pages = [
     PageInfo(
       title: '曲库',
@@ -59,55 +63,191 @@ class _FrameState extends State<Frame> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        if (MediaQuery.sizeOf(context).width >= 600)
-          NavigationRail(
-            selectedIndex: pageIndex,
-            backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-            mainAxisAlignment: MainAxisAlignment.center,
-            labelType: NavigationRailLabelType.all,
-            onDestinationSelected: (value) => setState(() {
-              pageIndex = value;
-            }),
-            destinations: List.generate(
-              pages.length,
-              (currentIndex) => NavigationRailDestination(
-                icon: pageIndex == currentIndex
-                    ? Icon(pages[currentIndex].selectedIcon)
-                    : Icon(pages[currentIndex].icon),
-                label: Text(pages[currentIndex].title),
-              ),
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: Row(
+        children: [
+          if (MediaQuery.sizeOf(context).width >= 600 &&
+              MediaQuery.sizeOf(context).width < 840)
+            AppNavRail(
+              pageIndex: pageIndex,
+              pages: pages,
+              onDestinationSelected: onPageSwitched,
             ),
-          ),
-        Expanded(
-          child: Scaffold(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            body: IndexedStack(
+          if (MediaQuery.sizeOf(context).width >= 840)
+            AppDrawer(
+              pageIndex: pageIndex,
+              pages: pages,
+              onSelected: onPageSwitched,
+            ),
+          Expanded(
+            child: IndexedStack(
               index: pageIndex,
               children: pages.map((pageInfo) => pageInfo.page).toList(),
             ),
-            bottomNavigationBar: MediaQuery.sizeOf(context).width >= 600
-                ? null
-                : NavigationBar(
-                    selectedIndex: pageIndex,
-                    labelBehavior:
-                        NavigationDestinationLabelBehavior.onlyShowSelected,
-                    onDestinationSelected: (value) => setState(() {
-                      pageIndex = value;
-                    }),
-                    destinations: List.generate(
-                      pages.length,
-                      (currentIndex) => NavigationDestination(
-                        icon: Icon(pages[currentIndex].icon),
-                        selectedIcon: Icon(pages[currentIndex].selectedIcon),
-                        label: pages[currentIndex].title,
+          ),
+        ],
+      ),
+      bottomNavigationBar: MediaQuery.sizeOf(context).width < 600
+          ? AppNavBar(
+              pageIndex: pageIndex,
+              pages: pages,
+              onDestinationSelected: onPageSwitched,
+            )
+          : null,
+    );
+  }
+}
+
+class AppDrawer extends StatefulWidget {
+  final int pageIndex;
+  final List<PageInfo> pages;
+  final ValueChanged<int> onSelected;
+
+  const AppDrawer({
+    super.key,
+    required this.pageIndex,
+    required this.pages,
+    required this.onSelected,
+  });
+
+  @override
+  State<AppDrawer> createState() => _AppDrawerState();
+}
+
+class _AppDrawerState extends State<AppDrawer> {
+  bool _isExtended = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Animate(target: _isExtended ? 1 : 0).custom(
+      duration: 200.ms,
+      curve: Curves.easeInOutCubic,
+      builder: (context, animationProgress, child) => Drawer(
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+        width: (16 * 2 + 24) + (220 - (16 * 2 + 24)) * animationProgress,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: IconButton(
+                  onPressed: () => setState(() => _isExtended = !_isExtended),
+                  icon: RevealIcon(
+                    isFilled: _isExtended,
+                    outlineIcon: Icons.menu,
+                    filledIcon: Icons.menu_open,
+                    outlineIconColor: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant,
+                    filledIconColor: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                children: List.generate(
+                  widget.pages.length,
+                  (currentIndex) => ListTile(
+                    leading: RevealIcon(
+                      isFilled: widget.pageIndex == currentIndex,
+                      outlineIcon: widget.pages[currentIndex].icon,
+                      filledIcon: widget.pages[currentIndex].selectedIcon,
+                    ),
+                    title: Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Text(
+                        widget.pages[currentIndex].title,
+                        style: TextStyle(overflow: TextOverflow.clip),
+                        maxLines: 1,
                       ),
                     ),
+                    onTap: () => widget.onSelected(currentIndex),
+                    selected: widget.pageIndex == currentIndex,
+                    selectedTileColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHigh,
+                    contentPadding: EdgeInsets.only(left: 16),
                   ),
-          ),
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class AppNavRail extends StatelessWidget {
+  const AppNavRail({
+    super.key,
+    required this.pageIndex,
+    required this.pages,
+    required this.onDestinationSelected,
+  });
+
+  final int pageIndex;
+  final List<PageInfo> pages;
+  final ValueChanged<int> onDestinationSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return NavigationRail(
+      selectedIndex: pageIndex,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+      mainAxisAlignment: MainAxisAlignment.center,
+      labelType: NavigationRailLabelType.all,
+      onDestinationSelected: onDestinationSelected,
+      destinations: List.generate(
+        pages.length,
+        (currentIndex) => NavigationRailDestination(
+          icon: RevealIcon(
+            isFilled: pageIndex == currentIndex,
+            outlineIcon: pages[currentIndex].icon,
+            filledIcon: pages[currentIndex].selectedIcon,
+          ),
+          label: Text(pages[currentIndex].title),
+        ),
+      ),
+    );
+  }
+}
+
+class AppNavBar extends StatelessWidget {
+  final int pageIndex;
+  final List<PageInfo> pages;
+  final ValueChanged<int> onDestinationSelected;
+
+  const AppNavBar({
+    super.key,
+    required this.pageIndex,
+    required this.pages,
+    required this.onDestinationSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return NavigationBar(
+      selectedIndex: pageIndex,
+      labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+      onDestinationSelected: onDestinationSelected,
+      destinations: List.generate(
+        pages.length,
+        (currentIndex) => NavigationDestination(
+          icon: RevealIcon(
+            isFilled: pageIndex == currentIndex,
+            outlineIcon: pages[currentIndex].icon,
+            filledIcon: pages[currentIndex].selectedIcon,
+          ),
+          label: pages[currentIndex].title,
+        ),
+      ),
     );
   }
 }
