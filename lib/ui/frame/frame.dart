@@ -1,7 +1,5 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'package:linglun/ui/utils/window_info.dart';
-
 import 'package:linglun/ui/frame/page_info.dart';
 
 import 'package:linglun/ui/pages/album_lib.dart';
@@ -63,7 +61,7 @@ class _FrameState extends State<Frame> {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        if (context.isTablet)
+        if (MediaQuery.sizeOf(context).width >= 600)
           NavigationRail(
             selectedIndex: pageIndex,
             backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
@@ -89,7 +87,7 @@ class _FrameState extends State<Frame> {
               index: pageIndex,
               children: pages.map((pageInfo) => pageInfo.page).toList(),
             ),
-            bottomNavigationBar: context.isTablet
+            bottomNavigationBar: MediaQuery.sizeOf(context).width >= 600
                 ? null
                 : NavigationBar(
                     selectedIndex: pageIndex,

@@ -1,6 +1,5 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'package:linglun/ui/utils/window_info.dart';
 import 'package:linglun/data/utils/track_sort.dart';
 import 'package:linglun/ui/pages/widgets/list_page_actions.dart';
 import 'package:linglun/ui/pages/track_lib/widgets/track_list_view.dart';
@@ -44,8 +43,8 @@ class _TrackLibState extends State<TrackLib> {
         ],
       ),
       body: Center(
-        child: SizedBox(
-          width: context.isDesktop ? 960 : null,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: 960),
           child: MusicListView(
             groupedMusicList: groupedMusicList,
             hasGroups: !groupedMusicList.keys.contains('default'),
