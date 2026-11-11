@@ -69,67 +69,15 @@ class _ListPageActionsState extends State<ListPageActions> {
           children: [
             Collapsible(
               progress: animationProgress,
-              child: PopupMenuButton<TrackSort>(
-                style: IconButton.styleFrom(
-                  minimumSize: buttonSize,
-                  maximumSize: buttonSize,
-                ),
-                popUpAnimationStyle: AnimationStyle(
-                  curve: Curves.easeInOutCubic,
-                  reverseCurve: Curves.easeInOutCubic,
-                  reverseDuration: 140.ms,
-                ),
-                onSelected: (value) {
-                  if (widget.sortConfig.method == value) {
-                    widget.onSortChanged(
-                      widget.sortConfig.copyWith(
-                        descending: !widget.sortConfig.descending,
-                      ),
-                    );
-                  } else {
-                    widget.onSortChanged(
-                      widget.sortConfig.copyWith(
-                        method: value,
-                        descending: false,
-                      ),
-                    );
-                  }
-                },
-                initialValue: widget.sortConfig.method,
-                itemBuilder: (context) => [
-                  for (final item in TrackSort.values)
-                    PopupMenuItem(
-                      value: item,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            item == widget.sortConfig.method
-                                ? (widget.sortConfig.descending
-                                      ? Icons.arrow_downward
-                                      : Icons.arrow_upward)
-                                : item.icon,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(item.label),
-                        ],
-                      ),
-                    ),
-                ],
-                tooltip: '排序依据',
-                icon: const Icon(Icons.sort),
+              child: SortButton(
+                buttonSize: buttonSize,
+                sortConfig: widget.sortConfig,
+                onSortChanged: widget.onSortChanged,
               ),
             ),
             Collapsible(
               progress: animationProgress,
-              child: IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.check_box_outlined),
-                style: IconButton.styleFrom(
-                  minimumSize: buttonSize,
-                  maximumSize: buttonSize,
-                ),
-              ),
+              child: CheckButton(buttonSize: buttonSize),
             ),
             SearchField(
               buttonSize: buttonSize,
@@ -141,6 +89,117 @@ class _ListPageActionsState extends State<ListPageActions> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class Collapsible extends StatelessWidget {
+  final Widget child;
+  final double progress;
+
+  const Collapsible({super.key, required this.child, required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = MediaQuery.sizeOf(context).width >= 600
+        ? 1.0
+        : (1 - progress).clamp(0.0, 1.0);
+    return ClipRect(
+      child: Align(
+        alignment: Alignment.centerLeft,
+        widthFactor: visible,
+        child: Opacity(
+          opacity: visible,
+          child: IgnorePointer(ignoring: visible < 0.5, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+class SortButton extends StatelessWidget {
+  final Size buttonSize;
+  final SortConfig sortConfig;
+  final ValueChanged<SortConfig> onSortChanged;
+
+  const SortButton({
+    super.key,
+    required this.buttonSize,
+    required this.sortConfig,
+    required this.onSortChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<TrackSort>(
+      style: IconButton.styleFrom(
+        minimumSize: buttonSize,
+        maximumSize: buttonSize,
+      ),
+      popUpAnimationStyle: AnimationStyle(
+        curve: Curves.easeInOutCubic,
+        reverseCurve: Curves.easeInOutCubic,
+        reverseDuration: 140.ms,
+      ),
+      onSelected: (value) {
+        if (sortConfig.method == value) {
+          onSortChanged(
+            sortConfig.copyWith(descending: !sortConfig.descending),
+          );
+        } else {
+          onSortChanged(sortConfig.copyWith(method: value, descending: false));
+        }
+      },
+      initialValue: sortConfig.method,
+      itemBuilder: (context) => [
+        for (final item in TrackSort.values)
+          PopupMenuItem(
+            value: item,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  item == sortConfig.method
+                      ? (sortConfig.descending
+                            ? Icons.arrow_downward
+                            : Icons.arrow_upward)
+                      : item.icon,
+                ),
+                const SizedBox(width: 12),
+                Text(item.label),
+              ],
+            ),
+          ),
+      ],
+      tooltip: '排序依据',
+      icon: Stack(
+        children: [
+          Icon(Icons.sort),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Icon(sortConfig.method.icon, size: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CheckButton extends StatelessWidget {
+  const CheckButton({super.key, required this.buttonSize});
+
+  final Size buttonSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: () {},
+      icon: const Icon(Icons.check_box_outlined),
+      style: IconButton.styleFrom(
+        minimumSize: buttonSize,
+        maximumSize: buttonSize,
       ),
     );
   }
@@ -249,30 +308,6 @@ class _SearchFieldState extends State<SearchField> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class Collapsible extends StatelessWidget {
-  final Widget child;
-  final double progress;
-
-  const Collapsible({super.key, required this.child, required this.progress});
-
-  @override
-  Widget build(BuildContext context) {
-    final visible = MediaQuery.sizeOf(context).width >= 600
-        ? 1.0
-        : (1 - progress).clamp(0.0, 1.0);
-    return ClipRect(
-      child: Align(
-        alignment: Alignment.centerLeft,
-        widthFactor: visible,
-        child: Opacity(
-          opacity: visible,
-          child: IgnorePointer(ignoring: visible < 0.5, child: child),
         ),
       ),
     );
