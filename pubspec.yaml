@@ -5,10 +5,13 @@ version: 0.1.0+1
 
 environment:
   sdk: ^3.13.5
+  flutter: ">=3.44.0"
 
 dependencies:
   flutter:
     sdk: flutter
+
+  flutter_riverpod: ^3.5.0
 
   material_ui: ^1.8.0
   flutter_animate: ^4.5.2
@@ -23,6 +26,7 @@ dependencies:
   path_provider: ^2.1.6
 
   haudiotagger: ^3.1.0
+  # 音乐标签
 
 dev_dependencies:
   flutter_test:

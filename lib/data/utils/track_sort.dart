@@ -71,6 +71,7 @@ Map<String, List<TrackInfo>> groupMusicList(
   SortConfig sortConfig,
 ) {
   if (!sortConfig.method.shouldBeGrouped) {
+    // TODO: 'default' 作为键是否需要修改
     return {'default': sortedList};
   }
   Map<String, List<TrackInfo>> result = {};

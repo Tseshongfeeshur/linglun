@@ -53,7 +53,7 @@ class TrackScanner {
             Object e,
           ) {
             if (e is FileSystemException) {
-              errorPaths.add(e.path ?? null.toString());
+              errorPaths.add(e.path ?? '');
             } else {
               throw e;
             }
@@ -79,20 +79,18 @@ class TrackScanner {
 
     for (final String path in paths) {
       final File file = File(path);
-      TrackInfo? existingTrack;
+      final TrackInfo? existingTrack = existingMap[path];
       FileStat? stat;
       Tag? tag;
 
       try {
         stat = await file.stat();
-        if (existingMap.keys.contains(path)) {
-          if (existingMap[path]?.editTime == stat.modified &&
-              existingMap[path]?.sizeBytes == stat.size) {
-            tracks.add(existingMap[path]!);
+        if (existingTrack != null) {
+          if (existingTrack.editTime == stat.modified &&
+              existingTrack.sizeBytes == stat.size) {
+            tracks.add(existingTrack);
             yield TrackSkipped(path: file.path);
             continue;
-          } else {
-            existingTrack = existingMap[path];
           }
         }
         tag = await Haudiotagger.read(file.path);
