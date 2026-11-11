@@ -23,6 +23,11 @@ class TrackScanned extends ScanEvent {
   TrackScanned({required this.track});
 }
 
+class TrackSkipped extends ScanEvent {
+  final String path;
+  TrackSkipped({required this.path});
+}
+
 class TrackScannedError extends ScanEvent {
   final String path;
   final String detail;
@@ -65,15 +70,31 @@ class TrackScanner {
     return TracksDiscovered(paths: paths.toList(), errorPaths: errorPaths);
   }
 
-  Stream<ScanEvent> scan(List<String> paths) async* {
+  Stream<ScanEvent> scan(List<String> paths, List<TrackInfo> existing) async* {
     List<TrackInfo> tracks = [];
+
+    Map<String, TrackInfo> existingMap = {
+      for (final TrackInfo element in existing) element.path: element,
+    };
+
     for (final String path in paths) {
       final File file = File(path);
+      TrackInfo? existingTrack;
       FileStat? stat;
       Tag? tag;
 
       try {
         stat = await file.stat();
+        if (existingMap.keys.contains(path)) {
+          if (existingMap[path]?.editTime == stat.modified &&
+              existingMap[path]?.sizeBytes == stat.size) {
+            tracks.add(existingMap[path]!);
+            yield TrackSkipped(path: file.path);
+            continue;
+          } else {
+            existingTrack = existingMap[path];
+          }
+        }
         tag = await Haudiotagger.read(file.path);
       } catch (e) {
         yield TrackScannedError(path: file.path, detail: e.toString());
@@ -108,8 +129,8 @@ class TrackScanner {
         durationMs: 1000 * (tag?.duration ?? 0),
         trackGainUpdated: false,
         editTime: stat.modified,
-        playCount: 0,
-        addTime: DateTime.now(),
+        playCount: existingTrack?.playCount ?? 0,
+        addTime: existingTrack?.addTime ?? DateTime.now(),
       );
       tracks.add(track);
       yield TrackScanned(track: track);
@@ -135,7 +156,8 @@ Future<int> main() async {
     );
 
     int scannedCounter = 0;
-    final scanStream = trackScanner.scan(tracksToScan);
+    List<TrackInfo> scanResult = [];
+    final scanStream = trackScanner.scan(tracksToScan, []);
 
     await for (final ScanEvent event in scanStream) {
       switch (event) {
@@ -144,6 +166,11 @@ Future<int> main() async {
           print(
             'Scanned $scannedCounter/${tracksToScan.length}: ${event.track.title} - ${event.track.artists} ${event.track.durationMs.ms}',
           );
+        case TrackSkipped():
+          scannedCounter++;
+          print(
+            'Skipped $scannedCounter/${tracksToScan.length}: ${event.path}',
+          );
         case TrackScannedError():
           scannedCounter++;
           print(
@@ -151,6 +178,36 @@ Future<int> main() async {
           );
         case TrackScannedFinish():
           stopwatch.stop();
+          scanResult = event.tracks;
+          print(
+            'ScanningFinish: $scannedCounter/${tracksToScan.length}, Time: ${stopwatch.elapsed}',
+          );
+          print(scanResult);
+      }
+    }
+
+    // rescan
+    scannedCounter = 0;
+    final scanStream2 = trackScanner.scan(tracksToScan, scanResult);
+
+    await for (final ScanEvent event in scanStream2) {
+      switch (event) {
+        case TrackScanned():
+          scannedCounter++;
+          print(
+            'Scanned $scannedCounter/${tracksToScan.length}: ${event.track.title} - ${event.track.artists} ${event.track.durationMs.ms}',
+          );
+        case TrackSkipped():
+          scannedCounter++;
+          print(
+            'Skipped $scannedCounter/${tracksToScan.length}: ${event.path}',
+          );
+        case TrackScannedError():
+          scannedCounter++;
+          print(
+            'Scanned $scannedCounter/${tracksToScan.length} Error: ${event.path}, Detail: ${event.detail}',
+          );
+        case TrackScannedFinish():
           print(
             'ScanningFinish: $scannedCounter/${tracksToScan.length}, Time: ${stopwatch.elapsed}',
           );
