@@ -71,6 +71,7 @@ class TrackScanner {
   }
 
   Stream<ScanEvent> scan(List<String> paths, List<TrackInfo> existing) async* {
+    // TODO: 需要处理条目存在但文件被移除的情况，添加 removed 字段
     List<TrackInfo> tracks = [];
 
     Map<String, TrackInfo> existingMap = {

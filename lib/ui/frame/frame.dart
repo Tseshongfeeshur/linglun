@@ -1,5 +1,5 @@
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:linglun/ui/pages/widgets/reveal_icon.dart';
+import 'package:linglun/ui/widgets/reveal_icon.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:linglun/ui/frame/page_info.dart';

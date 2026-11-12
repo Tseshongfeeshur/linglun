@@ -60,6 +60,9 @@ class RevealIcon extends StatelessWidget {
         : tentativeIconSize;
 
     final colorScheme = Theme.of(context).colorScheme;
+    final iconColor = isFilled
+        ? (filledIconColor ?? colorScheme.primary)
+        : (outlineIconColor ?? colorScheme.onSurfaceVariant);
 
     return Animate(target: isFilled ? 0 : 1).custom(
       duration: duration ?? 200.ms,
@@ -98,11 +101,7 @@ class RevealIcon extends StatelessWidget {
                   width: iconSize,
                   height: iconSize,
                   child: Center(
-                    child: Icon(
-                      filledIcon,
-                      color: filledIconColor ?? colorScheme.primary,
-                      size: size,
-                    ),
+                    child: Icon(filledIcon, color: iconColor, size: size),
                   ),
                 ),
               ),
@@ -114,11 +113,7 @@ class RevealIcon extends StatelessWidget {
                   width: iconSize,
                   height: iconSize,
                   child: Center(
-                    child: Icon(
-                      outlineIcon,
-                      color: outlineIconColor ?? colorScheme.onSurfaceVariant,
-                      size: size,
-                    ),
+                    child: Icon(outlineIcon, color: iconColor, size: size),
                   ),
                 ),
               ),
