@@ -43,6 +43,7 @@ class TrackScanner {
   static const extensions = {'.mp3', '.flac', '.m4a', '.ogg', '.opus', '.wav'};
 
   Future<TracksDiscovered> discover(List<String> rootPaths) async {
+    // TODO: 确保打断后能停止
     final Set<String> paths = {};
     final List<String> errorPaths = [];
 
@@ -71,6 +72,7 @@ class TrackScanner {
   }
 
   Stream<ScanEvent> scan(List<String> paths, List<TrackInfo> existing) async* {
+    // TODO: 确保打断后能停止
     // TODO: 需要处理条目存在但文件被移除的情况，添加 removed 字段
     List<TrackInfo> tracks = [];
 
@@ -138,80 +140,80 @@ class TrackScanner {
   }
 }
 
-Future<int> main() async {
-  if (Platform.isLinux) {
-    TrackScanner trackScanner = TrackScanner();
+// Future<int> main() async {
+//   if (Platform.isLinux) {
+//     TrackScanner trackScanner = TrackScanner();
 
-    final String musicPath = await getPlatformMusicPath();
+//     final String musicPath = await getPlatformMusicPath();
 
-    final stopwatch = Stopwatch()..start();
+//     final stopwatch = Stopwatch()..start();
 
-    final discoverResult = await trackScanner.discover([musicPath]);
-    final tracksToScan = discoverResult.paths;
-    final tracksDiscoverErr = discoverResult.errorPaths;
+//     final discoverResult = await trackScanner.discover([musicPath]);
+//     final tracksToScan = discoverResult.paths;
+//     final tracksDiscoverErr = discoverResult.errorPaths;
 
-    print(
-      'Discovered ${tracksToScan.length} paths, ${discoverResult.errorPaths.length} errors',
-    );
+//     print(
+//       'Discovered ${tracksToScan.length} paths, ${discoverResult.errorPaths.length} errors',
+//     );
 
-    int scannedCounter = 0;
-    List<TrackInfo> scanResult = [];
-    final scanStream = trackScanner.scan(tracksToScan, []);
+//     int scannedCounter = 0;
+//     List<TrackInfo> scanResult = [];
+//     final scanStream = trackScanner.scan(tracksToScan, []);
 
-    await for (final ScanEvent event in scanStream) {
-      switch (event) {
-        case TrackScanned():
-          scannedCounter++;
-          print(
-            'Scanned $scannedCounter/${tracksToScan.length}: ${event.track.title} - ${event.track.artists} ${event.track.durationMs.ms}',
-          );
-        case TrackSkipped():
-          scannedCounter++;
-          print(
-            'Skipped $scannedCounter/${tracksToScan.length}: ${event.path}',
-          );
-        case TrackScannedError():
-          scannedCounter++;
-          print(
-            'Scanned $scannedCounter/${tracksToScan.length} Error: ${event.path}, Detail: ${event.detail}',
-          );
-        case TrackScannedFinish():
-          stopwatch.stop();
-          scanResult = event.tracks;
-          print(
-            'ScanningFinish: $scannedCounter/${tracksToScan.length}, Time: ${stopwatch.elapsed}',
-          );
-          print(scanResult);
-      }
-    }
+//     await for (final ScanEvent event in scanStream) {
+//       switch (event) {
+//         case TrackScanned():
+//           scannedCounter++;
+//           print(
+//             'Scanned $scannedCounter/${tracksToScan.length}: ${event.track.title} - ${event.track.artists} ${event.track.durationMs.ms}',
+//           );
+//         case TrackSkipped():
+//           scannedCounter++;
+//           print(
+//             'Skipped $scannedCounter/${tracksToScan.length}: ${event.path}',
+//           );
+//         case TrackScannedError():
+//           scannedCounter++;
+//           print(
+//             'Scanned $scannedCounter/${tracksToScan.length} Error: ${event.path}, Detail: ${event.detail}',
+//           );
+//         case TrackScannedFinish():
+//           stopwatch.stop();
+//           scanResult = event.tracks;
+//           print(
+//             'ScanningFinish: $scannedCounter/${tracksToScan.length}, Time: ${stopwatch.elapsed}',
+//           );
+//           print(scanResult);
+//       }
+//     }
 
-    // rescan
-    scannedCounter = 0;
-    final scanStream2 = trackScanner.scan(tracksToScan, scanResult);
+//     // rescan
+//     scannedCounter = 0;
+//     final scanStream2 = trackScanner.scan(tracksToScan, scanResult);
 
-    await for (final ScanEvent event in scanStream2) {
-      switch (event) {
-        case TrackScanned():
-          scannedCounter++;
-          print(
-            'Scanned $scannedCounter/${tracksToScan.length}: ${event.track.title} - ${event.track.artists} ${event.track.durationMs.ms}',
-          );
-        case TrackSkipped():
-          scannedCounter++;
-          print(
-            'Skipped $scannedCounter/${tracksToScan.length}: ${event.path}',
-          );
-        case TrackScannedError():
-          scannedCounter++;
-          print(
-            'Scanned $scannedCounter/${tracksToScan.length} Error: ${event.path}, Detail: ${event.detail}',
-          );
-        case TrackScannedFinish():
-          print(
-            'ScanningFinish: $scannedCounter/${tracksToScan.length}, Time: ${stopwatch.elapsed}',
-          );
-      }
-    }
-  }
-  return 0;
-}
+//     await for (final ScanEvent event in scanStream2) {
+//       switch (event) {
+//         case TrackScanned():
+//           scannedCounter++;
+//           print(
+//             'Scanned $scannedCounter/${tracksToScan.length}: ${event.track.title} - ${event.track.artists} ${event.track.durationMs.ms}',
+//           );
+//         case TrackSkipped():
+//           scannedCounter++;
+//           print(
+//             'Skipped $scannedCounter/${tracksToScan.length}: ${event.path}',
+//           );
+//         case TrackScannedError():
+//           scannedCounter++;
+//           print(
+//             'Scanned $scannedCounter/${tracksToScan.length} Error: ${event.path}, Detail: ${event.detail}',
+//           );
+//         case TrackScannedFinish():
+//           print(
+//             'ScanningFinish: $scannedCounter/${tracksToScan.length}, Time: ${stopwatch.elapsed}',
+//           );
+//       }
+//     }
+//   }
+//   return 0;
+// }

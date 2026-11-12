@@ -7,7 +7,7 @@ import 'package:linglun/ui/frame/page_info.dart';
 import 'package:linglun/ui/pages/album_lib.dart';
 import 'package:linglun/ui/pages/artist_lib.dart';
 import 'package:linglun/ui/pages/track_lib/track_lib.dart';
-import 'package:linglun/ui/pages/track_sources.dart';
+import 'package:linglun/ui/pages/track_sources/track_sources.dart';
 import 'package:linglun/ui/pages/playlist.dart';
 import 'package:linglun/ui/pages/settings.dart';
 
