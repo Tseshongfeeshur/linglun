@@ -1,5 +1,5 @@
 import 'package:linglun/data/models/track_info_model.dart';
-import 'package:linglun/data/utils/string_to_latin.dart';
+import 'package:linglun/data/track_scanner/utils/string_to_latin.dart';
 
 List<TrackInfo> getTrackList() {
   final data =

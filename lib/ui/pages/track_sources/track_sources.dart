@@ -2,7 +2,7 @@ import 'package:linglun/ui/pages/track_sources/utils/show_scanning_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:file_picker/file_picker.dart';
 
-import 'package:linglun/data/utils/get_platform_music_path.dart';
+import 'package:linglun/data/track_scanner/utils/get_platform_music_path.dart';
 
 class TrackSources extends StatefulWidget {
   const TrackSources({super.key});

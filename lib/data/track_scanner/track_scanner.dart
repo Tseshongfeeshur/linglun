@@ -5,10 +5,10 @@ import 'package:path/path.dart' as p;
 import 'package:haudiotagger/haudiotagger.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import 'package:linglun/data/utils/get_platform_music_path.dart';
+import 'package:linglun/data/track_scanner/utils/get_platform_music_path.dart';
 import 'package:linglun/data/models/track_info_model.dart';
-import 'package:linglun/data/utils/string_to_latin.dart';
-import 'package:linglun/data/utils/artist_splitter.dart';
+import 'package:linglun/data/track_scanner/utils/string_to_latin.dart';
+import 'package:linglun/data/track_scanner/utils/artist_splitter.dart';
 
 sealed class ScanEvent {}
 
