@@ -1,43 +1,10 @@
+import 'package:linglun/data/track_scanner/providers/scan_provider.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:linglun/data/models/track_info_model.dart';
-import 'package:linglun/data/track_scanner/track_scanner.dart';
 import 'package:linglun/data/track_scanner/models/scan_state.dart';
-
-class _ScanNotifier extends Notifier<ScanState> {
-  @override
-  ScanState build() {
-    return const ScanState();
-  }
-
-  Future<void> startScan(
-    List<String> pathsToDiscover,
-    List<TrackInfo> existing,
-  ) async {
-    final TrackScanner trackScanner = TrackScanner();
-
-    final discoverResult = await trackScanner.discover(pathsToDiscover);
-    if (!ref.mounted) return;
-
-    final tracksToScan = discoverResult.paths;
-    state = state.copyWith(
-      discoverErrors: discoverResult.errorPaths,
-      discoveredCounter: tracksToScan.length,
-    );
-
-    final scanStream = trackScanner.scan(tracksToScan, existing);
-    await for (final ScanEvent event in scanStream) {
-      if (!ref.mounted) break;
-      state = state.apply(event);
-    }
-  }
-}
-
-final _scanProvider = NotifierProvider.autoDispose<_ScanNotifier, ScanState>(
-  _ScanNotifier.new,
-);
 
 Future<List<TrackInfo>?> showScanningDialog(
   BuildContext context,
@@ -71,13 +38,13 @@ class _ScanningDialogFrameState extends ConsumerState<_ScanningDialogFrame> {
   void initState() {
     super.initState();
     ref
-        .read(_scanProvider.notifier)
+        .read(scanProvider.notifier)
         .startScan(widget.pathsToDiscover, widget.existing);
   }
 
   @override
   Widget build(BuildContext context) {
-    final scanState = ref.watch<ScanState>(_scanProvider);
+    final scanState = ref.watch<ScanState>(scanProvider);
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 360),
       child: Padding(

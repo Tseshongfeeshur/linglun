@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:linglun/data/providers/tracks_provider.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:linglun/data/models/track_info_model.dart';
@@ -19,13 +20,8 @@ class _TrackLibState extends ConsumerState<TrackLib> {
   late List<TrackInfo> originalMusicList;
 
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    // List<TrackInfo> originalMusicList = ;
+    List<TrackInfo> originalMusicList = ref.watch(tracksProvider);
     Map<String, List<TrackInfo>> groupedMusicList = groupMusicList(
       sortMusicList(originalMusicList, sortConfig),
       sortConfig,

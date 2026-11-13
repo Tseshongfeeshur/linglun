@@ -1,3 +1,5 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:linglun/data/providers/tracks_provider.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:file_picker/file_picker.dart';
 
@@ -5,14 +7,14 @@ import 'package:linglun/data/models/track_info_model.dart';
 import 'package:linglun/data/track_scanner/utils/get_platform_music_path.dart';
 import 'package:linglun/ui/pages/track_sources/utils/show_scanning_dialog.dart';
 
-class TrackSources extends StatefulWidget {
+class TrackSources extends ConsumerStatefulWidget {
   const new({super.key});
 
   @override
-  State<TrackSources> createState() => _TrackSourcesState();
+  ConsumerState<TrackSources> createState() => _TrackSourcesState();
 }
 
-class _TrackSourcesState extends State<TrackSources> {
+class _TrackSourcesState extends ConsumerState<TrackSources> {
   ({String? path, bool ticked}) platformPath = (path: null, ticked: false);
 
   Future<void> getPlatformPath() async {
@@ -117,6 +119,7 @@ class _TrackSourcesState extends State<TrackSources> {
               platformPath.path!,
             ...userPaths.keys.where((element) => userPaths[element] ?? false),
           ], []);
+          ref.read(tracksProvider.notifier).update(tracks);
         },
         isExtended: true,
         icon: const Icon(Icons.refresh),
