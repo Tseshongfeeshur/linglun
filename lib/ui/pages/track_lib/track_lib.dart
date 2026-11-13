@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:linglun/ui/pages/track_sources/utils/show_scanning_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:linglun/data/models/track_info_model.dart';
@@ -45,7 +44,7 @@ class _TrackLibState extends ConsumerState<TrackLib> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
-          child: MusicListView(
+          child: TrackListView(
             groupedMusicList: groupedMusicList,
             hasGroups: !groupedMusicList.keys.contains('default'),
           ),

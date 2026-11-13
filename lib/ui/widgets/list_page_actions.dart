@@ -63,19 +63,19 @@ class _ListPageActionsState extends State<ListPageActions> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Collapsible(
+            _Collapsible(
               progress: animationProgress,
-              child: SortButton(
+              child: _SortButton(
                 buttonSize: buttonSize,
                 sortConfig: widget.sortConfig,
                 onSortChanged: widget.onSortChanged,
               ),
             ),
-            Collapsible(
+            _Collapsible(
               progress: animationProgress,
-              child: CheckButton(buttonSize: buttonSize),
+              child: _CheckButton(buttonSize: buttonSize),
             ),
-            SearchField(
+            _SearchField(
               buttonSize: buttonSize,
               controller: searchBarController,
               focusNode: searchBarFocusNode,
@@ -90,11 +90,11 @@ class _ListPageActionsState extends State<ListPageActions> {
   }
 }
 
-class Collapsible extends StatelessWidget {
+class _Collapsible extends StatelessWidget {
   final Widget child;
   final double progress;
 
-  const new({super.key, required this.child, required this.progress});
+  const new({required this.child, required this.progress});
 
   @override
   Widget build(BuildContext context) {
@@ -114,13 +114,12 @@ class Collapsible extends StatelessWidget {
   }
 }
 
-class SortButton extends StatelessWidget {
+class _SortButton extends StatelessWidget {
   final Size buttonSize;
   final SortConfig sortConfig;
   final ValueChanged<SortConfig> onSortChanged;
 
   const new({
-    super.key,
     required this.buttonSize,
     required this.sortConfig,
     required this.onSortChanged,
@@ -183,8 +182,8 @@ class SortButton extends StatelessWidget {
   }
 }
 
-class CheckButton extends StatelessWidget {
-  const new({super.key, required this.buttonSize});
+class _CheckButton extends StatelessWidget {
+  const new({required this.buttonSize});
 
   final Size buttonSize;
 
@@ -201,7 +200,7 @@ class CheckButton extends StatelessWidget {
   }
 }
 
-class SearchField extends StatefulWidget {
+class _SearchField extends StatefulWidget {
   final Size buttonSize;
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -210,7 +209,6 @@ class SearchField extends StatefulWidget {
   final double animationProgress;
 
   const new({
-    super.key,
     required this.buttonSize,
     required this.controller,
     required this.focusNode,
@@ -220,10 +218,10 @@ class SearchField extends StatefulWidget {
   });
 
   @override
-  State<SearchField> createState() => _SearchFieldState();
+  State<_SearchField> createState() => _SearchFieldState();
 }
 
-class _SearchFieldState extends State<SearchField> {
+class _SearchFieldState extends State<_SearchField> {
   final _groupId = Object();
 
   @override

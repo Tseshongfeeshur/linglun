@@ -69,13 +69,13 @@ class _FrameState extends State<Frame> {
         children: [
           if (MediaQuery.sizeOf(context).width >= 600 &&
               MediaQuery.sizeOf(context).width < 840)
-            AppNavRail(
+            _AppNavRail(
               pageIndex: pageIndex,
               pages: pages,
               onDestinationSelected: onPageSwitched,
             ),
           if (MediaQuery.sizeOf(context).width >= 840)
-            AppDrawer(
+            _AppDrawer(
               pageIndex: pageIndex,
               pages: pages,
               onSelected: onPageSwitched,
@@ -99,23 +99,22 @@ class _FrameState extends State<Frame> {
   }
 }
 
-class AppDrawer extends StatefulWidget {
+class _AppDrawer extends StatefulWidget {
   final int pageIndex;
   final List<PageInfo> pages;
   final ValueChanged<int> onSelected;
 
   const new({
-    super.key,
     required this.pageIndex,
     required this.pages,
     required this.onSelected,
   });
 
   @override
-  State<AppDrawer> createState() => _AppDrawerState();
+  State<_AppDrawer> createState() => _AppDrawerState();
 }
 
-class _AppDrawerState extends State<AppDrawer> {
+class _AppDrawerState extends State<_AppDrawer> {
   bool _isExtended = true;
 
   @override
@@ -184,9 +183,8 @@ class _AppDrawerState extends State<AppDrawer> {
   }
 }
 
-class AppNavRail extends StatelessWidget {
+class _AppNavRail extends StatelessWidget {
   const new({
-    super.key,
     required this.pageIndex,
     required this.pages,
     required this.onDestinationSelected,

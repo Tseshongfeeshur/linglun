@@ -1,6 +1,6 @@
 /// 名字带分隔符的艺术家
 /// 匹配时忽略大小写和名字内部的空白
-const List<String> protectedArtistNames = [
+const List<String> _protectedArtistNames = [
   // 含 & 的
   'Simon & Garfunkel',
   'Hall & Oates',
@@ -108,7 +108,7 @@ class ArtistSplitter {
 
 /// 全局单例
 final ArtistSplitter artistSplitter = ArtistSplitter(
-  protectedNames: protectedArtistNames,
+  protectedNames: _protectedArtistNames,
 );
 
 List<String> splitArtists(String raw) => artistSplitter.split(raw);

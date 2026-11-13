@@ -8,7 +8,7 @@ import 'package:linglun/data/models/track_info_model.dart';
 
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
-class MusicListView extends StatefulWidget {
+class TrackListView extends StatefulWidget {
   final Map<String, List<TrackInfo>> groupedMusicList;
   final bool hasGroups;
 
@@ -19,10 +19,10 @@ class MusicListView extends StatefulWidget {
   });
 
   @override
-  State<MusicListView> createState() => _MusicListViewState();
+  State<TrackListView> createState() => _TrackListViewState();
 }
 
-class _MusicListViewState extends State<MusicListView> {
+class _TrackListViewState extends State<TrackListView> {
   final ItemScrollController itemScrollController = ItemScrollController();
 
   @override
@@ -47,9 +47,9 @@ class _MusicListViewState extends State<MusicListView> {
         itemBuilder: (context, index) {
           switch (items[index]) {
             case TrackInfo musicInfo:
-              return MusicListItem(musicInfo: musicInfo);
+              return _MusicListItem(musicInfo: musicInfo);
             case String letter:
-              return MusicListGroupHead(
+              return _MusicListGroupHead(
                 letter: letter,
                 groupedMusicList: widget.groupedMusicList,
                 itemScrollController: itemScrollController,
@@ -63,7 +63,7 @@ class _MusicListViewState extends State<MusicListView> {
     } else {
       return ListView.builder(
         itemCount: widget.groupedMusicList['default']!.length,
-        itemBuilder: (context, index) => MusicListItem(
+        itemBuilder: (context, index) => _MusicListItem(
           musicInfo: widget.groupedMusicList['default']![index],
         ),
       );
@@ -71,14 +71,13 @@ class _MusicListViewState extends State<MusicListView> {
   }
 }
 
-class MusicListGroupHead extends StatelessWidget {
+class _MusicListGroupHead extends StatelessWidget {
   final String letter;
   final Map<String, List<TrackInfo>> groupedMusicList;
   final ItemScrollController itemScrollController;
   final List<int> keyIndexList;
 
   const new({
-    super.key,
     required this.letter,
     required this.groupedMusicList,
     required this.itemScrollController,
@@ -120,8 +119,8 @@ class MusicListGroupHead extends StatelessWidget {
   }
 }
 
-class MusicListItem extends StatelessWidget {
-  const new({super.key, required this.musicInfo});
+class _MusicListItem extends StatelessWidget {
+  const new({required this.musicInfo});
 
   final TrackInfo musicInfo;
 

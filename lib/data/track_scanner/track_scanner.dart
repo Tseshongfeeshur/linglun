@@ -38,7 +38,7 @@ class TrackScannedFinish extends ScanEvent {
 }
 
 class TrackScanner {
-  static const extensions = {'.mp3', '.flac', '.m4a', '.ogg', '.opus', '.wav'};
+  static const _extensions = {'.mp3', '.flac', '.m4a', '.ogg', '.opus', '.wav'};
 
   Future<TracksDiscovered> discover(List<String> rootPaths) async {
     // TODO: 确保打断后能停止
@@ -60,7 +60,7 @@ class TrackScanner {
         if (item is! File) continue;
 
         final ext = p.extension(item.path).toLowerCase();
-        if (!extensions.contains(ext)) continue;
+        if (!_extensions.contains(ext)) continue;
 
         paths.add(item.absolute.path);
       }

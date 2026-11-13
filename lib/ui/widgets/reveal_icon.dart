@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-class RRectHoleClipper extends CustomClipper<Path> {
+class _RRectHoleClipper extends CustomClipper<Path> {
   final RRect hole;
 
   final bool inverted; // true: 保留孔外
@@ -21,7 +21,7 @@ class RRectHoleClipper extends CustomClipper<Path> {
   }
 
   @override
-  bool shouldReclip(RRectHoleClipper old) =>
+  bool shouldReclip(_RRectHoleClipper old) =>
       old.hole != hole || old.inverted != inverted;
 }
 
@@ -95,7 +95,7 @@ class RevealIcon extends StatelessWidget {
             children: [
               // 上层 挖掉孔
               ClipPath(
-                clipper: RRectHoleClipper(hole: hole, inverted: true),
+                clipper: _RRectHoleClipper(hole: hole, inverted: true),
                 clipBehavior: Clip.hardEdge,
                 child: SizedBox(
                   width: iconSize,
@@ -107,7 +107,7 @@ class RevealIcon extends StatelessWidget {
               ),
               // 下层 保留孔
               ClipPath(
-                clipper: RRectHoleClipper(hole: hole, inverted: false),
+                clipper: _RRectHoleClipper(hole: hole, inverted: false),
                 clipBehavior: Clip.hardEdge,
                 child: SizedBox(
                   width: iconSize,

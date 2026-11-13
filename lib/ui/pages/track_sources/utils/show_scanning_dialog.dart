@@ -6,7 +6,7 @@ import 'package:linglun/data/models/track_info_model.dart';
 import 'package:linglun/data/track_scanner/track_scanner.dart';
 import 'package:linglun/data/track_scanner/models/scan_state.dart';
 
-class ScanNotifier extends Notifier<ScanState> {
+class _ScanNotifier extends Notifier<ScanState> {
   @override
   ScanState build() {
     return const ScanState();
@@ -35,8 +35,8 @@ class ScanNotifier extends Notifier<ScanState> {
   }
 }
 
-final scanProvider = NotifierProvider.autoDispose<ScanNotifier, ScanState>(
-  ScanNotifier.new,
+final _scanProvider = NotifierProvider.autoDispose<_ScanNotifier, ScanState>(
+  _ScanNotifier.new,
 );
 
 Future<List<TrackInfo>?> showScanningDialog(
@@ -49,49 +49,49 @@ Future<List<TrackInfo>?> showScanningDialog(
     builder: (BuildContext context) => PopScope(
       canPop: false,
       child: Dialog(
-        child: ScanningDialogFrame(pathsToDiscover: paths, existing: existing),
+        child: _ScanningDialogFrame(pathsToDiscover: paths, existing: existing),
       ),
     ),
     barrierDismissible: false,
   );
 }
 
-class ScanningDialogFrame extends ConsumerStatefulWidget {
+class _ScanningDialogFrame extends ConsumerStatefulWidget {
   final List<String> pathsToDiscover;
   final List<TrackInfo> existing;
-  const new({super.key, required this.pathsToDiscover, required this.existing});
+  const new({required this.pathsToDiscover, required this.existing});
 
   @override
-  ConsumerState<ScanningDialogFrame> createState() =>
+  ConsumerState<_ScanningDialogFrame> createState() =>
       _ScanningDialogFrameState();
 }
 
-class _ScanningDialogFrameState extends ConsumerState<ScanningDialogFrame> {
+class _ScanningDialogFrameState extends ConsumerState<_ScanningDialogFrame> {
   @override
   void initState() {
     super.initState();
     ref
-        .read(scanProvider.notifier)
+        .read(_scanProvider.notifier)
         .startScan(widget.pathsToDiscover, widget.existing);
   }
 
   @override
   Widget build(BuildContext context) {
-    final scanState = ref.watch<ScanState>(scanProvider);
+    final scanState = ref.watch<ScanState>(_scanProvider);
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 360),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: scanState.scanResult == null
-            ? ContentAtScanning(scanState: scanState)
-            : ContentAtFinnish(scanState: scanState),
+            ? _ContentAtScanning(scanState: scanState)
+            : _ContentAtFinnish(scanState: scanState),
       ),
     );
   }
 }
 
-class ContentAtScanning extends StatelessWidget {
-  const new({super.key, required this.scanState});
+class _ContentAtScanning extends StatelessWidget {
+  const new({required this.scanState});
 
   final ScanState scanState;
 
@@ -152,8 +152,8 @@ class ContentAtScanning extends StatelessWidget {
   }
 }
 
-class ContentAtFinnish extends StatelessWidget {
-  const new({super.key, required this.scanState});
+class _ContentAtFinnish extends StatelessWidget {
+  const new({required this.scanState});
 
   final ScanState scanState;
 
@@ -171,25 +171,25 @@ class ContentAtFinnish extends StatelessWidget {
           children: [
             const SizedBox(height: 4),
 
-            ResultInfoLine(
+            _ResultInfoLine(
               icon: Icons.find_in_page,
               text: '已处理',
               count: scanState.scannedCounter,
               help: '扫描器发现并处理的所有曲目，包括跳过的条目和失败的条目',
             ),
-            ResultInfoLine(
+            _ResultInfoLine(
               icon: Icons.update,
               text: '已更新',
               count: scanState.updatedCounter,
               help: '所有曲目中那些新增或修改过的曲目',
             ),
-            ResultInfoLine(
+            _ResultInfoLine(
               icon: Icons.skip_next,
               text: '已跳过',
               count: scanState.skippedCounter,
               help: '若在已有曲库中发现路径、大小和修改时间均相同的曲目，我们认为其没有发生变化，因此跳过了扫描。',
             ),
-            ResultInfoLine(
+            _ResultInfoLine(
               icon: Icons.error,
               text: '已失败',
               count:
@@ -229,14 +229,13 @@ class ContentAtFinnish extends StatelessWidget {
   }
 }
 
-class ResultInfoLine extends StatelessWidget {
+class _ResultInfoLine extends StatelessWidget {
   final IconData icon;
   final String text;
   final int count;
   final String help;
 
   const new({
-    super.key,
     required this.icon,
     required this.text,
     required this.count,
