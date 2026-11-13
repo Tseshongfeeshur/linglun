@@ -3,6 +3,7 @@ include: package:flutter_lints/flutter.yaml
 linter:
   rules:
     - unnecessary_type_name_in_constructor
+    - prefer_const_constructors
 
 analyzer:
   exclude:

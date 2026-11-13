@@ -6,8 +6,8 @@ class AlbumLib extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('专辑')),
-      body: Center(child: Text('AlbumLib')),
+      appBar: AppBar(title: const Text('专辑')),
+      body: const Center(child: Text('AlbumLib')),
     );
   }
 }

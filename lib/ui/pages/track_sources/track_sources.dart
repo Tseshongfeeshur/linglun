@@ -1,11 +1,12 @@
-import 'package:linglun/ui/pages/track_sources/utils/show_scanning_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:file_picker/file_picker.dart';
 
+import 'package:linglun/data/models/track_info_model.dart';
 import 'package:linglun/data/track_scanner/utils/get_platform_music_path.dart';
+import 'package:linglun/ui/pages/track_sources/utils/show_scanning_dialog.dart';
 
 class TrackSources extends StatefulWidget {
-  const TrackSources({super.key});
+  const new({super.key});
 
   @override
   State<TrackSources> createState() => _TrackSourcesState();
@@ -32,9 +33,9 @@ class _TrackSourcesState extends State<TrackSources> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('歌曲来源')),
+      appBar: AppBar(title: const Text('歌曲来源')),
       body: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 960),
+        constraints: const BoxConstraints(maxWidth: 960),
         child: ListView(
           children: [
             ListTile(
@@ -53,8 +54,8 @@ class _TrackSourcesState extends State<TrackSources> {
               ),
             ),
             CheckboxListTile(
-              secondary: Icon(Icons.folder_special),
-              title: Text('XDG 音乐目录'),
+              secondary: const Icon(Icons.folder_special),
+              title: const Text('XDG 音乐目录'),
               subtitle: platformPath.path == null
                   ? null
                   : Text(platformPath.path!),
@@ -83,8 +84,8 @@ class _TrackSourcesState extends State<TrackSources> {
               ),
             ),
             ListTile(
-              leading: Icon(Icons.add),
-              title: Text('添加文件夹'),
+              leading: const Icon(Icons.add),
+              title: const Text('添加文件夹'),
               onTap: () async {
                 String? path = await FilePicker.getDirectoryPath();
                 if (path != null) {
@@ -94,7 +95,7 @@ class _TrackSourcesState extends State<TrackSources> {
             ),
             ...userPaths.keys.map(
               (element) => CheckboxListTile(
-                secondary: Icon(Icons.folder),
+                secondary: const Icon(Icons.folder),
                 title: Text(element),
                 value: userPaths[element],
                 onChanged: (value) {
@@ -111,15 +112,15 @@ class _TrackSourcesState extends State<TrackSources> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          await showScanningDialog(context, [
+          final List<TrackInfo>? tracks = await showScanningDialog(context, [
             if (platformPath.ticked && platformPath.path != null)
               platformPath.path!,
             ...userPaths.keys.where((element) => userPaths[element] ?? false),
           ], []);
         },
         isExtended: true,
-        icon: Icon(Icons.refresh),
-        label: Text('刷新曲库'),
+        icon: const Icon(Icons.refresh),
+        label: const Text('刷新曲库'),
       ),
     );
   }

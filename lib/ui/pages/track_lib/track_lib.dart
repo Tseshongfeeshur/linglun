@@ -1,32 +1,32 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:linglun/ui/pages/track_sources/utils/show_scanning_dialog.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'package:linglun/data/models/track_info_model.dart';
 import 'package:linglun/data/utils/track_sort.dart';
+
 import 'package:linglun/ui/widgets/list_page_actions.dart';
 import 'package:linglun/ui/pages/track_lib/widgets/track_list_view.dart';
 
-import 'package:linglun/data/models/track_info_model.dart';
-
-import 'package:linglun/test/track_list_generator.dart';
-
-class TrackLib extends StatefulWidget {
+class TrackLib extends ConsumerStatefulWidget {
   const new({super.key});
 
   @override
-  State<TrackLib> createState() => _TrackLibState();
+  ConsumerState<TrackLib> createState() => _TrackLibState();
 }
 
-class _TrackLibState extends State<TrackLib> {
-  SortConfig sortConfig = SortConfig(TrackSort.titleInLatin, false);
+class _TrackLibState extends ConsumerState<TrackLib> {
+  SortConfig sortConfig = const SortConfig(TrackSort.titleInLatin, false);
   late List<TrackInfo> originalMusicList;
 
   @override
   void initState() {
     super.initState();
-    originalMusicList = getTrackList();
   }
 
   @override
   Widget build(BuildContext context) {
+    // List<TrackInfo> originalMusicList = ;
     Map<String, List<TrackInfo>> groupedMusicList = groupMusicList(
       sortMusicList(originalMusicList, sortConfig),
       sortConfig,
@@ -34,7 +34,7 @@ class _TrackLibState extends State<TrackLib> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('曲库', style: TextStyle(overflow: TextOverflow.fade)),
+        title: const Text('曲库', style: TextStyle(overflow: TextOverflow.fade)),
         actions: [
           ListPageActions(
             sortConfig: sortConfig,
@@ -44,7 +44,7 @@ class _TrackLibState extends State<TrackLib> {
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 960),
+          constraints: const BoxConstraints(maxWidth: 960),
           child: MusicListView(
             groupedMusicList: groupedMusicList,
             hasGroups: !groupedMusicList.keys.contains('default'),

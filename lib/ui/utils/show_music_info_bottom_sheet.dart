@@ -2,7 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:linglun/data/models/track_info_model.dart';
 
 TextStyle headStyle(BuildContext context) =>
-    TextStyle(fontWeight: FontWeight(500));
+    const TextStyle(fontWeight: FontWeight(500));
 TextStyle descStyle(BuildContext context) => TextStyle(
   color: Theme.of(context).colorScheme.onSurface.withAlpha(180),
   fontSize: 12,

@@ -27,37 +27,37 @@ class _FrameState extends State<Frame> {
       title: '曲库',
       icon: Icons.library_music_outlined,
       selectedIcon: Icons.library_music,
-      page: TrackLib(),
+      page: const TrackLib(),
     ),
     PageInfo(
       title: '专辑',
       icon: Icons.album_outlined,
       selectedIcon: Icons.album,
-      page: AlbumLib(),
+      page: const AlbumLib(),
     ),
     PageInfo(
       title: '艺术家',
       icon: Icons.person_outline,
       selectedIcon: Icons.person,
-      page: ArtistLib(),
+      page: const ArtistLib(),
     ),
     PageInfo(
       title: '播放列表',
       icon: Icons.queue_music_outlined,
       selectedIcon: Icons.queue_music,
-      page: Playlist(),
+      page: const Playlist(),
     ),
     PageInfo(
       title: '歌曲来源',
       icon: Icons.folder_special_outlined,
       selectedIcon: Icons.folder_special,
-      page: TrackSources(),
+      page: const TrackSources(),
     ),
     PageInfo(
       title: '设置',
       icon: Icons.settings_outlined,
       selectedIcon: Icons.settings,
-      page: Settings(),
+      page: const Settings(),
     ),
   ];
 
@@ -163,7 +163,7 @@ class _AppDrawerState extends State<AppDrawer> {
                       padding: const EdgeInsets.only(left: 4),
                       child: Text(
                         widget.pages[currentIndex].title,
-                        style: TextStyle(overflow: TextOverflow.clip),
+                        style: const TextStyle(overflow: TextOverflow.clip),
                         maxLines: 1,
                       ),
                     ),
@@ -172,7 +172,7 @@ class _AppDrawerState extends State<AppDrawer> {
                     selectedTileColor: Theme.of(context)
                         .colorScheme
                         .surfaceContainerHigh,
-                    contentPadding: EdgeInsets.only(left: 16),
+                    contentPadding: const EdgeInsets.only(left: 16),
                   ),
                 ),
               ),

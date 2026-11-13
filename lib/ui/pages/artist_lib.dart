@@ -6,8 +6,8 @@ class ArtistLib extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('艺术家')),
-      body: Center(child: Text('ArtistLib')),
+      appBar: AppBar(title: const Text('艺术家')),
+      body: const Center(child: Text('ArtistLib')),
     );
   }
 }

@@ -8,7 +8,7 @@ import 'package:linglun/ui/frame/frame.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   initRomanize();
-  runApp(ProviderScope(child: const MainApp()));
+  runApp(const ProviderScope(child: MainApp()));
 }
 
 class MainApp extends StatelessWidget {

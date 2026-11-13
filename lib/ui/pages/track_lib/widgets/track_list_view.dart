@@ -56,7 +56,7 @@ class _MusicListViewState extends State<MusicListView> {
                 keyIndexList: keyIndexList,
               );
           }
-          return SizedBox.shrink();
+          return const SizedBox.shrink();
         },
         itemScrollController: itemScrollController,
       );
@@ -145,12 +145,12 @@ class MusicListItem extends StatelessWidget {
       title: Text(
         musicInfo.title,
         maxLines: 1,
-        style: TextStyle(overflow: TextOverflow.ellipsis),
+        style: const TextStyle(overflow: TextOverflow.ellipsis),
       ),
       subtitle: Text(
-        musicInfo.titleInLatin,
+        musicInfo.artists?.join('/') ?? '未知艺术家',
         maxLines: 1,
-        style: TextStyle(overflow: TextOverflow.ellipsis),
+        style: const TextStyle(overflow: TextOverflow.ellipsis),
       ),
       onTap: () {
         showTrackInfoBottomSheet(context, musicInfo);

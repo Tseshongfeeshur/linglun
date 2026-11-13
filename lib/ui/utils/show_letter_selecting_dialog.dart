@@ -17,7 +17,7 @@ Future<String?> showLetterSelectingDialog(
   return showDialog<String>(
     context: context,
     builder: ((context) => AlertDialog(
-      title: Text('选择分组'),
+      title: const Text('选择分组'),
       content: SizedBox(
         width: 300,
         child: GridView.builder(
@@ -37,7 +37,10 @@ Future<String?> showLetterSelectingDialog(
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text('取消')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
       ],
     )),
   );

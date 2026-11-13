@@ -171,7 +171,7 @@ class SortButton extends StatelessWidget {
       tooltip: '排序依据',
       icon: Stack(
         children: [
-          Icon(Icons.sort),
+          const Icon(Icons.sort),
           Positioned(
             right: 0,
             bottom: 0,
@@ -251,7 +251,7 @@ class _SearchFieldState extends State<SearchField> {
           children: [
             IconButton(
               onPressed: () => widget.focusNode.requestFocus(),
-              icon: Icon(Icons.search),
+              icon: const Icon(Icons.search),
               style: IconButton.styleFrom(
                 minimumSize: widget.buttonSize,
                 maximumSize: widget.buttonSize,
@@ -294,7 +294,7 @@ class _SearchFieldState extends State<SearchField> {
                         widget.focusNode.requestFocus();
                       }
                     },
-                    icon: Icon(Icons.clear),
+                    icon: const Icon(Icons.clear),
                     style: IconButton.styleFrom(
                       minimumSize: widget.buttonSize,
                       maximumSize: widget.buttonSize,

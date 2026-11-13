@@ -1,7 +1,43 @@
 import 'package:material_ui/material_ui.dart';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:linglun/data/models/track_info_model.dart';
 import 'package:linglun/data/track_scanner/track_scanner.dart';
 import 'package:linglun/data/track_scanner/models/scan_state.dart';
+
+class ScanNotifier extends Notifier<ScanState> {
+  @override
+  ScanState build() {
+    return const ScanState();
+  }
+
+  Future<void> startScan(
+    List<String> pathsToDiscover,
+    List<TrackInfo> existing,
+  ) async {
+    final TrackScanner trackScanner = TrackScanner();
+
+    final discoverResult = await trackScanner.discover(pathsToDiscover);
+    if (!ref.mounted) return;
+
+    final tracksToScan = discoverResult.paths;
+    state = state.copyWith(
+      discoverErrors: discoverResult.errorPaths,
+      discoveredCounter: tracksToScan.length,
+    );
+
+    final scanStream = trackScanner.scan(tracksToScan, existing);
+    await for (final ScanEvent event in scanStream) {
+      if (!ref.mounted) break;
+      state = state.apply(event);
+    }
+  }
+}
+
+final scanProvider = NotifierProvider.autoDispose<ScanNotifier, ScanState>(
+  ScanNotifier.new,
+);
 
 Future<List<TrackInfo>?> showScanningDialog(
   BuildContext context,
@@ -20,59 +56,30 @@ Future<List<TrackInfo>?> showScanningDialog(
   );
 }
 
-class ScanningDialogFrame extends StatefulWidget {
+class ScanningDialogFrame extends ConsumerStatefulWidget {
   final List<String> pathsToDiscover;
   final List<TrackInfo> existing;
   const new({super.key, required this.pathsToDiscover, required this.existing});
 
   @override
-  State<ScanningDialogFrame> createState() => _ScanningDialogFrameState();
+  ConsumerState<ScanningDialogFrame> createState() =>
+      _ScanningDialogFrameState();
 }
 
-class _ScanningDialogFrameState extends State<ScanningDialogFrame> {
-  final TrackScanner trackScanner = TrackScanner();
-  ScanState scanState = ScanState();
-  bool isCanceled = false;
-
-  Future<void> scan() async {
-    final discoverResult = await trackScanner.discover(widget.pathsToDiscover);
-    final tracksToScan = discoverResult.paths;
-    scanState = scanState.copyWith(discoverErrors: discoverResult.errorPaths);
-
-    if (!mounted) return;
-    setState(
-      () => scanState = scanState.copyWith(
-        discoveredCounter: tracksToScan.length,
-      ),
-    );
-
-    final scanStream = trackScanner.scan(tracksToScan, widget.existing);
-    await for (final ScanEvent event in scanStream) {
-      if (isCanceled) break;
-      if (mounted) {
-        setState(() {
-          scanState = scanState.apply(event);
-        });
-      }
-    }
-  }
-
+class _ScanningDialogFrameState extends ConsumerState<ScanningDialogFrame> {
   @override
   void initState() {
     super.initState();
-    scan();
-  }
-
-  @override
-  void dispose() {
-    isCanceled = true;
-    super.dispose();
+    ref
+        .read(scanProvider.notifier)
+        .startScan(widget.pathsToDiscover, widget.existing);
   }
 
   @override
   Widget build(BuildContext context) {
+    final scanState = ref.watch<ScanState>(scanProvider);
     return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: 360),
+      constraints: const BoxConstraints(maxWidth: 360),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: scanState.scanResult == null
@@ -98,10 +105,10 @@ class ContentAtScanning extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text('扫描', style: TextStyle(fontSize: 24)),
+            const Text('扫描', style: TextStyle(fontSize: 24)),
             Text(
               '${scanState.scannedCounter}/${scanState.discoveredCounter}',
-              style: TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: 16),
             ),
           ],
         ),
@@ -109,13 +116,13 @@ class ContentAtScanning extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             LinearProgressIndicator(
               value: scanState.discoveredCounter > 0
                   ? scanState.scannedCounter / scanState.discoveredCounter
                   : null,
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             SizedBox(
               height: 18,
               child: Align(
@@ -130,14 +137,14 @@ class ContentAtScanning extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
             onPressed: () {
               Navigator.pop(context, scanState.scanResult);
             },
-            child: Text('取消'),
+            child: const Text('取消'),
           ),
         ),
       ],
@@ -156,13 +163,13 @@ class ContentAtFinnish extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('扫描完成', style: TextStyle(fontSize: 24)),
+        const Text('扫描完成', style: TextStyle(fontSize: 24)),
         Column(
           spacing: 12,
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
 
             ResultInfoLine(
               icon: Icons.find_in_page,
@@ -192,14 +199,14 @@ class ContentAtFinnish extends StatelessWidget {
 
             if (scanState.discoverErrors.isNotEmpty ||
                 scanState.scanErrors.isNotEmpty)
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
             if (scanState.discoverErrors.isNotEmpty)
               for (final String path in scanState.discoverErrors) Text(path),
             if (scanState.scanErrors.isNotEmpty)
               for (final String detail in scanState.scanErrors) Text(detail),
           ],
         ),
-        SizedBox(height: 14),
+        const SizedBox(height: 14),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -207,13 +214,13 @@ class ContentAtFinnish extends StatelessWidget {
               onPressed: () {
                 Navigator.pop(context);
               },
-              child: Text('取消'),
+              child: const Text('取消'),
             ),
             TextButton(
               onPressed: () {
                 Navigator.pop(context, scanState.scanResult);
               },
-              child: Text('更新曲库'),
+              child: const Text('更新曲库'),
             ),
           ],
         ),
@@ -243,14 +250,14 @@ class ResultInfoLine extends StatelessWidget {
       // spacing: ,
       children: [
         Icon(icon),
-        SizedBox(width: 12),
-        Text(text, style: TextStyle(fontSize: 16)),
-        Spacer(),
+        const SizedBox(width: 12),
+        Text(text, style: const TextStyle(fontSize: 16)),
+        const Spacer(),
         Text('$count 项'),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Tooltip(
           message: help,
-          child: SizedBox(
+          child: const SizedBox(
             width: 18,
             height: 18,
             child: Icon(Icons.question_mark, size: 18),
