@@ -67,18 +67,12 @@ class _FrameState extends State<Frame> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: Row(
         children: [
-          if (MediaQuery.sizeOf(context).width >= 600 &&
-              MediaQuery.sizeOf(context).width < 840)
-            _AppNavRail(
-              pageIndex: pageIndex,
-              pages: pages,
-              onDestinationSelected: onPageSwitched,
-            ),
-          if (MediaQuery.sizeOf(context).width >= 840)
+          if (MediaQuery.sizeOf(context).width >= 600)
             _AppDrawer(
               pageIndex: pageIndex,
               pages: pages,
               onSelected: onPageSwitched,
+              extended: MediaQuery.sizeOf(context).width >= 840,
             ),
           Expanded(
             child: IndexedStack(
@@ -103,11 +97,13 @@ class _AppDrawer extends StatefulWidget {
   final int pageIndex;
   final List<PageInfo> pages;
   final ValueChanged<int> onSelected;
+  final bool extended;
 
   const new({
     required this.pageIndex,
     required this.pages,
     required this.onSelected,
+    required this.extended,
   });
 
   @override
@@ -115,6 +111,7 @@ class _AppDrawer extends StatefulWidget {
 }
 
 class _AppDrawerState extends State<_AppDrawer> {
+  // TODO: 让 laptop 时展开动作浮动，desktop 时展开常驻
   bool _isExtended = true;
 
   @override
@@ -177,40 +174,6 @@ class _AppDrawerState extends State<_AppDrawer> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AppNavRail extends StatelessWidget {
-  const new({
-    required this.pageIndex,
-    required this.pages,
-    required this.onDestinationSelected,
-  });
-
-  final int pageIndex;
-  final List<PageInfo> pages;
-  final ValueChanged<int> onDestinationSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return NavigationRail(
-      selectedIndex: pageIndex,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-      mainAxisAlignment: MainAxisAlignment.center,
-      labelType: NavigationRailLabelType.all,
-      onDestinationSelected: onDestinationSelected,
-      destinations: List.generate(
-        pages.length,
-        (currentIndex) => NavigationRailDestination(
-          icon: RevealIcon(
-            isFilled: pageIndex == currentIndex,
-            outlineIcon: pages[currentIndex].icon,
-            filledIcon: pages[currentIndex].selectedIcon,
-          ),
-          label: Text(pages[currentIndex].title),
         ),
       ),
     );
