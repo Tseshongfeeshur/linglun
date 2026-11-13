@@ -12,7 +12,7 @@ class MusicListView extends StatefulWidget {
   final Map<String, List<TrackInfo>> groupedMusicList;
   final bool hasGroups;
 
-  const MusicListView({
+  const new({
     super.key,
     required this.groupedMusicList,
     required this.hasGroups,
@@ -77,7 +77,7 @@ class MusicListGroupHead extends StatelessWidget {
   final ItemScrollController itemScrollController;
   final List<int> keyIndexList;
 
-  const MusicListGroupHead({
+  const new({
     super.key,
     required this.letter,
     required this.groupedMusicList,
@@ -121,7 +121,7 @@ class MusicListGroupHead extends StatelessWidget {
 }
 
 class MusicListItem extends StatelessWidget {
-  const MusicListItem({super.key, required this.musicInfo});
+  const new({super.key, required this.musicInfo});
 
   final TrackInfo musicInfo;
 

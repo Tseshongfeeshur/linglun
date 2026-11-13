@@ -39,7 +39,7 @@ const List<String> protectedArtistNames = [
 ];
 
 class ArtistSplitter {
-  ArtistSplitter({
+  new({
     required List<String> protectedNames,
     List<String> separators = const ['、', ';', '/', '&', '；'],
   }) : _separatorPattern = RegExp(separators.map(RegExp.escape).join('|')),

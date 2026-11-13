@@ -9,7 +9,7 @@ import 'package:linglun/data/models/track_info_model.dart';
 import 'package:linglun/test/track_list_generator.dart';
 
 class TrackLib extends StatefulWidget {
-  const TrackLib({super.key});
+  const new({super.key});
 
   @override
   State<TrackLib> createState() => _TrackLibState();

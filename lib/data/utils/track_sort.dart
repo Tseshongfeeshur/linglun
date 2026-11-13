@@ -14,7 +14,7 @@ enum TrackSort {
   addTime('扫描时间', Icons.add, false),
   editTime('编辑时间', Icons.edit, false);
 
-  const TrackSort(this.label, this.icon, this.shouldBeGrouped);
+  const new(this.label, this.icon, this.shouldBeGrouped);
 
   final String label;
   final IconData icon;
@@ -32,7 +32,7 @@ enum TrackSort {
 class SortConfig {
   final TrackSort method;
   final bool descending;
-  const SortConfig(this.method, this.descending);
+  const new(this.method, this.descending);
 
   SortConfig copyWith({TrackSort? method, bool? descending}) =>
       SortConfig(method ?? this.method, descending ?? this.descending);

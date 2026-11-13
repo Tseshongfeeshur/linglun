@@ -20,7 +20,7 @@ class TrackInfo {
   final int playCount;
   final DateTime addTime;
 
-  TrackInfo({
+  new({
     required this.title,
     required this.titleInLatin,
     this.artists,

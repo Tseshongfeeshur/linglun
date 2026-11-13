@@ -15,28 +15,28 @@ sealed class ScanEvent {}
 class TracksDiscovered {
   final List<String> paths;
   final List<String> errorPaths;
-  TracksDiscovered({required this.paths, required this.errorPaths});
+  new({required this.paths, required this.errorPaths});
 }
 
 class TrackScanned extends ScanEvent {
   final TrackInfo track;
-  TrackScanned({required this.track});
+  new({required this.track});
 }
 
 class TrackSkipped extends ScanEvent {
   final String path;
-  TrackSkipped({required this.path});
+  new({required this.path});
 }
 
 class TrackScannedError extends ScanEvent {
   final String path;
   final String detail;
-  TrackScannedError({required this.path, required this.detail});
+  new({required this.path, required this.detail});
 }
 
 class TrackScannedFinish extends ScanEvent {
   final List<TrackInfo> tracks;
-  TrackScannedFinish({required this.tracks});
+  new({required this.tracks});
 }
 
 class TrackScanner {

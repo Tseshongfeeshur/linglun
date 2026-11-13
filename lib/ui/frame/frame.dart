@@ -12,7 +12,7 @@ import 'package:linglun/ui/pages/playlist.dart';
 import 'package:linglun/ui/pages/settings.dart';
 
 class Frame extends StatefulWidget {
-  const Frame({super.key});
+  const new({super.key});
 
   @override
   State<Frame> createState() => _FrameState();
@@ -104,7 +104,7 @@ class AppDrawer extends StatefulWidget {
   final List<PageInfo> pages;
   final ValueChanged<int> onSelected;
 
-  const AppDrawer({
+  const new({
     super.key,
     required this.pageIndex,
     required this.pages,
@@ -185,7 +185,7 @@ class _AppDrawerState extends State<AppDrawer> {
 }
 
 class AppNavRail extends StatelessWidget {
-  const AppNavRail({
+  const new({
     super.key,
     required this.pageIndex,
     required this.pages,
@@ -224,7 +224,7 @@ class AppNavBar extends StatelessWidget {
   final List<PageInfo> pages;
   final ValueChanged<int> onDestinationSelected;
 
-  const AppNavBar({
+  const new({
     super.key,
     required this.pageIndex,
     required this.pages,

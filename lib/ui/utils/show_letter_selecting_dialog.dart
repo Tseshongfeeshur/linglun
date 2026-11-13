@@ -48,7 +48,7 @@ class _LetterCell extends StatelessWidget {
   final bool isCurrent;
   final bool isValid;
 
-  const _LetterCell({
+  const new({
     required this.letter,
     required this.isCurrent,
     required this.isValid,

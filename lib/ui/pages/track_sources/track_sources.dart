@@ -110,11 +110,13 @@ class _TrackSourcesState extends State<TrackSources> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => showScanningDialog(context, [
-          if (platformPath.ticked && platformPath.path != null)
-            platformPath.path!,
-          ...userPaths.keys.where((element) => userPaths[element] ?? false),
-        ]),
+        onPressed: () async {
+          await showScanningDialog(context, [
+            if (platformPath.ticked && platformPath.path != null)
+              platformPath.path!,
+            ...userPaths.keys.where((element) => userPaths[element] ?? false),
+          ], []);
+        },
         isExtended: true,
         icon: Icon(Icons.refresh),
         label: Text('刷新曲库'),

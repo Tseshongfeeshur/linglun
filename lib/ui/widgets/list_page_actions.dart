@@ -7,11 +7,7 @@ import 'package:linglun/data/utils/track_sort.dart';
 class ListPageActions extends StatefulWidget {
   final SortConfig sortConfig;
   final ValueChanged<SortConfig> onSortChanged;
-  const ListPageActions({
-    super.key,
-    required this.sortConfig,
-    required this.onSortChanged,
-  });
+  const new({super.key, required this.sortConfig, required this.onSortChanged});
 
   @override
   State<ListPageActions> createState() => _ListPageActionsState();
@@ -98,7 +94,7 @@ class Collapsible extends StatelessWidget {
   final Widget child;
   final double progress;
 
-  const Collapsible({super.key, required this.child, required this.progress});
+  const new({super.key, required this.child, required this.progress});
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +119,7 @@ class SortButton extends StatelessWidget {
   final SortConfig sortConfig;
   final ValueChanged<SortConfig> onSortChanged;
 
-  const SortButton({
+  const new({
     super.key,
     required this.buttonSize,
     required this.sortConfig,
@@ -188,7 +184,7 @@ class SortButton extends StatelessWidget {
 }
 
 class CheckButton extends StatelessWidget {
-  const CheckButton({super.key, required this.buttonSize});
+  const new({super.key, required this.buttonSize});
 
   final Size buttonSize;
 
@@ -213,7 +209,7 @@ class SearchField extends StatefulWidget {
   final bool extended;
   final double animationProgress;
 
-  const SearchField({
+  const new({
     super.key,
     required this.buttonSize,
     required this.controller,

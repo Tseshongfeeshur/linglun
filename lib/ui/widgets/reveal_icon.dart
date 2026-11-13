@@ -6,7 +6,7 @@ class RRectHoleClipper extends CustomClipper<Path> {
 
   final bool inverted; // true: 保留孔外
 
-  const RRectHoleClipper({required this.hole, required this.inverted});
+  const new({required this.hole, required this.inverted});
 
   @override
   Path getClip(Size size) {
@@ -35,7 +35,7 @@ class RevealIcon extends StatelessWidget {
   final Curve? curve;
   final double? size;
 
-  const RevealIcon({
+  const new({
     super.key,
     required this.isFilled,
     required this.outlineIcon,

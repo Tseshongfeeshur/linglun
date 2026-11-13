@@ -6,7 +6,7 @@ class PageInfo {
   final IconData selectedIcon;
   final Widget page;
 
-  PageInfo({
+  new({
     required this.title,
     required this.icon,
     required this.selectedIcon,
