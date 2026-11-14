@@ -20,6 +20,9 @@ class Frame extends StatefulWidget {
 
 class _FrameState extends State<Frame> {
   int pageIndex = 0;
+  bool drawerExtended = false;
+  void onExtendingChange([bool? value]) =>
+      setState(() => drawerExtended = value ?? !drawerExtended);
   void onPageSwitched(int index) => setState(() => pageIndex = index);
 
   final List<PageInfo> pages = [
@@ -63,151 +66,343 @@ class _FrameState extends State<Frame> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: Row(
-        children: [
-          if (MediaQuery.sizeOf(context).width >= 600)
-            _AppDrawer(
+    return Stack(
+      children: [
+        Row(
+          children: [
+            if (MediaQuery.sizeOf(context).width >= 600)
+              if (MediaQuery.sizeOf(context).width >= 840)
+                _DesktopDrawer(
+                  pageIndex: pageIndex,
+                  pages: pages,
+                  onSelected: onPageSwitched,
+                  extended: drawerExtended,
+                  isWideScreen: true,
+                  onExtendingChange: onExtendingChange,
+                )
+              else
+                const SizedBox(width: 16 * 2 + 24),
+            Expanded(
+              child: IndexedStack(
+                index: pageIndex,
+                children: pages.map((pageInfo) => pageInfo.page).toList(),
+              ),
+            ),
+          ],
+        ),
+        if (MediaQuery.sizeOf(context).width >= 600 &&
+            MediaQuery.sizeOf(context).width <= 840)
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: _TabletDrawer(
               pageIndex: pageIndex,
               pages: pages,
               onSelected: onPageSwitched,
-              extended: MediaQuery.sizeOf(context).width >= 840,
-            ),
-          Expanded(
-            child: IndexedStack(
-              index: pageIndex,
-              children: pages.map((pageInfo) => pageInfo.page).toList(),
+              extended: drawerExtended,
+              isWideScreen: false,
+              onExtendingChange: onExtendingChange,
             ),
           ),
-        ],
-      ),
-      bottomNavigationBar: MediaQuery.sizeOf(context).width < 600
-          ? AppNavBar(
-              pageIndex: pageIndex,
-              pages: pages,
-              onDestinationSelected: onPageSwitched,
-            )
-          : null,
+      ],
     );
   }
 }
 
-class _AppDrawer extends StatefulWidget {
+class _PhoneDrawer extends StatefulWidget {
+  final int pageIndex;
+  final List<PageInfo> pages;
+  final ValueChanged<int> onSelected;
+
+  const new({
+    required this.pageIndex,
+    required this.pages,
+    required this.onSelected,
+  });
+
+  @override
+  State<_PhoneDrawer> createState() => _PhoneDrawerState();
+}
+
+class _PhoneDrawerState extends State<_PhoneDrawer> {
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      width: 220,
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.menu_open),
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              children: List.generate(
+                widget.pages.length,
+                (currentIndex) => ListTile(
+                  leading: RevealIcon(
+                    isFilled: widget.pageIndex == currentIndex,
+                    outlineIcon: widget.pages[currentIndex].icon,
+                    filledIcon: widget.pages[currentIndex].selectedIcon,
+                  ),
+                  title: Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Text(
+                      widget.pages[currentIndex].title,
+                      style: const TextStyle(overflow: TextOverflow.clip),
+                      maxLines: 1,
+                    ),
+                  ),
+                  onTap: () => widget.onSelected(currentIndex),
+                  selected: widget.pageIndex == currentIndex,
+                  selectedTileColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHigh,
+                  contentPadding: const EdgeInsets.only(left: 16),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabletDrawer extends StatefulWidget {
   final int pageIndex;
   final List<PageInfo> pages;
   final ValueChanged<int> onSelected;
   final bool extended;
+  final bool isWideScreen;
+  final Function onExtendingChange;
 
   const new({
     required this.pageIndex,
     required this.pages,
     required this.onSelected,
     required this.extended,
+    required this.isWideScreen,
+    required this.onExtendingChange,
   });
 
   @override
-  State<_AppDrawer> createState() => _AppDrawerState();
+  State<_PhoneDrawer> createState() => _PhoneDrawerState();
 }
 
-class _AppDrawerState extends State<_AppDrawer> {
-  // TODO: 让 laptop 时展开动作浮动，desktop 时展开常驻
-  bool _isExtended = true;
+class _TabletDrawerState extends State<_TabletDrawer> {
+  // TODO: 使用 provider 重构 drawer
 
   @override
   Widget build(BuildContext context) {
-    return Animate(target: _isExtended ? 1 : 0).custom(
+    return Animate(
+      onInit: (controller) => controller.value = widget.extended ? 1 : 0,
+      target: widget.extended ? 1 : 0,
+    ).custom(
       duration: 200.ms,
       curve: Curves.easeInOutCubic,
-      builder: (context, animationProgress, child) => Drawer(
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-        width: (16 * 2 + 24) + (220 - (16 * 2 + 24)) * animationProgress,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: IconButton(
-                  onPressed: () => setState(() => _isExtended = !_isExtended),
-                  icon: RevealIcon(
-                    isFilled: _isExtended,
-                    outlineIcon: Icons.menu,
-                    filledIcon: Icons.menu_open,
-                    outlineIconColor: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant,
-                    filledIconColor: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant,
-                  ),
-                ),
+      builder: (context, animationProgress, child) => Stack(
+        children: [
+          if (!widget.isWideScreen)
+            IgnorePointer(
+              ignoring: true,
+              child: Container(
+                width: MediaQuery.sizeOf(context).width,
+                height: MediaQuery.sizeOf(context).height,
+                color: Theme.of(context).colorScheme.onSurface
+                    .withAlpha((100 * animationProgress).toInt().clamp(0, 100)),
               ),
             ),
-            Expanded(
-              child: ListView(
-                children: List.generate(
-                  widget.pages.length,
-                  (currentIndex) => ListTile(
-                    leading: RevealIcon(
-                      isFilled: widget.pageIndex == currentIndex,
-                      outlineIcon: widget.pages[currentIndex].icon,
-                      filledIcon: widget.pages[currentIndex].selectedIcon,
-                    ),
-                    title: Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: Text(
-                        widget.pages[currentIndex].title,
-                        style: const TextStyle(overflow: TextOverflow.clip),
-                        maxLines: 1,
+          TapRegion(
+            onTapOutside: widget.isWideScreen
+                ? null
+                : (event) => widget.onExtendingChange(false),
+            child: Drawer(
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+              width: (16 * 2 + 24) + (220 - (16 * 2 + 24)) * animationProgress,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+              ),
+              child: Column(
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: IconButton(
+                        onPressed: () => widget.onExtendingChange(),
+                        icon: RevealIcon(
+                          isFilled: widget.extended,
+                          outlineIcon: Icons.menu,
+                          filledIcon: Icons.menu_open,
+                          outlineIconColor: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                          filledIconColor: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
                       ),
                     ),
-                    onTap: () => widget.onSelected(currentIndex),
-                    selected: widget.pageIndex == currentIndex,
-                    selectedTileColor: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHigh,
-                    contentPadding: const EdgeInsets.only(left: 16),
                   ),
-                ),
+                  Expanded(
+                    child: ListView(
+                      children: List.generate(
+                        widget.pages.length,
+                        (currentIndex) => ListTile(
+                          leading: RevealIcon(
+                            isFilled: widget.pageIndex == currentIndex,
+                            outlineIcon: widget.pages[currentIndex].icon,
+                            filledIcon: widget.pages[currentIndex].selectedIcon,
+                          ),
+                          title: Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Text(
+                              widget.pages[currentIndex].title,
+                              style: const TextStyle(
+                                overflow: TextOverflow.clip,
+                              ),
+                              maxLines: 1,
+                            ),
+                          ),
+                          onTap: () => widget.onSelected(currentIndex),
+                          selected: widget.pageIndex == currentIndex,
+                          selectedTileColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHigh,
+                          contentPadding: const EdgeInsets.only(left: 16),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class AppNavBar extends StatelessWidget {
+class _DesktopDrawer extends StatefulWidget {
   final int pageIndex;
   final List<PageInfo> pages;
-  final ValueChanged<int> onDestinationSelected;
+  final ValueChanged<int> onSelected;
+  final bool extended;
+  final bool isWideScreen;
+  final Function onExtendingChange;
 
   const new({
-    super.key,
     required this.pageIndex,
     required this.pages,
-    required this.onDestinationSelected,
+    required this.onSelected,
+    required this.extended,
+    required this.isWideScreen,
+    required this.onExtendingChange,
   });
 
   @override
+  State<_PhoneDrawer> createState() => _PhoneDrawerState();
+}
+
+class _DesktopDrawerState extends State<_TabletDrawer> {
+  // TODO: 让 laptop 时展开动作浮动，desktop 时展开常驻
+
+  @override
   Widget build(BuildContext context) {
-    return NavigationBar(
-      selectedIndex: pageIndex,
-      labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-      onDestinationSelected: onDestinationSelected,
-      destinations: List.generate(
-        pages.length,
-        (currentIndex) => NavigationDestination(
-          icon: RevealIcon(
-            isFilled: pageIndex == currentIndex,
-            outlineIcon: pages[currentIndex].icon,
-            filledIcon: pages[currentIndex].selectedIcon,
+    return Animate(
+      onInit: (controller) => controller.value = widget.extended ? 1 : 0,
+      target: widget.extended ? 1 : 0,
+    ).custom(
+      duration: 200.ms,
+      curve: Curves.easeInOutCubic,
+      builder: (context, animationProgress, child) => Stack(
+        children: [
+          if (!widget.isWideScreen)
+            IgnorePointer(
+              ignoring: true,
+              child: Container(
+                width: MediaQuery.sizeOf(context).width,
+                height: MediaQuery.sizeOf(context).height,
+                color: Theme.of(context).colorScheme.onSurface
+                    .withAlpha((100 * animationProgress).toInt().clamp(0, 100)),
+              ),
+            ),
+          TapRegion(
+            onTapOutside: widget.isWideScreen
+                ? null
+                : (event) => widget.onExtendingChange(false),
+            child: Drawer(
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+              width: (16 * 2 + 24) + (220 - (16 * 2 + 24)) * animationProgress,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.zero,
+              ),
+              child: Column(
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: IconButton(
+                        onPressed: () => widget.onExtendingChange(),
+                        icon: RevealIcon(
+                          isFilled: widget.extended,
+                          outlineIcon: Icons.menu,
+                          filledIcon: Icons.menu_open,
+                          outlineIconColor: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                          filledIconColor: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      children: List.generate(
+                        widget.pages.length,
+                        (currentIndex) => ListTile(
+                          leading: RevealIcon(
+                            isFilled: widget.pageIndex == currentIndex,
+                            outlineIcon: widget.pages[currentIndex].icon,
+                            filledIcon: widget.pages[currentIndex].selectedIcon,
+                          ),
+                          title: Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: Text(
+                              widget.pages[currentIndex].title,
+                              style: const TextStyle(
+                                overflow: TextOverflow.clip,
+                              ),
+                              maxLines: 1,
+                            ),
+                          ),
+                          onTap: () => widget.onSelected(currentIndex),
+                          selected: widget.pageIndex == currentIndex,
+                          selectedTileColor: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHigh,
+                          contentPadding: const EdgeInsets.only(left: 16),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          label: pages[currentIndex].title,
-        ),
+        ],
       ),
     );
   }
