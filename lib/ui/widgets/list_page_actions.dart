@@ -52,19 +52,16 @@ class _ListPageActionsState extends State<ListPageActions> {
     return Animate(target: isSearchBarExtended ? 1 : 0).custom(
       duration: 200.ms,
       curve: Curves.easeInOutCubic,
-      builder: (context, animationProgress, child) => Padding(
+      builder: (context, progress, child) => Padding(
         padding: EdgeInsets.symmetric(
-          horizontal: (searchBarPadding * animationProgress).clamp(
-            0,
-            searchBarPadding,
-          ),
+          horizontal: (searchBarPadding * progress).clamp(0, searchBarPadding),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             _Collapsible(
-              progress: animationProgress,
+              progress: progress,
               child: _SortButton(
                 buttonSize: buttonSize,
                 sortConfig: widget.sortConfig,
@@ -72,7 +69,7 @@ class _ListPageActionsState extends State<ListPageActions> {
               ),
             ),
             _Collapsible(
-              progress: animationProgress,
+              progress: progress,
               child: _CheckButton(buttonSize: buttonSize),
             ),
             _SearchField(
@@ -81,7 +78,7 @@ class _ListPageActionsState extends State<ListPageActions> {
               focusNode: searchBarFocusNode,
               searchBarPadding: searchBarPadding,
               extended: isSearchBarExtended,
-              animationProgress: animationProgress,
+              progress: progress,
             ),
           ],
         ),
@@ -206,7 +203,7 @@ class _SearchField extends StatefulWidget {
   final FocusNode focusNode;
   final double searchBarPadding;
   final bool extended;
-  final double animationProgress;
+  final double progress;
 
   const new({
     required this.buttonSize,
@@ -214,7 +211,7 @@ class _SearchField extends StatefulWidget {
     required this.focusNode,
     required this.searchBarPadding,
     required this.extended,
-    required this.animationProgress,
+    required this.progress,
   });
 
   @override
@@ -236,12 +233,11 @@ class _SearchFieldState extends State<_SearchField> {
                     : (MediaQuery.sizeOf(context).width -
                               widget.searchBarPadding * 2) -
                           widget.buttonSize.width) *
-                widget.animationProgress,
+                widget.progress,
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainer.withAlpha(
-            (255 * widget.animationProgress).toInt().clamp(0, 255),
-          ),
+          color: Theme.of(context).colorScheme.surfaceContainer
+              .withAlpha((255 * widget.progress).toInt().clamp(0, 255)),
           borderRadius: BorderRadius.circular(999),
         ),
         child: Stack(
@@ -268,7 +264,7 @@ class _SearchFieldState extends State<_SearchField> {
                   hintText: '搜索',
                   hintStyle: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface
-                        .withAlpha((160 * widget.animationProgress).toInt()),
+                        .withAlpha((160 * widget.progress).toInt()),
                     fontSize: 16,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -280,9 +276,9 @@ class _SearchFieldState extends State<_SearchField> {
             Positioned(
               right: 0,
               child: Opacity(
-                opacity: ((widget.animationProgress - 0.5) / 0.5).clamp(0, 1),
+                opacity: ((widget.progress - 0.5) / 0.5).clamp(0, 1),
                 child: IgnorePointer(
-                  ignoring: widget.animationProgress < 0.5,
+                  ignoring: widget.progress < 0.5,
                   child: IconButton(
                     onPressed: () {
                       if (widget.controller.text.isEmpty) {

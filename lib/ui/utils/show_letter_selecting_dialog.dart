@@ -1,4 +1,4 @@
-import 'package:linglun/data/models/track_info_model.dart';
+import 'package:linglun/data/models/track_info.dart';
 import 'package:material_ui/material_ui.dart';
 
 Future<String?> showLetterSelectingDialog(

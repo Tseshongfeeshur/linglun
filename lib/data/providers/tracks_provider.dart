@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:linglun/data/models/track_info_model.dart';
+import 'package:linglun/data/models/track_info.dart';
 
 class _TracksNotifer extends Notifier<List<TrackInfo>> {
   @override

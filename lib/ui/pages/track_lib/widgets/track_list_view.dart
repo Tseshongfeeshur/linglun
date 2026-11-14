@@ -4,7 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:linglun/ui/utils/show_music_info_bottom_sheet.dart';
 import 'package:linglun/ui/utils/show_letter_selecting_dialog.dart';
 
-import 'package:linglun/data/models/track_info_model.dart';
+import 'package:linglun/data/models/track_info.dart';
 
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 

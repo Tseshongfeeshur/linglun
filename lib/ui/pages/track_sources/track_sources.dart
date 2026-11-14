@@ -1,10 +1,13 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:linglun/data/providers/tracks_provider.dart';
+import 'package:linglun/data/models/window_layout.dart';
+import 'package:linglun/data/providers/drawer_provider.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 
-import 'package:linglun/data/models/track_info_model.dart';
+import 'package:linglun/data/providers/tracks_provider.dart';
+import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/track_scanner/utils/get_platform_music_path.dart';
+import 'package:linglun/ui/widgets/reveal_icon.dart';
 import 'package:linglun/ui/pages/track_sources/utils/show_scanning_dialog.dart';
 
 class TrackSources extends ConsumerStatefulWidget {
@@ -34,8 +37,31 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
 
   @override
   Widget build(BuildContext context) {
+    final drawerState = ref.watch<DrawerState>(drawerProvider);
+    final layout = context.layout;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('歌曲来源')),
+      appBar: AppBar(
+        leading: layout == WindowLayout.phone
+            ? IconButton(
+                onPressed: () => ref
+                    .read(drawerProvider.notifier)
+                    .switchExtendingAt(layout, target: true),
+                icon: RevealIcon(
+                  isFilled: drawerState.extendedAt(layout),
+                  outlineIcon: Icons.menu,
+                  filledIcon: Icons.menu_open,
+                  outlineIconColor: Theme.of(context)
+                      .colorScheme
+                      .onSurfaceVariant,
+                  filledIconColor: Theme.of(context)
+                      .colorScheme
+                      .onSurfaceVariant,
+                ),
+              )
+            : null,
+        title: const Text('歌曲来源'),
+      ),
       body: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 960),
         child: ListView(

@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:haudiotagger/haudiotagger.dart';
 
-import 'package:linglun/data/models/track_info_model.dart';
+import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/track_scanner/utils/string_to_latin.dart';
 import 'package:linglun/data/track_scanner/utils/artist_splitter.dart';
 

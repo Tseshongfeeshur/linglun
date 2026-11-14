@@ -1,4 +1,4 @@
-import 'package:linglun/data/models/track_info_model.dart';
+import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/track_scanner/track_scanner.dart';
 
 class ScanState {

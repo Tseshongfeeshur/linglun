@@ -1,5 +1,5 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:linglun/data/models/track_info_model.dart';
+import 'package:linglun/data/models/track_info.dart';
 
 enum TrackSort {
   titleInLatin('标题', Icons.title, true),
