@@ -6,7 +6,7 @@ class Playlist extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('播放列表')),
+      appBar: AppBar(title: const Text('歌单')),
       body: const Center(child: Text('Playlist')),
     );
   }

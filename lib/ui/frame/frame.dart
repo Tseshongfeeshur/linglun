@@ -42,7 +42,7 @@ class _FrameState extends State<Frame> {
       page: const ArtistLib(),
     ),
     PageInfo(
-      title: '播放列表',
+      title: '歌单',
       icon: Icons.queue_music_outlined,
       selectedIcon: Icons.queue_music,
       page: const Playlist(),
