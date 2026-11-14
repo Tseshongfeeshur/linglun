@@ -64,7 +64,10 @@ class RevealIcon extends StatelessWidget {
         ? (filledIconColor ?? colorScheme.primary)
         : (outlineIconColor ?? colorScheme.onSurfaceVariant);
 
-    return Animate(target: isFilled ? 0 : 1).custom(
+    return Animate(
+      onInit: (controller) => controller.value = isFilled ? 0 : 1,
+      target: isFilled ? 0 : 1,
+    ).custom(
       duration: duration ?? 200.ms,
       curve: curve ?? Curves.easeInOutCubic,
       builder: (context, value, child) {
