@@ -20,14 +20,13 @@ class TrackLib extends ConsumerStatefulWidget {
 
 class _TrackLibState extends ConsumerState<TrackLib> {
   SortConfig sortConfig = const SortConfig(TrackSort.titleInLatin, false);
-  late List<TrackInfo> originalMusicList;
 
   @override
   Widget build(BuildContext context) {
     final drawerState = ref.watch<DrawerState>(drawerProvider);
     final layout = context.layout;
 
-    List<TrackInfo> originalMusicList = ref.watch(tracksProvider);
+    final List<TrackInfo> originalMusicList = ref.watch(tracksProvider);
     Map<String, List<TrackInfo>> groupedMusicList = groupMusicList(
       sortMusicList(originalMusicList, sortConfig),
       sortConfig,
@@ -66,6 +65,7 @@ class _TrackLibState extends ConsumerState<TrackLib> {
           child: TrackListView(
             groupedMusicList: groupedMusicList,
             hasGroups: !groupedMusicList.keys.contains('default'),
+            descending: sortConfig.descending,
           ),
         ),
       ),

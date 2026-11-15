@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -13,11 +14,13 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 class TrackListView extends StatefulWidget {
   final Map<String, List<TrackInfo>> groupedMusicList;
   final bool hasGroups;
+  final bool descending;
 
   const new({
     super.key,
     required this.groupedMusicList,
     required this.hasGroups,
+    required this.descending,
   });
 
   @override
@@ -30,18 +33,21 @@ class _TrackListViewState extends State<TrackListView> {
   @override
   Widget build(BuildContext context) {
     if (widget.hasGroups) {
-      final List<String> keys = widget.groupedMusicList.keys.toList();
-      List<List<TrackInfo>> valuesList = widget.groupedMusicList.values
-          .toList();
+      final entries = widget.groupedMusicList.entries;
 
-      List<int> keyIndexList = [];
-      List<Object> items = [];
-      for (int i = 0; i < keys.length; i++) {
-        items.add(keys[i]);
-        items.addAll(valuesList[i]);
-        keyIndexList.add(
-          i == 0 ? 0 : keyIndexList.last + valuesList[i - 1].length + 1,
-        );
+      final List<Object> items = [];
+      final List<int> keyIndexList = [];
+
+      int index = 0;
+
+      for (final entry in entries) {
+        keyIndexList.add(index);
+        items.add(entry.key);
+
+        index++;
+
+        items.addAll(entry.value);
+        index += entry.value.length;
       }
 
       return Stack(
@@ -68,16 +74,18 @@ class _TrackListViewState extends State<TrackListView> {
               itemScrollController: itemScrollController,
             ),
           ),
-          Positioned(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: _LetterIndexRail(
-                existLetters: widget.groupedMusicList.keys.toList(),
-                itemScrollController: itemScrollController,
-                keyIndexList: keyIndexList,
+          if (widget.hasGroups)
+            Positioned(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: LetterIndexRail(
+                  existLetters: widget.groupedMusicList.keys.toList(),
+                  itemScrollController: itemScrollController,
+                  keyIndexList: keyIndexList,
+                  descending: widget.descending,
+                ),
               ),
             ),
-          ),
         ],
       );
     } else {
@@ -88,164 +96,6 @@ class _TrackListViewState extends State<TrackListView> {
         ),
       );
     }
-  }
-}
-
-class _LetterIndexRail extends StatefulWidget {
-  const new({
-    required this.existLetters,
-    required this.itemScrollController,
-    required this.keyIndexList,
-  });
-
-  final List<String> existLetters;
-  final ItemScrollController itemScrollController;
-  final List<int> keyIndexList;
-
-  @override
-  State<_LetterIndexRail> createState() => _LetterIndexRailState();
-}
-
-class _LetterIndexRailState extends State<_LetterIndexRail> {
-  static const double letterHeight = 12;
-  static const double letterSinglePadding = 2;
-  static const double railOuterPadding = 6;
-
-  static const double hinterSize = 48;
-
-  bool isDragging = false;
-  double dragPosition = 0;
-  String letter = '';
-
-  void onPointer(double y) {
-    setState(() => dragPosition = y);
-    letter =
-        allLetters[((y - railOuterPadding) ~/
-                (letterHeight + letterSinglePadding * 2))
-            .clamp(0, allLetters.length - 1)];
-    final int index = widget.existLetters.indexOf(letter);
-    if (index == -1) return;
-    widget.itemScrollController.jumpTo(index: widget.keyIndexList[index]);
-  }
-
-  double hinterOffset(double y) {
-    final double min = -hinterSize / 2;
-    final double max =
-        (letterHeight + letterSinglePadding * 2) * allLetters.length +
-        railOuterPadding * 2 -
-        hinterSize / 2;
-
-    final double offset = y - hinterSize / 2;
-
-    if (offset < min) {
-      final double d = min - offset;
-      return min - 8 * (1 - math.exp(-d / 20));
-    } else if (offset > max) {
-      final double d = offset - max;
-      return max + 8 * (1 - math.exp(-d / 20));
-    }
-
-    return offset;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 8,
-      children: [
-        if (isDragging)
-          Transform.translate(
-            offset: Offset(0, hinterOffset(dragPosition)),
-            child: Container(
-              width: hinterSize,
-              height: hinterSize,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Center(
-                child: Text(
-                  letter,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSecondaryContainer
-                        .withAlpha(
-                          widget.existLetters.contains(letter) ? 255 : 120,
-                        ),
-                    fontSize: hinterSize / 2,
-                    fontWeight: const FontWeight(600),
-                    height: 1,
-                  ),
-                  maxLines: 1,
-                ),
-              ),
-            ),
-          ),
-        GestureDetector(
-          // 令内部 padding 响应事件
-          behavior: HitTestBehavior.opaque,
-          onTapUp: (details) {
-            onPointer(details.localPosition.dy);
-          },
-          onVerticalDragUpdate: (details) {
-            isDragging = true;
-            onPointer(details.localPosition.dy);
-          },
-          onVerticalDragStart: (details) {
-            isDragging = true;
-            onPointer(details.localPosition.dy);
-          },
-          onVerticalDragEnd: (_) => setState(() => isDragging = false),
-          onVerticalDragCancel: () => setState(() => isDragging = false),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainer,
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                ),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 2,
-                  vertical: railOuterPadding,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: allLetters
-                      .map(
-                        (letter) => Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: letterSinglePadding,
-                          ),
-                          child: Text(
-                            letter,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface
-                                  .withAlpha(
-                                    widget.existLetters.contains(letter)
-                                        ? 255
-                                        : 120,
-                                  ),
-                              fontSize: letterHeight,
-                              height: 1,
-                            ),
-                            maxLines: 1,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
   }
 }
 
