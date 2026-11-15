@@ -120,11 +120,8 @@ class _LetterIndexRailState extends State<_LetterIndexRail> {
   double dragPosition = 0;
   String letter = '#';
 
-  void onDraging(double y) {
-    setState(() {
-      dragPosition = y;
-      isDragging = true;
-    });
+  void onPointer(double y) {
+    setState(() => dragPosition = y);
     letter =
         allLetters[((y - railOuterPadding) ~/
                 (letterHeight + letterSinglePadding * 2))
@@ -193,10 +190,17 @@ class _LetterIndexRailState extends State<_LetterIndexRail> {
             borderRadius: BorderRadius.circular(999),
           ),
           child: GestureDetector(
-            onVerticalDragUpdate: (details) =>
-                onDraging(details.localPosition.dy),
-            onVerticalDragStart: (details) =>
-                onDraging(details.localPosition.dy),
+            onTapUp: (details) {
+              onPointer(details.localPosition.dy);
+            },
+            onVerticalDragUpdate: (details) {
+              isDragging = true;
+              onPointer(details.localPosition.dy);
+            },
+            onVerticalDragStart: (details) {
+              isDragging = true;
+              onPointer(details.localPosition.dy);
+            },
             onVerticalDragEnd: (_) => setState(() => isDragging = false),
             onVerticalDragCancel: () => setState(() => isDragging = false),
             child: Padding(
