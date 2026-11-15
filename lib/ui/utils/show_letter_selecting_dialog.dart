@@ -1,19 +1,19 @@
-import 'package:linglun/data/models/track_info.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:linglun/data/models/track_info.dart';
+
+List<String> allLetters = [
+  '#',
+  ...List.generate(
+    26,
+    (index) => String.fromCharCode('A'.codeUnitAt(0) + index),
+  ),
+];
 
 Future<String?> showLetterSelectingDialog(
   BuildContext context,
   Map<String, List<TrackInfo>> groupedTrackList,
   String currentLetter,
 ) async {
-  List<String> allLetters = [
-    '#',
-    ...List.generate(
-      26,
-      (index) => String.fromCharCode('A'.codeUnitAt(0) + index),
-    ),
-  ];
-
   return showDialog<String>(
     context: context,
     builder: ((context) => AlertDialog(

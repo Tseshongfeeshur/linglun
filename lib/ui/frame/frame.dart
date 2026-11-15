@@ -95,7 +95,9 @@ class _FrameState extends ConsumerState<Frame> {
                   ),
                 ),
                 IgnorePointer(
-                  ignoring: true,
+                  ignoring:
+                      !(layout == WindowLayout.phone &&
+                          drawerState.extendedAt(layout)),
                   child: Container(
                     width: MediaQuery.sizeOf(context).width,
                     height: MediaQuery.sizeOf(context).height,

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -42,23 +44,44 @@ class _TrackListViewState extends State<TrackListView> {
         );
       }
 
-      return ScrollablePositionedList.builder(
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          switch (items[index]) {
-            case TrackInfo musicInfo:
-              return _MusicListItem(musicInfo: musicInfo);
-            case String letter:
-              return _MusicListGroupHead(
-                letter: letter,
-                groupedMusicList: widget.groupedMusicList,
-                itemScrollController: itemScrollController,
-                keyIndexList: keyIndexList,
-              );
-          }
-          return const SizedBox.shrink();
-        },
-        itemScrollController: itemScrollController,
+      return Stack(
+        children: [
+          ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context)
+                .copyWith(scrollbars: false),
+            child: ScrollablePositionedList.builder(
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                switch (items[index]) {
+                  case TrackInfo musicInfo:
+                    return _MusicListItem(musicInfo: musicInfo);
+                  case String letter:
+                    return _MusicListGroupHead(
+                      letter: letter,
+                      groupedMusicList: widget.groupedMusicList,
+                      itemScrollController: itemScrollController,
+                      keyIndexList: keyIndexList,
+                    );
+                }
+                return const SizedBox.shrink();
+              },
+              itemScrollController: itemScrollController,
+            ),
+          ),
+          Positioned(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: _LetterIndexRail(
+                  existLetters: widget.groupedMusicList.keys.toList(),
+                  itemScrollController: itemScrollController,
+                  keyIndexList: keyIndexList,
+                ),
+              ),
+            ),
+          ),
+        ],
       );
     } else {
       return ListView.builder(
@@ -68,6 +91,145 @@ class _TrackListViewState extends State<TrackListView> {
         ),
       );
     }
+  }
+}
+
+class _LetterIndexRail extends StatefulWidget {
+  const new({
+    required this.existLetters,
+    required this.itemScrollController,
+    required this.keyIndexList,
+  });
+
+  final List<String> existLetters;
+  final ItemScrollController itemScrollController;
+  final List<int> keyIndexList;
+
+  @override
+  State<_LetterIndexRail> createState() => _LetterIndexRailState();
+}
+
+class _LetterIndexRailState extends State<_LetterIndexRail> {
+  static const double letterHeight = 12;
+  static const double letterSinglePadding = 2;
+  static const double railOuterPadding = 6;
+
+  static const double hinterSize = 36;
+
+  bool isDragging = false;
+  double dragPosition = 0;
+  String letter = '#';
+
+  void onDraging(double y) {
+    setState(() {
+      dragPosition = y;
+      isDragging = true;
+    });
+    letter =
+        allLetters[((y - railOuterPadding) ~/
+                (letterHeight + letterSinglePadding * 2))
+            .clamp(0, allLetters.length - 1)];
+    final int index = widget.existLetters.indexOf(letter);
+    if (index == -1) return;
+    widget.itemScrollController.jumpTo(index: widget.keyIndexList[index]);
+  }
+
+  double hinterOffset(double y) {
+    final double min = -hinterSize / 2;
+    final double max =
+        (letterHeight + letterSinglePadding * 2) * allLetters.length +
+        railOuterPadding * 2 -
+        hinterSize / 2;
+
+    final double offset = y - hinterSize / 2;
+
+    if (offset < min) {
+      final double d = min - offset;
+      return min - 8 * (1 - math.exp(-d / 20));
+    } else if (offset > max) {
+      final double d = offset - max;
+      return max + 8 * (1 - math.exp(-d / 20));
+    }
+
+    return offset;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 8,
+      children: [
+        if (isDragging)
+          Transform.translate(
+            offset: Offset(0, hinterOffset(dragPosition)),
+            child: Container(
+              width: hinterSize,
+              height: hinterSize,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Center(
+                child: Text(
+                  letter,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    fontWeight: const FontWeight(600),
+                    height: 1,
+                  ),
+                  maxLines: 1,
+                ),
+              ),
+            ),
+          ),
+        Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainer,
+            border: Border.all(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            ),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: GestureDetector(
+            onVerticalDragUpdate: (details) =>
+                onDraging(details.localPosition.dy),
+            onVerticalDragStart: (details) =>
+                onDraging(details.localPosition.dy),
+            onVerticalDragEnd: (_) => setState(() => isDragging = false),
+            onVerticalDragCancel: () => setState(() => isDragging = false),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 2,
+                vertical: railOuterPadding,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: allLetters
+                    .map(
+                      (letter) => Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: letterSinglePadding,
+                        ),
+                        child: Text(
+                          letter,
+                          style: const TextStyle(
+                            fontSize: letterHeight,
+                            height: 1,
+                          ),
+                          maxLines: 1,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
