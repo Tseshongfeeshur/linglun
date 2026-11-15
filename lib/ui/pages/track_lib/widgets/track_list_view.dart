@@ -71,13 +71,10 @@ class _TrackListViewState extends State<TrackListView> {
           Positioned(
             child: Align(
               alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 6),
-                child: _LetterIndexRail(
-                  existLetters: widget.groupedMusicList.keys.toList(),
-                  itemScrollController: itemScrollController,
-                  keyIndexList: keyIndexList,
-                ),
+              child: _LetterIndexRail(
+                existLetters: widget.groupedMusicList.keys.toList(),
+                itemScrollController: itemScrollController,
+                keyIndexList: keyIndexList,
               ),
             ),
           ),
@@ -114,11 +111,11 @@ class _LetterIndexRailState extends State<_LetterIndexRail> {
   static const double letterSinglePadding = 2;
   static const double railOuterPadding = 6;
 
-  static const double hinterSize = 36;
+  static const double hinterSize = 48;
 
   bool isDragging = false;
   double dragPosition = 0;
-  String letter = '#';
+  String letter = '';
 
   void onPointer(double y) {
     setState(() => dragPosition = y);
@@ -172,7 +169,11 @@ class _LetterIndexRailState extends State<_LetterIndexRail> {
                 child: Text(
                   letter,
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    color: Theme.of(context).colorScheme.onSecondaryContainer
+                        .withAlpha(
+                          widget.existLetters.contains(letter) ? 255 : 120,
+                        ),
+                    fontSize: hinterSize / 2,
                     fontWeight: const FontWeight(600),
                     height: 1,
                   ),
@@ -181,53 +182,64 @@ class _LetterIndexRailState extends State<_LetterIndexRail> {
               ),
             ),
           ),
-        Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainer,
-            border: Border.all(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            ),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: GestureDetector(
-            onTapUp: (details) {
-              onPointer(details.localPosition.dy);
-            },
-            onVerticalDragUpdate: (details) {
-              isDragging = true;
-              onPointer(details.localPosition.dy);
-            },
-            onVerticalDragStart: (details) {
-              isDragging = true;
-              onPointer(details.localPosition.dy);
-            },
-            onVerticalDragEnd: (_) => setState(() => isDragging = false),
-            onVerticalDragCancel: () => setState(() => isDragging = false),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 2,
-                vertical: railOuterPadding,
+        GestureDetector(
+          // 令内部 padding 响应事件
+          behavior: HitTestBehavior.opaque,
+          onTapUp: (details) {
+            onPointer(details.localPosition.dy);
+          },
+          onVerticalDragUpdate: (details) {
+            isDragging = true;
+            onPointer(details.localPosition.dy);
+          },
+          onVerticalDragStart: (details) {
+            isDragging = true;
+            onPointer(details.localPosition.dy);
+          },
+          onVerticalDragEnd: (_) => setState(() => isDragging = false),
+          onVerticalDragCancel: () => setState(() => isDragging = false),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                ),
+                borderRadius: BorderRadius.circular(999),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: allLetters
-                    .map(
-                      (letter) => Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: letterSinglePadding,
-                        ),
-                        child: Text(
-                          letter,
-                          style: const TextStyle(
-                            fontSize: letterHeight,
-                            height: 1,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 2,
+                  vertical: railOuterPadding,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: allLetters
+                      .map(
+                        (letter) => Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: letterSinglePadding,
                           ),
-                          maxLines: 1,
+                          child: Text(
+                            letter,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface
+                                  .withAlpha(
+                                    widget.existLetters.contains(letter)
+                                        ? 255
+                                        : 120,
+                                  ),
+                              fontSize: letterHeight,
+                              height: 1,
+                            ),
+                            maxLines: 1,
+                          ),
                         ),
-                      ),
-                    )
-                    .toList(),
+                      )
+                      .toList(),
+                ),
               ),
             ),
           ),
