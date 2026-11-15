@@ -1,5 +1,6 @@
 import 'package:linglun/data/models/window_layout.dart';
 import 'package:linglun/data/providers/drawer_provider.dart';
+import 'package:linglun/ui/utils/show_snack_bar.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -116,23 +117,45 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
               title: const Text('添加文件夹'),
               onTap: () async {
                 String? path = await FilePicker.getDirectoryPath();
-                if (path != null) {
-                  setState(() => userPaths.addAll({path: true}));
+                if (path == null) {
+                  if (context.mounted) {
+                    showSnackBar(context, Icons.warning, '未选择任何文件夹');
+                  }
+                  return;
                 }
+                setState(() => userPaths.addAll({path: true}));
               },
             ),
             ...userPaths.keys.map(
-              (element) => CheckboxListTile(
-                secondary: const Icon(Icons.folder),
-                title: Text(element),
-                value: userPaths[element],
-                onChanged: (value) {
-                  setState(() {
-                    userPaths[element] = value ?? false;
-                    // userPaths.addAll({path: value ?? false});
-                  });
-                },
-                enabled: userPaths[element] != null,
+              (path) => Dismissible(
+                key: Key(path),
+                background: Container(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: Icon(
+                        Icons.delete_forever,
+                        color: Theme.of(context).colorScheme.onErrorContainer,
+                      ),
+                    ),
+                  ),
+                ),
+                direction: DismissDirection.endToStart,
+                onDismissed: (_) => setState(() => userPaths.remove(path)),
+                child: CheckboxListTile(
+                  secondary: const Icon(Icons.folder),
+                  title: Text(path),
+                  value: userPaths[path],
+                  onChanged: (value) {
+                    setState(() {
+                      userPaths[path] = value ?? false;
+                      // userPaths.addAll({path: value ?? false});
+                    });
+                  },
+                  enabled: userPaths[path] != null,
+                ),
               ),
             ),
           ],
