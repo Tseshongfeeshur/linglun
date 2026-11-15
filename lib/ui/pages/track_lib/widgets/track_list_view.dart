@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
