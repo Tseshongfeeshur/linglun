@@ -311,7 +311,7 @@ constexpr const wchar_t kWindowClassName[] = L"LINGLUN_WIN32_WINDOW";
 
 /// Minimum window size in logical (96-DPI) pixels, client area.
 constexpr int kMinClientWidth = 300;
-constexpr int kMinClientHeight = 400;
+constexpr int kMinClientHeight = 480;
 
 /// Where window placement is persisted (HKCU).
 constexpr const wchar_t kWindowStateRegKey[] = L"Software\\linglun\\Window";

@@ -163,11 +163,11 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          final List<TrackInfo>? tracks = await showScanningDialog(context, [
+          final List<TrackInfo>? tracks = await showScanningDialog(context, {
             if (platformPath.ticked && platformPath.path != null)
               platformPath.path!,
             ...userPaths.keys.where((element) => userPaths[element] ?? false),
-          ], []);
+          }, []);
           ref.read(tracksProvider.notifier).update(tracks);
         },
         isExtended: true,

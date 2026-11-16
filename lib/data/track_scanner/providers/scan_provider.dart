@@ -1,33 +1,47 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/track_scanner/models/scan_state.dart';
 import 'package:linglun/data/track_scanner/track_scanner.dart';
+import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
+import 'package:linglun/data/track_scanner/utils/platforms/android_file_utils.dart';
+import 'package:linglun/data/track_scanner/utils/platforms/linux_file_utils.dart';
 
 class _ScanNotifier extends Notifier<ScanState> {
   @override
   ScanState build() {
-    return const ScanState();
+    return ScanState();
   }
 
   Future<void> startScan(
-    List<String> pathsToDiscover,
+    Set<String> pathsToDiscover,
     List<TrackInfo> existing,
   ) async {
     final TrackScanner trackScanner = TrackScanner();
 
-    final discoverResult = await trackScanner.discover(pathsToDiscover);
-    if (!ref.mounted) return;
+    PlatformFileUtils? utils;
+    if (Platform.isLinux) {
+      utils = LinuxFileUtils();
+    } else if (Platform.isAndroid) {
+      utils = AndroidFileUtils();
+    }
 
-    final tracksToScan = discoverResult.paths;
-    state = state.copyWith(
-      discoverErrors: discoverResult.errorPaths,
-      discoveredCounter: tracksToScan.length,
-    );
-
-    final scanStream = trackScanner.scan(tracksToScan, existing);
-    await for (final ScanEvent event in scanStream) {
+    final discoverStream = trackScanner.discover(utils, pathsToDiscover);
+    await for (final event in discoverStream) {
       if (!ref.mounted) break;
-      state = state.apply(event);
+      state = state.applyDiscover(event);
+    }
+
+    List<FileDiscovered> tracksToParse = [];
+    if (ref.mounted) {
+      tracksToParse = state.discoverResult;
+    }
+
+    final parseStream = trackScanner.parse(utils, tracksToParse, existing);
+    await for (final ParseEvent event in parseStream) {
+      if (!ref.mounted) break;
+      state = state.applyParse(event);
     }
   }
 }

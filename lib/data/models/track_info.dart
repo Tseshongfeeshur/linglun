@@ -11,6 +11,7 @@ class TrackInfo {
   final String albumInLatin;
 
   final String path;
+  final String fileName;
 
   final int sizeBytes;
   final int durationMs;
@@ -28,6 +29,7 @@ class TrackInfo {
     this.album,
     required this.albumInLatin,
     required this.path,
+    required this.fileName,
     required this.sizeBytes,
     required this.durationMs,
     required this.editTime,

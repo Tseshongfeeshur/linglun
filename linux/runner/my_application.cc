@@ -162,7 +162,7 @@
 #define DEFAULT_WIDTH 840
 #define DEFAULT_HEIGHT 600
 #define MIN_WIDTH 300
-#define MIN_HEIGHT 400
+#define MIN_HEIGHT 480
 // ---------------------------------------------------------------------------
 
 struct _MyApplication {

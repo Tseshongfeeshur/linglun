@@ -1,71 +1,93 @@
-import 'package:linglun/data/models/track_info.dart';
+import 'package:path/path.dart' as p;
 import 'package:linglun/data/track_scanner/track_scanner.dart';
 
 class ScanState {
-  final List<String> discoverErrors;
-  final List<String> scanErrors;
-  final int scannedCounter;
-  final int updatedCounter;
-  final int skippedCounter;
-  final int discoveredCounter;
-  final String? currentScanning;
-  final List<TrackInfo>? scanResult;
+  final List<FileDiscovered> discoverResult;
+  final List<FileDiscoveredError> discoverErrors;
+  final bool discoverFinished;
 
-  const new({
+  final List<TrackParsed> parseUpdates;
+  final List<TrackSkipped> parseSkips;
+  final List<TrackParsedError> parseErrors;
+  final bool parseFinished;
+
+  final String? current;
+
+  new({
+    this.discoverResult = const [],
     this.discoverErrors = const [],
-    this.scanErrors = const [],
-    this.scannedCounter = 0,
-    this.updatedCounter = 0,
-    this.skippedCounter = 0,
-    this.discoveredCounter = 0,
-    this.currentScanning,
-    this.scanResult,
+    this.discoverFinished = false,
+
+    this.parseUpdates = const [],
+    this.parseSkips = const [],
+    this.parseErrors = const [],
+    this.parseFinished = false,
+
+    this.current,
   });
 
   ScanState copyWith({
-    List<String>? discoverErrors,
-    List<String>? scanErrors,
-    int? scannedCounter,
-    int? updatedCounter,
-    int? skippedCounter,
-    int? discoveredCounter,
-    String? currentScanning,
-    List<TrackInfo>? scanResult,
+    List<FileDiscovered>? discoverResult,
+    List<FileDiscoveredError>? discoverErrors,
+    bool? discoverFinished,
+
+    List<TrackParsed>? parseUpdates,
+    List<TrackSkipped>? parseSkips,
+    List<TrackParsedError>? parseErrors,
+    bool? parseFinished,
+
+    String? current,
   }) {
     return ScanState(
+      discoverResult: discoverResult ?? this.discoverResult,
       discoverErrors: discoverErrors ?? this.discoverErrors,
-      scanErrors: scanErrors ?? this.scanErrors,
-      scannedCounter: scannedCounter ?? this.scannedCounter,
-      updatedCounter: updatedCounter ?? this.updatedCounter,
-      skippedCounter: skippedCounter ?? this.skippedCounter,
-      discoveredCounter: discoveredCounter ?? this.discoveredCounter,
-      currentScanning: currentScanning ?? this.currentScanning,
-      scanResult: scanResult ?? this.scanResult,
+      discoverFinished: discoverFinished ?? this.discoverFinished,
+
+      parseUpdates: parseUpdates ?? this.parseUpdates,
+      parseSkips: parseSkips ?? this.parseSkips,
+      parseErrors: parseErrors ?? this.parseErrors,
+      parseFinished: parseFinished ?? this.parseFinished,
+
+      current: current ?? this.current,
     );
   }
 
-  ScanState apply(ScanEvent event) {
+  ScanState applyDiscover(DiscoverEvent event) {
     switch (event) {
-      case TrackScanned():
+      case FileDiscovered():
         return copyWith(
-          scannedCounter: scannedCounter + 1,
-          updatedCounter: updatedCounter + 1,
-          currentScanning: event.track.path,
+          discoverResult: [...discoverResult, event],
+          current: event.name,
+        );
+      case FileDiscoveredError():
+        return copyWith(
+          discoverErrors: [...discoverErrors, event],
+          current: p.basename(event.path),
+        );
+      case FileDiscoveredFinish():
+        return copyWith(discoverFinished: true);
+    }
+  }
+
+  ScanState applyParse(ParseEvent event) {
+    switch (event) {
+      case TrackParsed():
+        return copyWith(
+          parseUpdates: [...parseUpdates, event],
+          current: event.track.fileName,
         );
       case TrackSkipped():
         return copyWith(
-          scannedCounter: scannedCounter + 1,
-          skippedCounter: skippedCounter + 1,
-          currentScanning: event.path,
+          parseSkips: [...parseSkips, event],
+          current: event.track.fileName,
         );
-      case TrackScannedError():
+      case TrackParsedError():
         return copyWith(
-          scannedCounter: scannedCounter + 1,
-          currentScanning: event.path,
-          scanErrors: [...scanErrors, '${event.path}: ${event.detail}'],
+          parseErrors: [...parseErrors, event],
+          current: event.file.name,
         );
-      case TrackScannedFinish():
-        return copyWith(scanResult: event.tracks);
+      case TrackParsedFinish():
+        return copyWith(parseFinished: true);
     }
   }
 }

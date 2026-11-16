@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
 import 'package:path/path.dart' as p;
 import 'package:haudiotagger/haudiotagger.dart';
 
@@ -8,39 +8,24 @@ import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/track_scanner/utils/string_to_latin.dart';
 import 'package:linglun/data/track_scanner/utils/artist_splitter.dart';
 
-class TracksDiscovered {
-  final List<String> paths;
-  final List<String> errorPaths;
-  new({required this.paths, required this.errorPaths});
-}
+const _extensions = {
+  '.mp3',
+  '.flac',
+  '.m4a',
+  '.ogg',
+  '.opus',
+  '.wav',
+  '.aac',
+  '.wma',
+  '.ape',
+};
 
-sealed class ScanEvent {}
+sealed class DiscoverEvent {}
 
-class TrackScanned extends ScanEvent {
-  final TrackInfo track;
-  new({required this.track});
-}
-
-class TrackSkipped extends ScanEvent {
-  final String path;
-  new({required this.path});
-}
-
-class TrackScannedError extends ScanEvent {
-  final String path;
-  final String detail;
-  new({required this.path, required this.detail});
-}
-
-class TrackScannedFinish extends ScanEvent {
-  final List<TrackInfo> tracks;
-  new({required this.tracks});
-}
-
-class DiscoveredFile {
-  final Uri uri;
+class FileDiscovered extends DiscoverEvent {
+  final String uri;
   final String name;
-  final String sizeBytes;
+  final int sizeBytes;
   final DateTime editTime;
 
   new({
@@ -51,74 +36,90 @@ class DiscoveredFile {
   });
 }
 
-class PlatformFileUtil {}
+class FileDiscoveredError extends DiscoverEvent {
+  final String path;
+  final String detail;
+
+  new({required this.path, required this.detail});
+}
+
+class FileDiscoveredFinish extends DiscoverEvent {}
+
+sealed class ParseEvent {}
+
+class TrackParsed extends ParseEvent {
+  final TrackInfo track;
+  new({required this.track});
+}
+
+class TrackSkipped extends ParseEvent {
+  final TrackInfo track;
+  new({required this.track});
+}
+
+class TrackParsedError extends ParseEvent {
+  final FileDiscovered file;
+  final String detail;
+  new({required this.file, required this.detail});
+}
+
+class TrackParsedFinish extends ParseEvent {}
 
 class TrackScanner {
-  static const _extensions = {'.mp3', '.flac', '.m4a', '.ogg', '.opus', '.wav'};
+  Stream<DiscoverEvent> discover(
+    PlatformFileUtils? utils,
+    Set<String> rootPaths,
+  ) async* {
+    if (utils == null) return;
 
-  Future<TracksDiscovered> discover(List<String> rootPaths) async {
-    // TODO: 确保打断后能停止
-    final Set<String> paths = {};
-    final List<String> errorPaths = [];
-
-    for (final String path in rootPaths) {
-      final dir = Directory(path);
-      await for (final item
-          in dir.list(followLinks: false, recursive: true).handleError((
-            Object e,
-          ) {
-            if (e is FileSystemException) {
-              errorPaths.add(e.path ?? '');
-            } else {
-              throw e;
-            }
-          })) {
-        if (item is! File) continue;
-
-        final ext = p.extension(item.path).toLowerCase();
-        if (!_extensions.contains(ext)) continue;
-
-        paths.add(item.absolute.path);
+    final list = utils.discover(rootPaths);
+    await for (final item in list) {
+      switch (item) {
+        case FileDiscovered():
+          final ext = p.extension(item.name).toLowerCase();
+          if (!_extensions.contains(ext)) continue;
+          yield item;
+        case FileDiscoveredError():
+          yield item;
+        case FileDiscoveredFinish():
+          yield item;
       }
     }
-
-    return TracksDiscovered(paths: paths.toList(), errorPaths: errorPaths);
   }
 
-  Stream<ScanEvent> scan(List<String> paths, List<TrackInfo> existing) async* {
-    // TODO: 确保打断后能停止
+  Stream<ParseEvent> parse(
+    PlatformFileUtils? utils,
+    List<FileDiscovered> files,
+    List<TrackInfo> existing,
+  ) async* {
     // TODO: 需要处理条目存在但文件被移除的情况，添加 removed 字段
-    List<TrackInfo> tracks = [];
+    if (utils == null) return;
 
     Map<String, TrackInfo> existingMap = {
       for (final TrackInfo element in existing) element.path: element,
     };
 
-    for (final String path in paths) {
-      final File file = File(path);
-      final TrackInfo? existingTrack = existingMap[path];
-      FileStat? stat;
+    for (final FileDiscovered item in files) {
       Tag? tag;
+      final TrackInfo? existingTrack = existingMap[item.uri];
 
       try {
-        stat = await file.stat();
         if (existingTrack != null) {
-          if (existingTrack.editTime == stat.modified &&
-              existingTrack.sizeBytes == stat.size) {
-            tracks.add(existingTrack);
-            yield TrackSkipped(path: file.path);
+          if (existingTrack.editTime == item.editTime &&
+              existingTrack.sizeBytes == item.sizeBytes) {
+            yield TrackSkipped(track: existingTrack);
             continue;
           }
         }
-        tag = await Haudiotagger.read(file.path);
+        tag = await utils.parse(item);
       } catch (e) {
-        yield TrackScannedError(path: file.path, detail: e.toString());
+        yield TrackParsedError(file: item, detail: e.toString());
         continue;
       }
 
       String title = (() {
         String str = tag?.title ?? '';
-        if (str.isEmpty) str = p.basenameWithoutExtension(file.path);
+        if (str.isEmpty) str = p.basenameWithoutExtension(item.name);
         return str;
       })();
       List<String>? artists = (() {
@@ -139,17 +140,17 @@ class TrackScanner {
         artistsInLatin: artists?.join('/').toLatin() ?? '#',
         album: album,
         albumInLatin: album?.toLatin() ?? '#',
-        path: path,
-        sizeBytes: stat.size,
+        path: item.uri,
+        fileName: item.name,
+        sizeBytes: item.sizeBytes,
         durationMs: 1000 * (tag?.duration ?? 0),
         trackGainUpdated: false,
-        editTime: stat.modified,
+        editTime: item.editTime,
         playCount: existingTrack?.playCount ?? 0,
         addTime: existingTrack?.addTime ?? DateTime.now(),
       );
-      tracks.add(track);
-      yield TrackScanned(track: track);
+      yield TrackParsed(track: track);
     }
-    yield TrackScannedFinish(tracks: tracks);
+    yield TrackParsedFinish();
   }
 }

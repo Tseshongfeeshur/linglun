@@ -27,7 +27,7 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     // Minimum size, so the Flutter layout can't be crushed.
-    self.contentMinSize = NSSize(width: 300, height: 400)
+    self.contentMinSize = NSSize(width: 300, height: 480)
 
     // Remember position and size across launches (handled by AppKit).
     // First launch has no saved frame: use a sensible default, centered.

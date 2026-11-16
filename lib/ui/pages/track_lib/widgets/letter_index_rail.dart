@@ -7,6 +7,7 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:linglun/ui/utils/show_letter_selecting_dialog.dart';
 
 class LetterIndexRail extends StatefulWidget {
+  //TODO: 键盘弹出时隐藏字母滚动条
   const new({
     super.key,
     required this.existLetters,
