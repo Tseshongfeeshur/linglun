@@ -59,7 +59,8 @@ class _TrackLibState extends ConsumerState<TrackLib> {
           ),
         ],
       ),
-      body: Center(
+      body: Align(
+        alignment: AlignmentGeometry.topCenter,
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
           child: TrackListView(

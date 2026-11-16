@@ -71,62 +71,64 @@ class _AppDrawerState extends State<AppDrawer> {
                     widget.animationProgress,
       child: Material(
         color: Theme.of(context).colorScheme.surfaceContainer,
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: IconButton(
-                  onPressed: () => widget.onTapSwitch(),
-                  icon: RevealIcon(
-                    isFilled: widget.extended,
-                    outlineIcon: Icons.menu,
-                    filledIcon: Icons.menu_open,
-                    outlineIconColor: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant,
-                    filledIconColor: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant,
+        child: SafeArea(
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: IconButton(
+                    onPressed: () => widget.onTapSwitch(),
+                    icon: RevealIcon(
+                      isFilled: widget.extended,
+                      outlineIcon: Icons.menu,
+                      filledIcon: Icons.menu_open,
+                      outlineIconColor: Theme.of(context)
+                          .colorScheme
+                          .onSurfaceVariant,
+                      filledIconColor: Theme.of(context)
+                          .colorScheme
+                          .onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),
-            ),
-            Expanded(
-              child: ListView(
-                children: List.generate(
-                  widget.pages.length,
-                  (currentIndex) => ListTile(
-                    leading: RevealIcon(
-                      isFilled: widget.pageIndex == currentIndex,
-                      outlineIcon: widget.pages[currentIndex].icon,
-                      filledIcon: widget.pages[currentIndex].selectedIcon,
-                    ),
-                    title: Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: Text(
-                        widget.pages[currentIndex].title,
-                        style: const TextStyle(overflow: TextOverflow.clip),
-                        maxLines: 1,
+              Expanded(
+                child: ListView(
+                  children: List.generate(
+                    widget.pages.length,
+                    (currentIndex) => ListTile(
+                      leading: RevealIcon(
+                        isFilled: widget.pageIndex == currentIndex,
+                        outlineIcon: widget.pages[currentIndex].icon,
+                        filledIcon: widget.pages[currentIndex].selectedIcon,
                       ),
+                      title: Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Text(
+                          widget.pages[currentIndex].title,
+                          style: const TextStyle(overflow: TextOverflow.clip),
+                          maxLines: 1,
+                        ),
+                      ),
+                      onTap: () {
+                        if (widget.layout != WindowLayout.desktop) {
+                          widget.onTapSwitch(false);
+                        }
+                        widget.onSelected(currentIndex);
+                      },
+                      selected: widget.pageIndex == currentIndex,
+                      selectedTileColor: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHigh,
+                      contentPadding: const EdgeInsets.only(left: 16),
                     ),
-                    onTap: () {
-                      if (widget.layout != WindowLayout.desktop) {
-                        widget.onTapSwitch(false);
-                      }
-                      widget.onSelected(currentIndex);
-                    },
-                    selected: widget.pageIndex == currentIndex,
-                    selectedTileColor: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHigh,
-                    contentPadding: const EdgeInsets.only(left: 16),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

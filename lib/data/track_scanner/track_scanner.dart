@@ -8,13 +8,13 @@ import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/track_scanner/utils/string_to_latin.dart';
 import 'package:linglun/data/track_scanner/utils/artist_splitter.dart';
 
-sealed class ScanEvent {}
-
 class TracksDiscovered {
   final List<String> paths;
   final List<String> errorPaths;
   new({required this.paths, required this.errorPaths});
 }
+
+sealed class ScanEvent {}
 
 class TrackScanned extends ScanEvent {
   final TrackInfo track;
@@ -36,6 +36,22 @@ class TrackScannedFinish extends ScanEvent {
   final List<TrackInfo> tracks;
   new({required this.tracks});
 }
+
+class DiscoveredFile {
+  final Uri uri;
+  final String name;
+  final String sizeBytes;
+  final DateTime editTime;
+
+  new({
+    required this.uri,
+    required this.name,
+    required this.sizeBytes,
+    required this.editTime,
+  });
+}
+
+class PlatformFileUtil {}
 
 class TrackScanner {
   static const _extensions = {'.mp3', '.flac', '.m4a', '.ogg', '.opus', '.wav'};

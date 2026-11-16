@@ -52,7 +52,7 @@ class _TrackListViewState extends State<TrackListView> {
         children: [
           ScrollConfiguration(
             behavior: ScrollConfiguration.of(context)
-                .copyWith(scrollbars: false),
+                .copyWith(scrollbars: !widget.hasGroups),
             child: ScrollablePositionedList.builder(
               itemCount: items.length,
               itemBuilder: (context, index) {
@@ -74,6 +74,9 @@ class _TrackListViewState extends State<TrackListView> {
           ),
           if (widget.hasGroups)
             Positioned(
+              top: 0,
+              bottom: 0,
+              right: 0,
               child: Align(
                 alignment: Alignment.centerRight,
                 child: LetterIndexRail(

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
@@ -25,10 +26,10 @@ class LetterIndexRail extends StatefulWidget {
 
 class _LetterIndexRailState extends State<LetterIndexRail> {
   static const double letterHeight = 12;
-  static const double letterSinglePadding = 2;
+  static const double letterSpacing = 6;
   static const double railOuterPadding = 6;
 
-  static const double hinterSize = 48;
+  static const double hinterSize = 52;
 
   bool isDragging = false;
   double dragPosition = 0;
@@ -38,22 +39,33 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
   List<String> get letters => widget.descending ? reversedLetters : allLetters;
 
   void onPointer(double y) {
+    final int idx =
+        ((y - railOuterPadding + letterSpacing) ~/
+                (letterHeight + letterSpacing))
+            .clamp(0, letters.length - 1)
+            .toInt();
+    final String newLetter = letters[idx];
+    final int existIndex = widget.existLetters.indexOf(newLetter);
+    final bool letterChanged = letter != newLetter;
+
     setState(() {
       dragPosition = y;
-      letter =
-          letters[((y - railOuterPadding) ~/
-                  (letterHeight + letterSinglePadding * 2))
-              .clamp(0, letters.length - 1)];
+      letter = newLetter;
     });
-    final int index = widget.existLetters.indexOf(letter);
-    if (index == -1) return;
-    widget.itemScrollController.jumpTo(index: widget.keyIndexList[index]);
+
+    if (letterChanged && existIndex != -1) {
+      HapticFeedback.selectionClick();
+      widget.itemScrollController.jumpTo(
+        index: widget.keyIndexList[existIndex],
+      );
+    }
   }
 
   double hinterOffset(double y) {
     final double min = -hinterSize / 2;
     final double max =
-        (letterHeight + letterSinglePadding * 2) * letters.length +
+        (letterHeight + letterSpacing) * letters.length -
+        letterSpacing +
         railOuterPadding * 2 -
         hinterSize / 2;
 
@@ -75,7 +87,7 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 8,
+      spacing: 20,
       children: [
         if (isDragging)
           Transform.translate(
@@ -136,28 +148,24 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
                   vertical: railOuterPadding,
                 ),
                 child: Column(
+                  spacing: letterSpacing,
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: letters
                       .map(
-                        (letter) => Padding(
-                          padding: const EdgeInsets.symmetric(
-                            vertical: letterSinglePadding,
+                        (letter) => Text(
+                          letter,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface
+                                .withAlpha(
+                                  widget.existLetters.contains(letter)
+                                      ? 255
+                                      : 120,
+                                ),
+                            fontSize: letterHeight,
+                            height: 1,
                           ),
-                          child: Text(
-                            letter,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface
-                                  .withAlpha(
-                                    widget.existLetters.contains(letter)
-                                        ? 255
-                                        : 120,
-                                  ),
-                              fontSize: letterHeight,
-                              height: 1,
-                            ),
-                            maxLines: 1,
-                          ),
+                          maxLines: 1,
                         ),
                       )
                       .toList(),
