@@ -1,7 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:linglun/data/providers/drawer_provider.dart';
+import 'package:linglun/states/drawer_provider.dart';
 import 'package:linglun/data/models/window_layout.dart';
+import 'package:linglun/data/models/drawer_state.dart';
 import 'package:linglun/ui/widgets/reveal_icon.dart';
 
 class Settings extends ConsumerWidget {
