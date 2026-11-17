@@ -144,8 +144,12 @@ class TrackScanner {
         editTime: item.editTime,
         playCount: existingTrack?.playCount ?? 0,
         addTime: existingTrack?.addTime ?? DateTime.now(),
+        removed: false,
       );
       yield TrackParsed(track: track);
+    }
+    for (var item in existingMap.values) {
+      yield TrackParsed(track: item.copyWith(removed: true));
     }
     yield TrackParsedFinish();
   }
