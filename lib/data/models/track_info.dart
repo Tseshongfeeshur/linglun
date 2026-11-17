@@ -20,7 +20,6 @@ class TrackInfo {
 
   final int playCount;
   final DateTime addTime;
-  final bool removed;
 
   new({
     required this.title,
@@ -37,7 +36,6 @@ class TrackInfo {
     required this.trackGainUpdated,
     required this.playCount,
     required this.addTime,
-    required this.removed,
   });
 
   TrackInfo copyWith({
@@ -55,7 +53,6 @@ class TrackInfo {
     bool? trackGainUpdated,
     int? playCount,
     DateTime? addTime,
-    bool? removed,
   }) {
     return TrackInfo(
       title: title ?? this.title,
@@ -72,7 +69,6 @@ class TrackInfo {
       trackGainUpdated: trackGainUpdated ?? this.trackGainUpdated,
       playCount: playCount ?? this.playCount,
       addTime: addTime ?? this.addTime,
-      removed: removed ?? this.removed,
     );
   }
 }

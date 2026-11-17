@@ -161,7 +161,7 @@ class _ContentAtFinish extends StatelessWidget {
                   maxLines: 1,
                 ),
                 subtitle: const Text(
-                  '修改或增删过的曲目',
+                  '新增或修改过的曲目',
                   style: TextStyle(overflow: TextOverflow.ellipsis),
                   maxLines: 2,
                 ),
@@ -195,20 +195,6 @@ class _ContentAtFinish extends StatelessWidget {
                                             .track
                                             .fileName,
                                         style: const TextStyle(height: 1.1),
-                                      ),
-                                      subtitle:
-                                          scanState
-                                              .parseUpdates[index]
-                                              .track
-                                              .removed
-                                          ? const Text('源文件曾被移除')
-                                          : null,
-                                      trailing: IconButton(
-                                        onPressed: () {
-                                          // TODO
-                                        },
-                                        icon: const Icon(Icons.delete_forever),
-                                        tooltip: '移除曲目数据',
                                       ),
                                       minTileHeight: 0,
                                       minVerticalPadding: 4,
