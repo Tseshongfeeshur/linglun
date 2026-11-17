@@ -101,13 +101,15 @@ class TrackScanner {
       try {
         if (existingTrack != null) {
           existingMap.remove(item.uri);
-          if (existingTrack.editTime == item.editTime &&
-              existingTrack.sizeBytes == item.sizeBytes) {
+          if ((existingTrack.editTime == item.editTime &&
+                  existingTrack.sizeBytes == item.sizeBytes) &&
+              (existingTrack.editTime.millisecondsSinceEpoch != 0 &&
+                  existingTrack.sizeBytes != -1)) {
             yield TrackSkipped(track: existingTrack);
             continue;
           }
-          tag = await utils.parse(item);
         }
+        tag = await utils.parse(item);
       } catch (e) {
         yield TrackParsedError(file: item, detail: e.toString());
         continue;

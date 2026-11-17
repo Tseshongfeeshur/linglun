@@ -1,20 +1,20 @@
 import 'dart:io';
 
-// import 'package:path/path.dart' as p;
-
-Future<String?> getPlatformMusicPath() async {
+Future<({String name, String? path})> getPlatformMusicPath() async {
   if (Platform.isLinux) {
     final result = await Process.run('sh', [
       '-c',
       '. "\$HOME/.config/user-dirs.dirs"; printf "%s" "\$XDG_MUSIC_DIR"',
     ]);
 
-    if (result.exitCode != 0) return null;
+    if (result.exitCode != 0) return (name: 'XDG 音乐目录', path: null);
 
     final path = (result.stdout as String).trim();
-    return path.isNotEmpty ? path : null;
+    return (name: '', path: path.isNotEmpty ? path : null);
+  } else if (Platform.isAndroid) {
+    return (name: '', path: null);
   } else {
     // TODO: 待实现的跨平台
-    return null;
+    return (name: '', path: null);
   }
 }

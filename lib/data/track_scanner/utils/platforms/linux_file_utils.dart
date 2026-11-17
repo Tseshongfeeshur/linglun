@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:haudiotagger/haudiotagger.dart';
 import 'package:path/path.dart' as p;
 import 'package:linglun/data/track_scanner/track_scanner.dart';
@@ -62,5 +63,10 @@ class LinuxFileUtils extends PlatformFileUtils {
   @override
   Future<Tag?> parse(FileDiscovered item) async {
     return await Haudiotagger.read(item.uri);
+  }
+
+  @override
+  Future<String?> getUri() {
+    return FilePicker.getDirectoryPath();
   }
 }

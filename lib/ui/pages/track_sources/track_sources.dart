@@ -1,11 +1,15 @@
+import 'dart:io';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:file_picker/file_picker.dart';
 
+import 'package:linglun/data/track_scanner/utils/get_platform_music_path.dart';
+import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
+import 'package:linglun/data/track_scanner/utils/platforms/android_file_utils.dart';
+import 'package:linglun/data/track_scanner/utils/platforms/linux_file_utils.dart';
 import 'package:linglun/data/models/window_layout.dart';
 import 'package:linglun/data/models/drawer_state.dart';
 import 'package:linglun/data/models/track_info.dart';
-import 'package:linglun/data/track_scanner/utils/get_platform_music_path.dart';
 import 'package:linglun/states/tracks_provider.dart';
 import 'package:linglun/states/drawer_provider.dart';
 import 'package:linglun/ui/utils/show_snack_bar.dart';
@@ -20,12 +24,20 @@ class TrackSources extends ConsumerStatefulWidget {
 }
 
 class _TrackSourcesState extends ConsumerState<TrackSources> {
-  ({String? path, bool ticked}) platformPath = (path: null, ticked: false);
+  ({String name, String? path, bool ticked}) platformPath = (
+    name: '',
+    path: null,
+    ticked: false,
+  );
 
   Future<void> getPlatformPath() async {
-    String? path = await getPlatformMusicPath();
+    final result = await getPlatformMusicPath();
+    String? path = result.path;
+
     if (context.mounted && path != null) {
-      setState(() => platformPath = (path: path, ticked: true));
+      setState(
+        () => platformPath = (name: result.name, path: path, ticked: true),
+      );
     }
   }
 
@@ -39,6 +51,15 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
 
   @override
   Widget build(BuildContext context) {
+    PlatformFileUtils utils;
+    if (Platform.isLinux) {
+      utils = LinuxFileUtils();
+    } else if (Platform.isAndroid) {
+      utils = AndroidFileUtils();
+    } else {
+      throw 'platform not supported';
+    }
+
     final drawerState = ref.watch<DrawerState>(drawerProvider);
     final layout = context.layout;
 
@@ -68,36 +89,42 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
         constraints: const BoxConstraints(maxWidth: 960),
         child: ListView(
           children: [
-            ListTile(
-              minTileHeight: 0,
-              minVerticalPadding: 0,
-              title: Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  '系统媒体库',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface
-                        .withAlpha(180),
-                    fontSize: 14,
+            if (platformPath.path != null)
+              Column(
+                children: [
+                  ListTile(
+                    minTileHeight: 0,
+                    minVerticalPadding: 0,
+                    title: Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Text(
+                        '系统媒体库',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface
+                              .withAlpha(180),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                  CheckboxListTile(
+                    secondary: const Icon(Icons.folder_special),
+                    title: Text(platformPath.name),
+                    subtitle: platformPath.path == null
+                        ? null
+                        : Text(platformPath.path!),
+                    value: platformPath.ticked,
+                    onChanged: (value) => setState(
+                      () => platformPath = (
+                        name: platformPath.name,
+                        path: platformPath.path,
+                        ticked: value ?? false,
+                      ),
+                    ),
+                    enabled: platformPath.path != null,
+                  ),
+                ],
               ),
-            ),
-            CheckboxListTile(
-              secondary: const Icon(Icons.folder_special),
-              title: const Text('XDG 音乐目录'),
-              subtitle: platformPath.path == null
-                  ? null
-                  : Text(platformPath.path!),
-              value: platformPath.ticked,
-              onChanged: (value) => setState(
-                () => platformPath = (
-                  path: platformPath.path,
-                  ticked: value ?? false,
-                ),
-              ),
-              enabled: platformPath.path != null,
-            ),
             ListTile(
               minTileHeight: 0,
               minVerticalPadding: 0,
@@ -117,14 +144,14 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
               leading: const Icon(Icons.add),
               title: const Text('添加文件夹'),
               onTap: () async {
-                String? path = await FilePicker.getDirectoryPath();
-                if (path == null) {
+                String? uri = await utils.getUri();
+                if (uri == null) {
                   if (context.mounted) {
                     showSnackBar(context, Icons.warning, '未选择任何文件夹');
                   }
                   return;
                 }
-                setState(() => userPaths.addAll({path: true}));
+                setState(() => userPaths.addAll({uri: true}));
               },
             ),
             ...userPaths.keys.map(
