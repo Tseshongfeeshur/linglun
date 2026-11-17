@@ -67,11 +67,9 @@ class TrackParsedFinish extends ParseEvent {}
 
 class TrackScanner {
   Stream<DiscoverEvent> discover(
-    PlatformFileUtils? utils,
+    PlatformFileUtils utils,
     Set<String> rootPaths,
   ) async* {
-    if (utils == null) return;
-
     final list = utils.discover(rootPaths);
     await for (final item in list) {
       switch (item) {
@@ -88,13 +86,10 @@ class TrackScanner {
   }
 
   Stream<ParseEvent> parse(
-    PlatformFileUtils? utils,
+    PlatformFileUtils utils,
     List<FileDiscovered> files,
     List<TrackInfo> existing,
   ) async* {
-    // TODO: 需要处理条目存在但文件被移除的情况，添加 removed 字段
-    if (utils == null) return;
-
     Map<String, TrackInfo> existingMap = {
       for (final TrackInfo element in existing) element.path: element,
     };
@@ -105,13 +100,14 @@ class TrackScanner {
 
       try {
         if (existingTrack != null) {
+          existingMap.remove(item.uri);
           if (existingTrack.editTime == item.editTime &&
               existingTrack.sizeBytes == item.sizeBytes) {
             yield TrackSkipped(track: existingTrack);
             continue;
           }
+          tag = await utils.parse(item);
         }
-        tag = await utils.parse(item);
       } catch (e) {
         yield TrackParsedError(file: item, detail: e.toString());
         continue;
@@ -148,8 +144,12 @@ class TrackScanner {
         editTime: item.editTime,
         playCount: existingTrack?.playCount ?? 0,
         addTime: existingTrack?.addTime ?? DateTime.now(),
+        removed: false,
       );
       yield TrackParsed(track: track);
+    }
+    for (var item in existingMap.values) {
+      yield TrackParsed(track: item.copyWith(removed: true));
     }
     yield TrackParsedFinish();
   }

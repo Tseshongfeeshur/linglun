@@ -167,7 +167,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
             if (platformPath.ticked && platformPath.path != null)
               platformPath.path!,
             ...userPaths.keys.where((element) => userPaths[element] ?? false),
-          }, []);
+          }, ref.read(tracksProvider));
           ref.read(tracksProvider.notifier).update(tracks);
         },
         isExtended: true,

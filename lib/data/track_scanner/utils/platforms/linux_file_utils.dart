@@ -9,6 +9,7 @@ class LinuxFileUtils extends PlatformFileUtils {
   @override
   Stream<DiscoverEvent> discover(Set<String> rootPaths) async* {
     // TODO: 确保打断后能停止
+    Set<String> paths = {};
     for (final String path in rootPaths) {
       final dir = Directory(path);
       List<FileDiscoveredError> errors = [];
@@ -18,7 +19,9 @@ class LinuxFileUtils extends PlatformFileUtils {
             Object e,
           ) {
             if (e is FileSystemException) {
-              errors.add(FileDiscoveredError(path: path, detail: e.message));
+              errors.add(
+                FileDiscoveredError(path: e.path ?? path, detail: e.message),
+              );
             } else {
               throw e;
             }
@@ -30,20 +33,24 @@ class LinuxFileUtils extends PlatformFileUtils {
           stat = await item.stat();
         } catch (e) {
           yield FileDiscoveredError(path: item.path, detail: e.toString());
+          continue;
         }
-        if (stat == null) {
+        if (stat.type == FileSystemEntityType.notFound) {
           yield FileDiscoveredError(
             path: item.path,
             detail: 'file stat unavailable',
           );
           continue;
         }
-        yield FileDiscovered(
-          uri: item.absolute.path,
-          name: p.basename(item.path),
-          sizeBytes: stat.size,
-          editTime: stat.modified,
-        );
+        if (!paths.contains(item.absolute.path)) {
+          paths.add(item.absolute.path);
+          yield FileDiscovered(
+            uri: item.absolute.path,
+            name: p.basename(item.path),
+            sizeBytes: stat.size,
+            editTime: stat.modified,
+          );
+        }
       }
       for (final error in errors) {
         yield error;

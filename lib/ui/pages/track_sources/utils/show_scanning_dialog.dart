@@ -50,7 +50,7 @@ class _ScanningDialogFrameState extends ConsumerState<_ScanningDialogFrame> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: scanState.parseFinished
-          ? _ContentAtFinnish(scanState: scanState)
+          ? _ContentAtFinish(scanState: scanState)
           : _ContentAtScanning(scanState: scanState),
     );
   }
@@ -129,7 +129,7 @@ class _ContentAtScanning extends StatelessWidget {
   }
 }
 
-class _ContentAtFinnish extends StatelessWidget {
+class _ContentAtFinish extends StatelessWidget {
   const new({required this.scanState});
 
   final ScanState scanState;
@@ -137,59 +137,107 @@ class _ContentAtFinnish extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: 480,
-        maxHeight: max(MediaQuery.sizeOf(context).height - 20, 0),
-      ),
+      constraints: const BoxConstraints(maxWidth: 480),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('扫描完成', style: TextStyle(fontSize: 24)),
           Column(
-            spacing: 12,
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 4),
 
-              ExpansionTile(
-                initiallyExpanded: false,
+              // 第一项：已更新
+              ListTile(
                 leading: const Icon(Icons.update),
+                trailing: scanState.parseUpdates.isEmpty
+                    ? null
+                    : const Icon(Icons.keyboard_arrow_right),
                 title: Text(
                   '已更新 ${scanState.parseUpdates.length} 项',
                   style: const TextStyle(overflow: TextOverflow.ellipsis),
                   maxLines: 1,
                 ),
                 subtitle: const Text(
-                  '新增或修改过的曲目',
+                  '修改或增删过的曲目',
                   style: TextStyle(overflow: TextOverflow.ellipsis),
                   maxLines: 2,
                 ),
-                children: [
-                  ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: max(
-                        MediaQuery.sizeOf(context).height - 500,
-                        0,
-                      ),
-                    ),
-                    child: ListView.builder(
-                      itemCount: scanState.parseUpdates.length,
-                      itemBuilder: (context, index) => ListTile(
-                        dense: true,
-                        title: Text(
-                          scanState.parseUpdates[index].track.fileName,
+                onTap: () => scanState.parseUpdates.isEmpty
+                    ? null
+                    : showDialog(
+                        context: context,
+                        builder: (context) => Dialog(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 400),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text(
+                                    '更新明细',
+                                    style: TextStyle(fontSize: 24),
+                                  ),
+                                ),
+                                Flexible(
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: scanState.parseUpdates.length,
+                                    itemBuilder: (context, index) => ListTile(
+                                      dense: true,
+                                      title: Text(
+                                        scanState
+                                            .parseUpdates[index]
+                                            .track
+                                            .fileName,
+                                        style: const TextStyle(height: 1.1),
+                                      ),
+                                      subtitle:
+                                          scanState
+                                              .parseUpdates[index]
+                                              .track
+                                              .removed
+                                          ? const Text('源文件曾被移除')
+                                          : null,
+                                      trailing: IconButton(
+                                        onPressed: () {
+                                          // TODO
+                                        },
+                                        icon: const Icon(Icons.delete_forever),
+                                        tooltip: '移除曲目数据',
+                                      ),
+                                      minTileHeight: 0,
+                                      minVerticalPadding: 4,
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('取消'),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                ],
               ),
 
-              ExpansionTile(
-                initiallyExpanded: false,
+              // 第二项：已跳过（已统一结构）
+              ListTile(
                 leading: const Icon(Icons.skip_next),
+                trailing: scanState.parseSkips.isEmpty
+                    ? null
+                    : const Icon(Icons.keyboard_arrow_right),
                 title: Text(
                   '已跳过 ${scanState.parseSkips.length} 项',
                   style: const TextStyle(overflow: TextOverflow.ellipsis),
@@ -200,19 +248,67 @@ class _ContentAtFinnish extends StatelessWidget {
                   style: TextStyle(overflow: TextOverflow.ellipsis),
                   maxLines: 2,
                 ),
-                children: scanState.parseSkips
-                    .map(
-                      (item) => ListTile(
-                        dense: true,
-                        title: Text(item.track.fileName),
+                onTap: () => scanState.parseSkips.isEmpty
+                    ? null
+                    : showDialog(
+                        context: context,
+                        builder: (context) => Dialog(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 400),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text(
+                                    '跳过明细',
+                                    style: TextStyle(fontSize: 24),
+                                  ),
+                                ),
+                                Flexible(
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount: scanState.parseSkips.length,
+                                    itemBuilder: (context, index) => ListTile(
+                                      dense: true,
+                                      title: Text(
+                                        scanState
+                                            .parseSkips[index]
+                                            .track
+                                            .fileName,
+                                        style: const TextStyle(height: 1.1),
+                                      ),
+                                      minTileHeight: 0,
+                                      minVerticalPadding: 4,
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('取消'),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                    )
-                    .toList(),
               ),
 
-              ExpansionTile(
-                initiallyExpanded: false,
+              // 第三项：已失败（已统一结构）
+              ListTile(
                 leading: const Icon(Icons.error),
+                trailing:
+                    scanState.discoverErrors.isEmpty &&
+                        scanState.parseErrors.isEmpty
+                    ? null
+                    : const Icon(Icons.keyboard_arrow_right),
                 title: Text(
                   '已失败 ${scanState.discoverErrors.length + scanState.parseErrors.length} 项',
                   style: const TextStyle(overflow: TextOverflow.ellipsis),
@@ -223,20 +319,77 @@ class _ContentAtFinnish extends StatelessWidget {
                   style: TextStyle(overflow: TextOverflow.ellipsis),
                   maxLines: 2,
                 ),
-                children: [
-                  ...scanState.discoverErrors.map(
-                    (item) => ListTile(
-                      dense: true,
-                      title: Text('${item.path}: ${item.detail}'),
-                    ),
-                  ),
-                  ...scanState.parseErrors.map(
-                    (item) => ListTile(
-                      dense: true,
-                      title: Text('${item.file.uri}: ${item.detail}'),
-                    ),
-                  ),
-                ],
+                onTap: () =>
+                    scanState.discoverErrors.isEmpty &&
+                        scanState.parseErrors.isEmpty
+                    ? null
+                    : showDialog(
+                        context: context,
+                        builder: (context) => Dialog(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 400),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text(
+                                    '失败明细',
+                                    style: TextStyle(fontSize: 24),
+                                  ),
+                                ),
+                                Flexible(
+                                  child: ListView.builder(
+                                    shrinkWrap: true,
+                                    itemCount:
+                                        scanState.discoverErrors.length +
+                                        scanState.parseErrors.length,
+                                    itemBuilder: (context, index) {
+                                      if (index <
+                                          scanState.discoverErrors.length) {
+                                        final item =
+                                            scanState.discoverErrors[index];
+                                        return ListTile(
+                                          dense: true,
+                                          title: Text(
+                                            '${item.path}: ${item.detail}',
+                                            style: const TextStyle(height: 1.1),
+                                          ),
+                                        );
+                                      } else {
+                                        final item =
+                                            scanState.parseErrors[index -
+                                                scanState
+                                                    .discoverErrors
+                                                    .length];
+                                        return ListTile(
+                                          dense: true,
+                                          title: Text(
+                                            '${item.file.uri}: ${item.detail}',
+                                          ),
+                                          minTileHeight: 0,
+                                          minVerticalPadding: 4,
+                                        );
+                                      }
+                                    },
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('取消'),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),

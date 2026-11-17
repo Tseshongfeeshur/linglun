@@ -20,11 +20,13 @@ class _ScanNotifier extends Notifier<ScanState> {
   ) async {
     final TrackScanner trackScanner = TrackScanner();
 
-    PlatformFileUtils? utils;
+    PlatformFileUtils utils;
     if (Platform.isLinux) {
       utils = LinuxFileUtils();
     } else if (Platform.isAndroid) {
       utils = AndroidFileUtils();
+    } else {
+      throw 'platform not supported';
     }
 
     final discoverStream = trackScanner.discover(utils, pathsToDiscover);
