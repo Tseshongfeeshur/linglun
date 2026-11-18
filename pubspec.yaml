@@ -28,7 +28,7 @@ dependencies:
   saf_util: ^3.1.1
   saf_stream: ^4.0.3
 
-  haudiotagger: ^3.1.0
+  flutter_taglib: ^1.6.0
   # 音乐标签
 
 dev_dependencies:

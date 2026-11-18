@@ -1,31 +1,31 @@
-import 'package:haudiotagger/haudiotagger.dart';
+import 'package:flutter_taglib/flutter_taglib.dart' hide Picture;
+import 'package:linglun/data/models/simple_tag.dart';
 import 'package:linglun/data/track_scanner/track_scanner.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
-import 'package:saf_stream/saf_stream.dart';
 import 'package:saf_util/saf_util.dart';
 import 'package:saf_util/saf_util_platform_interface.dart';
 
 class AndroidFileUtils extends PlatformFileUtils {
   @override
-  Stream<DiscoverEvent> discover(Set<String> rootPaths) async* {
+  Stream<DiscoverEvent> discover(Set<String> rootUris) async* {
     final safUtil = SafUtil();
-    List<String> paths = rootPaths.toList();
+    List<String> uris = rootUris.toList();
 
-    while (paths.isNotEmpty) {
-      final path = paths.last;
-      paths.removeLast();
+    while (uris.isNotEmpty) {
+      final uri = uris.last;
+      uris.removeLast();
 
       List<SafDocumentFile> files = [];
       try {
-        files = await safUtil.list(path);
+        files = await safUtil.list(uri);
       } catch (e) {
-        yield FileDiscoveredError(path: path, detail: e.toString());
+        yield FileDiscoveredError(uri: uri, detail: e.toString());
         continue;
       }
 
       for (var item in files) {
         if (item.isDir) {
-          paths.add(item.uri);
+          uris.add(item.uri);
           continue;
         }
         yield FileDiscovered(
@@ -40,11 +40,25 @@ class AndroidFileUtils extends PlatformFileUtils {
   }
 
   @override
-  Future<Tag?> parse(FileDiscovered item) async {
-    final safStream = SafStream();
-    return await Haudiotagger.readFromBytes(
-      await safStream.readFileBytes(item.uri),
-    );
+  Future<SimpleTag> parse(FileDiscovered item) async {
+    final file = await TagLibFile.openAsync(item.uri);
+    if (file == null) {
+      throw 'failed to open file';
+    }
+
+    SimpleTag? tag;
+    try {
+      tag = SimpleTag(
+        title: file.title,
+        artists: file.artist,
+        album: file.album,
+        durationMs: file.duration.inMilliseconds,
+      );
+    } finally {
+      file.close();
+    }
+
+    return tag;
   }
 
   @override
@@ -55,5 +69,10 @@ class AndroidFileUtils extends PlatformFileUtils {
       persistablePermission: true,
     );
     return result?.uri;
+  }
+
+  @override
+  Future<({String name, String? path})> getPlatformMusicPath() async {
+    return (name: '', path: null);
   }
 }

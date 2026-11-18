@@ -6,7 +6,7 @@ enum TrackSort {
   artistsInLatin('艺术家', Icons.person, true),
   albumInLatin('专辑', Icons.album, true),
 
-  path('文件路径', Icons.folder_copy, false),
+  uri('文件路径', Icons.folder_copy, false),
 
   sizeBytes('文件体积', Icons.storage, false),
   durationMs('时长', Icons.timer, false),
@@ -48,8 +48,8 @@ List<TrackInfo> sortMusicList(List<TrackInfo> list, SortConfig sortConfig) {
     case TrackSort.albumInLatin:
       result.sort((a, b) => a.albumInLatin.compareTo(b.albumInLatin));
 
-    case TrackSort.path:
-      result.sort((a, b) => a.path.compareTo(b.path));
+    case TrackSort.uri:
+      result.sort((a, b) => a.uri.compareTo(b.uri));
 
     case TrackSort.sizeBytes:
       result.sort((a, b) => a.sizeBytes.compareTo(b.sizeBytes));

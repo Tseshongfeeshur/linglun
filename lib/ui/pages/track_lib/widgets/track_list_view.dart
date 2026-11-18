@@ -176,6 +176,7 @@ class _MusicListItem extends StatelessWidget {
         style: const TextStyle(overflow: TextOverflow.ellipsis),
       ),
       subtitle: Text(
+        // TODO: 使用富文本，淡化斜杠
         musicInfo.artists?.join('/') ?? '未知艺术家',
         maxLines: 1,
         style: const TextStyle(overflow: TextOverflow.ellipsis),

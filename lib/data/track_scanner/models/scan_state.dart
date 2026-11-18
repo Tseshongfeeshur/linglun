@@ -62,7 +62,7 @@ class ScanState {
       case FileDiscoveredError():
         return copyWith(
           discoverErrors: [...discoverErrors, event],
-          current: p.basename(event.path),
+          current: p.basename(event.uri),
         );
       case FileDiscoveredFinish():
         return copyWith(discoverFinished: true);

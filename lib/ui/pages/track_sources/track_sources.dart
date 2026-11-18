@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:linglun/data/track_scanner/utils/get_platform_music_path.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/android_file_utils.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/linux_file_utils.dart';
@@ -24,6 +23,7 @@ class TrackSources extends ConsumerStatefulWidget {
 }
 
 class _TrackSourcesState extends ConsumerState<TrackSources> {
+  late PlatformFileUtils utils;
   ({String name, String? path, bool ticked}) platformPath = (
     name: '',
     path: null,
@@ -31,7 +31,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
   );
 
   Future<void> getPlatformPath() async {
-    final result = await getPlatformMusicPath();
+    final result = await utils.getPlatformMusicPath();
     String? path = result.path;
 
     if (context.mounted && path != null) {
@@ -41,17 +41,12 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
     }
   }
 
-  Map<String, bool> userPaths = {};
+  Map<String, bool> userUris = {};
 
   @override
   void initState() {
     super.initState();
-    getPlatformPath();
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    PlatformFileUtils utils;
     if (Platform.isLinux) {
       utils = LinuxFileUtils();
     } else if (Platform.isAndroid) {
@@ -59,7 +54,11 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
     } else {
       throw 'platform not supported';
     }
+    getPlatformPath();
+  }
 
+  @override
+  Widget build(BuildContext context) {
     final drawerState = ref.watch<DrawerState>(drawerProvider);
     final layout = context.layout;
 
@@ -151,12 +150,12 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
                   }
                   return;
                 }
-                setState(() => userPaths.addAll({uri: true}));
+                setState(() => userUris.addAll({uri: true}));
               },
             ),
-            ...userPaths.keys.map(
-              (path) => Dismissible(
-                key: Key(path),
+            ...userUris.keys.map(
+              (uri) => Dismissible(
+                key: Key(uri),
                 background: Container(
                   color: Theme.of(context).colorScheme.errorContainer,
                   child: Align(
@@ -171,18 +170,17 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
                   ),
                 ),
                 direction: DismissDirection.endToStart,
-                onDismissed: (_) => setState(() => userPaths.remove(path)),
+                onDismissed: (_) => setState(() => userUris.remove(uri)),
                 child: CheckboxListTile(
                   secondary: const Icon(Icons.folder),
-                  title: Text(path),
-                  value: userPaths[path],
+                  title: Text(uri),
+                  value: userUris[uri],
                   onChanged: (value) {
                     setState(() {
-                      userPaths[path] = value ?? false;
-                      // userPaths.addAll({path: value ?? false});
+                      userUris[uri] = value ?? false;
                     });
                   },
-                  enabled: userPaths[path] != null,
+                  enabled: userUris[uri] != null,
                 ),
               ),
             ),
@@ -194,7 +192,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
           final List<TrackInfo>? tracks = await showScanningDialog(context, {
             if (platformPath.ticked && platformPath.path != null)
               platformPath.path!,
-            ...userPaths.keys.where((element) => userPaths[element] ?? false),
+            ...userUris.keys.where((element) => userUris[element] ?? false),
           }, ref.read(tracksProvider));
           ref.read(tracksProvider.notifier).update(tracks);
         },

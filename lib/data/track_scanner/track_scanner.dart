@@ -1,8 +1,8 @@
 import 'dart:async';
 
+import 'package:linglun/data/models/simple_tag.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
 import 'package:path/path.dart' as p;
-import 'package:haudiotagger/haudiotagger.dart';
 
 import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/track_scanner/utils/string_to_latin.dart';
@@ -37,10 +37,10 @@ class FileDiscovered extends DiscoverEvent {
 }
 
 class FileDiscoveredError extends DiscoverEvent {
-  final String path;
+  final String uri;
   final String detail;
 
-  new({required this.path, required this.detail});
+  new({required this.uri, required this.detail});
 }
 
 class FileDiscoveredFinish extends DiscoverEvent {}
@@ -68,9 +68,9 @@ class TrackParsedFinish extends ParseEvent {}
 class TrackScanner {
   Stream<DiscoverEvent> discover(
     PlatformFileUtils utils,
-    Set<String> rootPaths,
+    Set<String> rootUris,
   ) async* {
-    final list = utils.discover(rootPaths);
+    final list = utils.discover(rootUris);
     await for (final item in list) {
       switch (item) {
         case FileDiscovered():
@@ -91,11 +91,11 @@ class TrackScanner {
     List<TrackInfo> existing,
   ) async* {
     Map<String, TrackInfo> existingMap = {
-      for (final TrackInfo element in existing) element.path: element,
+      for (final TrackInfo element in existing) element.uri: element,
     };
 
     for (final FileDiscovered item in files) {
-      Tag? tag;
+      SimpleTag tag;
       final TrackInfo? existingTrack = existingMap[item.uri];
 
       try {
@@ -116,17 +116,17 @@ class TrackScanner {
       }
 
       String title = (() {
-        String str = tag?.title ?? '';
+        String str = tag.title ?? '';
         if (str.isEmpty) str = p.basenameWithoutExtension(item.name);
         return str;
       })();
       List<String>? artists = (() {
-        String str = tag?.trackArtist ?? '';
+        String str = tag.artists ?? '';
         if (str.isEmpty) return null;
         return splitArtists(str);
       })();
       String? album = (() {
-        String? str = tag?.album ?? '';
+        String? str = tag.album ?? '';
         if (str.isEmpty) str = null;
         return str;
       })();
@@ -138,10 +138,10 @@ class TrackScanner {
         artistsInLatin: artists?.join('/').toLatin() ?? '#',
         album: album,
         albumInLatin: album?.toLatin() ?? '#',
-        path: item.uri,
+        uri: item.uri,
         fileName: item.name,
         sizeBytes: item.sizeBytes,
-        durationMs: 1000 * (tag?.duration ?? 0),
+        durationMs: tag.durationMs ?? 0,
         trackGainUpdated: false,
         editTime: item.editTime,
         playCount: existingTrack?.playCount ?? 0,

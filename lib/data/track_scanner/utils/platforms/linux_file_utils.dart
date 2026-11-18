@@ -1,18 +1,18 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:haudiotagger/haudiotagger.dart';
+import 'package:flutter_taglib/flutter_taglib.dart';
+import 'package:linglun/data/models/simple_tag.dart';
 import 'package:path/path.dart' as p;
 import 'package:linglun/data/track_scanner/track_scanner.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
 
 class LinuxFileUtils extends PlatformFileUtils {
   @override
-  Stream<DiscoverEvent> discover(Set<String> rootPaths) async* {
-    // TODO: 确保打断后能停止
-    Set<String> paths = {};
-    for (final String path in rootPaths) {
-      final dir = Directory(path);
+  Stream<DiscoverEvent> discover(Set<String> rootUris) async* {
+    Set<String> uris = {};
+    for (final String uri in rootUris) {
+      final dir = Directory(uri);
       List<FileDiscoveredError> errors = [];
 
       await for (final item
@@ -21,7 +21,7 @@ class LinuxFileUtils extends PlatformFileUtils {
           ) {
             if (e is FileSystemException) {
               errors.add(
-                FileDiscoveredError(path: e.path ?? path, detail: e.message),
+                FileDiscoveredError(uri: e.path ?? uri, detail: e.message),
               );
             } else {
               throw e;
@@ -33,18 +33,18 @@ class LinuxFileUtils extends PlatformFileUtils {
         try {
           stat = await item.stat();
         } catch (e) {
-          yield FileDiscoveredError(path: item.path, detail: e.toString());
+          yield FileDiscoveredError(uri: item.path, detail: e.toString());
           continue;
         }
         if (stat.type == FileSystemEntityType.notFound) {
           yield FileDiscoveredError(
-            path: item.path,
+            uri: item.path,
             detail: 'file stat unavailable',
           );
           continue;
         }
-        if (!paths.contains(item.absolute.path)) {
-          paths.add(item.absolute.path);
+        if (!uris.contains(item.absolute.path)) {
+          uris.add(item.absolute.path);
           yield FileDiscovered(
             uri: item.absolute.path,
             name: p.basename(item.path),
@@ -61,12 +61,42 @@ class LinuxFileUtils extends PlatformFileUtils {
   }
 
   @override
-  Future<Tag?> parse(FileDiscovered item) async {
-    return await Haudiotagger.read(item.uri);
+  Future<SimpleTag> parse(FileDiscovered item) async {
+    final file = await TagLibFile.openAsync(item.uri);
+    if (file == null) {
+      throw 'failed to open file';
+    }
+
+    SimpleTag? tag;
+    try {
+      tag = SimpleTag(
+        title: file.title,
+        artists: file.artist,
+        album: file.album,
+        durationMs: file.duration.inMilliseconds,
+      );
+    } finally {
+      file.close();
+    }
+
+    return tag;
   }
 
   @override
   Future<String?> getUri() {
     return FilePicker.getDirectoryPath();
+  }
+
+  @override
+  Future<({String name, String? path})> getPlatformMusicPath() async {
+    final result = await Process.run('sh', [
+      '-c',
+      '. "\$HOME/.config/user-dirs.dirs"; printf "%s" "\$XDG_MUSIC_DIR"',
+    ]);
+
+    if (result.exitCode != 0) return (name: 'XDG 音乐目录', path: null);
+
+    final path = (result.stdout as String).trim();
+    return (name: 'XDG 音乐目录', path: path.isNotEmpty ? path : null);
   }
 }

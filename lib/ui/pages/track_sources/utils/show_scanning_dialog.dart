@@ -8,7 +8,7 @@ import 'package:linglun/data/track_scanner/models/scan_state.dart';
 
 Future<List<TrackInfo>?> showScanningDialog(
   BuildContext context,
-  Set<String> paths,
+  Set<String> uris,
   List<TrackInfo> existing,
 ) async {
   return await showDialog(
@@ -16,7 +16,7 @@ Future<List<TrackInfo>?> showScanningDialog(
     builder: (BuildContext context) => PopScope(
       canPop: false,
       child: Dialog(
-        child: _ScanningDialogFrame(pathsToDiscover: paths, existing: existing),
+        child: _ScanningDialogFrame(urisToDiscover: uris, existing: existing),
       ),
     ),
     barrierDismissible: false,
@@ -24,9 +24,9 @@ Future<List<TrackInfo>?> showScanningDialog(
 }
 
 class _ScanningDialogFrame extends ConsumerStatefulWidget {
-  final Set<String> pathsToDiscover;
+  final Set<String> urisToDiscover;
   final List<TrackInfo> existing;
-  const new({required this.pathsToDiscover, required this.existing});
+  const new({required this.urisToDiscover, required this.existing});
 
   @override
   ConsumerState<_ScanningDialogFrame> createState() =>
@@ -39,7 +39,7 @@ class _ScanningDialogFrameState extends ConsumerState<_ScanningDialogFrame> {
     super.initState();
     ref
         .read(scanProvider.notifier)
-        .startScan(widget.pathsToDiscover, widget.existing);
+        .startScan(widget.urisToDiscover, widget.existing);
   }
 
   @override
@@ -154,7 +154,7 @@ class _ContentAtFinish extends StatelessWidget {
                     ? null
                     : const Icon(Icons.keyboard_arrow_right),
                 title: Text(
-                  '已更新 ${scanState.parseUpdates.length} 项',
+                  '已更新 ${scanState.parseUpdates.where((item) => item.track.removed == false).length} 项',
                   style: const TextStyle(overflow: TextOverflow.ellipsis),
                   maxLines: 1,
                 ),
@@ -184,12 +184,20 @@ class _ContentAtFinish extends StatelessWidget {
                                 Flexible(
                                   child: ListView.builder(
                                     shrinkWrap: true,
-                                    itemCount: scanState.parseUpdates.length,
+                                    itemCount: scanState.parseUpdates
+                                        .where(
+                                          (item) => item.track.removed == false,
+                                        )
+                                        .length,
                                     itemBuilder: (context, index) => ListTile(
                                       dense: true,
                                       title: Text(
-                                        scanState
-                                            .parseUpdates[index]
+                                        scanState.parseUpdates
+                                            .where(
+                                              (item) =>
+                                                  item.track.removed == false,
+                                            )
+                                            .toList()[index]
                                             .track
                                             .fileName,
                                         style: const TextStyle(height: 1.1),
@@ -337,7 +345,7 @@ class _ContentAtFinish extends StatelessWidget {
                                         return ListTile(
                                           dense: true,
                                           title: Text(
-                                            '${item.path}: ${item.detail}',
+                                            '${item.uri}: ${item.detail}',
                                             style: const TextStyle(height: 1.1),
                                           ),
                                         );

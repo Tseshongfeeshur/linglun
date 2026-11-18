@@ -10,7 +10,7 @@ class TrackInfo {
   final String? album;
   final String albumInLatin;
 
-  final String path;
+  final String uri;
   final String fileName;
 
   final int sizeBytes;
@@ -29,7 +29,7 @@ class TrackInfo {
     required this.artistsInLatin,
     this.album,
     required this.albumInLatin,
-    required this.path,
+    required this.uri,
     required this.fileName,
     required this.sizeBytes,
     required this.durationMs,
@@ -47,7 +47,7 @@ class TrackInfo {
     String? artistsInLatin,
     String? album,
     String? albumInLatin,
-    String? path,
+    String? uri,
     String? fileName,
     int? sizeBytes,
     int? durationMs,
@@ -64,7 +64,7 @@ class TrackInfo {
       artistsInLatin: artistsInLatin ?? this.artistsInLatin,
       album: album ?? this.album,
       albumInLatin: albumInLatin ?? this.albumInLatin,
-      path: path ?? this.path,
+      uri: uri ?? this.uri,
       fileName: fileName ?? this.fileName,
       sizeBytes: sizeBytes ?? this.sizeBytes,
       durationMs: durationMs ?? this.durationMs,

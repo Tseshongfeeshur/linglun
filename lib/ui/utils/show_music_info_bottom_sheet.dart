@@ -44,7 +44,7 @@ void showTrackInfoBottomSheet(
                 style: descStyle(context),
               ),
               TextSpan(text: '\n路径：', style: headStyle(context)),
-              TextSpan(text: track.path),
+              TextSpan(text: track.uri),
               TextSpan(text: '\n文件体积：', style: headStyle(context)),
               TextSpan(
                 text:

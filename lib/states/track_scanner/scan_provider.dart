@@ -15,7 +15,7 @@ class _ScanNotifier extends Notifier<ScanState> {
   }
 
   Future<void> startScan(
-    Set<String> pathsToDiscover,
+    Set<String> urisToDiscover,
     List<TrackInfo> existing,
   ) async {
     final TrackScanner trackScanner = TrackScanner();
@@ -29,7 +29,7 @@ class _ScanNotifier extends Notifier<ScanState> {
       throw 'platform not supported';
     }
 
-    final discoverStream = trackScanner.discover(utils, pathsToDiscover);
+    final discoverStream = trackScanner.discover(utils, urisToDiscover);
     await for (final event in discoverStream) {
       if (!ref.mounted) break;
       state = state.applyDiscover(event);
