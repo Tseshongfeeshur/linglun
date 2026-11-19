@@ -10,10 +10,9 @@ import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.d
 class LinuxFileUtils extends PlatformFileUtils {
   @override
   Stream<DiscoverEvent> discover(Set<String> rootUris) async* {
-    Set<String> uris = {};
-    for (final String uri in rootUris) {
+    for (final uri in rootUris) {
       final dir = Directory(uri);
-      List<FileDiscoveredError> errors = [];
+      var errors = <FileDiscoveredError>[];
 
       await for (final item
           in dir.list(followLinks: false, recursive: true).handleError((
@@ -43,15 +42,13 @@ class LinuxFileUtils extends PlatformFileUtils {
           );
           continue;
         }
-        if (!uris.contains(item.absolute.path)) {
-          uris.add(item.absolute.path);
-          yield FileDiscovered(
-            uri: item.absolute.path,
-            name: p.basename(item.path),
-            sizeBytes: stat.size,
-            editTime: stat.modified,
-          );
-        }
+        yield FileDiscovered(
+          uri: item.absolute.path,
+          sourceKey: item.absolute.path,
+          name: p.basename(item.path),
+          sizeBytes: stat.size,
+          editTime: stat.modified,
+        );
       }
       for (final error in errors) {
         yield error;

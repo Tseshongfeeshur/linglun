@@ -18,7 +18,7 @@ class _ScanNotifier extends Notifier<ScanState> {
     Set<String> urisToDiscover,
     List<TrackInfo> existing,
   ) async {
-    final TrackScanner trackScanner = TrackScanner();
+    final trackScanner = TrackScanner();
 
     PlatformFileUtils utils;
     if (Platform.isLinux) {
@@ -35,7 +35,7 @@ class _ScanNotifier extends Notifier<ScanState> {
       state = state.applyDiscover(event);
     }
 
-    List<FileDiscovered> tracksToParse = [];
+    var tracksToParse = <FileDiscovered>[];
     if (ref.mounted) {
       tracksToParse = state.discoverResult;
     }

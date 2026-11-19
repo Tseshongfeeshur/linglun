@@ -74,10 +74,10 @@ Map<String, List<TrackInfo>> groupMusicList(
     // TODO: 'default' 作为键是否需要修改
     return {'default': sortedList};
   }
-  Map<String, List<TrackInfo>> result = {};
+  var result = <String, List<TrackInfo>>{};
   for (final element in sortedList) {
     final sortSource = sortConfig.method.groupSource(element) ?? '';
-    String key = sortSource.isEmpty
+    var key = sortSource.isEmpty
         ? '#'
         : sortSource.characters.first.toUpperCase();
     if (!RegExp(r'^[A-Z]$').hasMatch(key)) key = '#';

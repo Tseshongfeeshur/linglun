@@ -49,13 +49,12 @@ class RevealIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool applyTextScaling =
-        IconTheme.of(context).applyTextScaling ?? false;
+    final applyTextScaling = IconTheme.of(context).applyTextScaling ?? false;
 
-    final double tentativeIconSize =
+    final tentativeIconSize =
         size ?? IconTheme.of(context).size ?? kDefaultFontSize;
 
-    final double iconSize = applyTextScaling
+    final iconSize = applyTextScaling
         ? MediaQuery.textScalerOf(context).scale(tentativeIconSize)
         : tentativeIconSize;
 
@@ -72,16 +71,16 @@ class RevealIcon extends StatelessWidget {
       curve: curve ?? Curves.easeInOutCubic,
       builder: (context, value, child) {
         // 圆角半径
-        final double rawRadius = value <= 0.95
+        final rawRadius = value <= 0.95
             ? (iconSize * 0.95 / 2)
             : (iconSize * 0.95 / 2 * ((1 - value) / 0.05));
 
         // 当前方块边长，半径不能超过边长的一半
-        final double side = iconSize * value;
-        final double radius = rawRadius.clamp(0.0, side / 2);
+        final side = iconSize * value;
+        final radius = rawRadius.clamp(0.0, side / 2);
 
         // 上下两层共用的形状
-        final RRect hole = RRect.fromRectAndRadius(
+        final hole = RRect.fromRectAndRadius(
           Rect.fromCenter(
             center: Offset(iconSize / 2, iconSize / 2),
             width: side,

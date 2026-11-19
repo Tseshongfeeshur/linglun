@@ -4,6 +4,7 @@ linter:
   rules:
     - unnecessary_type_name_in_constructor
     - prefer_const_constructors
+    - omit_local_variable_types
 
 analyzer:
   exclude:

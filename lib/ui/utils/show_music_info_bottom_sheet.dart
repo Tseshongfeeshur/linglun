@@ -57,10 +57,10 @@ void showTrackInfoBottomSheet(
               TextSpan(text: '\n时长：', style: headStyle(context)),
               TextSpan(
                 text: (() {
-                  int tmps = (track.durationMs ~/ 1000);
-                  int h = tmps ~/ 60 ~/ 60;
-                  int m = tmps ~/ 60 % 60;
-                  int s = tmps % 60;
+                  var tmps = (track.durationMs ~/ 1000);
+                  var h = tmps ~/ 60 ~/ 60;
+                  var m = tmps ~/ 60 % 60;
+                  var s = tmps % 60;
                   return '${h != 0 ? '${h.toString().padLeft(2, '0')}:' : ''}${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
                 })(),
               ),

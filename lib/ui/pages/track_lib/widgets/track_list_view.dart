@@ -33,10 +33,10 @@ class _TrackListViewState extends State<TrackListView> {
     if (widget.hasGroups) {
       final entries = widget.groupedMusicList.entries;
 
-      final List<Object> items = [];
-      final List<int> keyIndexList = [];
+      final items = <Object>[];
+      final keyIndexList = <int>[];
 
-      int index = 0;
+      var index = 0;
 
       for (final entry in entries) {
         keyIndexList.add(index);
@@ -128,16 +128,14 @@ class _MusicListGroupHead extends StatelessWidget {
         ),
       ),
       onTap: () async {
-        String? selectedLetter = await showLetterSelectingDialog(
+        var selectedLetter = await showLetterSelectingDialog(
           context,
           groupedMusicList,
           letter,
         );
         if (selectedLetter == null) return;
 
-        final int index = groupedMusicList.keys.toList().indexOf(
-          selectedLetter,
-        );
+        final index = groupedMusicList.keys.toList().indexOf(selectedLetter);
         itemScrollController.scrollTo(
           index: keyIndexList[index],
           duration: 400.ms,

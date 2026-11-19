@@ -24,12 +24,14 @@ sealed class DiscoverEvent {}
 
 class FileDiscovered extends DiscoverEvent {
   final String uri;
+  final String sourceKey;
   final String name;
   final int sizeBytes;
   final DateTime editTime;
 
   new({
     required this.uri,
+    required this.sourceKey,
     required this.name,
     required this.sizeBytes,
     required this.editTime,
@@ -70,12 +72,16 @@ class TrackScanner {
     PlatformFileUtils utils,
     Set<String> rootUris,
   ) async* {
+    final keys = <String>{};
     final list = utils.discover(rootUris);
     await for (final item in list) {
       switch (item) {
         case FileDiscovered():
           final ext = p.extension(item.name).toLowerCase();
           if (!_extensions.contains(ext)) continue;
+          if (keys.contains(item.sourceKey)) continue;
+
+          keys.add(item.sourceKey);
           yield item;
         case FileDiscoveredError():
           yield item;
@@ -90,22 +96,22 @@ class TrackScanner {
     List<FileDiscovered> files,
     List<TrackInfo> existing,
   ) async* {
-    Map<String, TrackInfo> existingMap = {
-      for (final TrackInfo element in existing) element.uri: element,
+    var existingMap = <String, TrackInfo>{
+      for (final TrackInfo element in existing) element.sourceKey: element,
     };
 
-    for (final FileDiscovered item in files) {
+    for (final item in files) {
       SimpleTag tag;
-      final TrackInfo? existingTrack = existingMap[item.uri];
+      final existingTrack = existingMap[item.sourceKey];
 
       try {
         if (existingTrack != null) {
-          existingMap.remove(item.uri);
+          existingMap.remove(item.sourceKey);
           if ((existingTrack.editTime == item.editTime &&
                   existingTrack.sizeBytes == item.sizeBytes) &&
               (existingTrack.editTime.millisecondsSinceEpoch != 0 &&
                   existingTrack.sizeBytes != -1)) {
-            yield TrackSkipped(track: existingTrack);
+            yield TrackSkipped(track: existingTrack.copyWith(uri: item.uri));
             continue;
           }
         }
@@ -115,23 +121,24 @@ class TrackScanner {
         continue;
       }
 
-      String title = (() {
-        String str = tag.title ?? '';
+      var title = (() {
+        var str = tag.title ?? '';
         if (str.isEmpty) str = p.basenameWithoutExtension(item.name);
         return str;
       })();
-      List<String>? artists = (() {
-        String str = tag.artists ?? '';
+      var artists = (() {
+        var str = tag.artists ?? '';
         if (str.isEmpty) return null;
         return splitArtists(str);
       })();
-      String? album = (() {
+      var album = (() {
         String? str = tag.album ?? '';
         if (str.isEmpty) str = null;
         return str;
       })();
 
       final track = TrackInfo(
+        sourceKey: item.sourceKey,
         title: title,
         titleInLatin: title.toLatin(),
         artists: artists,

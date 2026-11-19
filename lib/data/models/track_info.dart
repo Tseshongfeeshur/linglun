@@ -1,5 +1,6 @@
 class TrackInfo {
-  // Id id = ;
+  // final int id;
+  final String sourceKey;
 
   final String title;
   final String titleInLatin;
@@ -23,6 +24,7 @@ class TrackInfo {
   final bool removed;
 
   new({
+    required this.sourceKey,
     required this.title,
     required this.titleInLatin,
     this.artists,
@@ -41,6 +43,7 @@ class TrackInfo {
   });
 
   TrackInfo copyWith({
+    String? sourceKey,
     String? title,
     String? titleInLatin,
     List<String>? artists,
@@ -58,6 +61,7 @@ class TrackInfo {
     bool? removed,
   }) {
     return TrackInfo(
+      sourceKey: sourceKey ?? this.sourceKey,
       title: title ?? this.title,
       titleInLatin: titleInLatin ?? this.titleInLatin,
       artists: artists ?? this.artists,

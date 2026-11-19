@@ -6,7 +6,6 @@ import 'package:linglun/data/models/drawer_state.dart';
 import 'package:linglun/states/drawer_provider.dart';
 import 'package:linglun/states/tracks_provider.dart';
 
-import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/utils/track_sort.dart';
 
 import 'package:linglun/ui/widgets/list_page_actions.dart';
@@ -27,8 +26,8 @@ class _TrackLibState extends ConsumerState<TrackLib> {
     final drawerState = ref.watch<DrawerState>(drawerProvider);
     final layout = context.layout;
 
-    final List<TrackInfo> originalMusicList = ref.watch(tracksProvider);
-    Map<String, List<TrackInfo>> groupedMusicList = groupMusicList(
+    final originalMusicList = ref.watch(tracksProvider);
+    var groupedMusicList = groupMusicList(
       sortMusicList(originalMusicList, sortConfig),
       sortConfig,
     );

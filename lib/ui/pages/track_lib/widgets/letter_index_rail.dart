@@ -40,14 +40,14 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
   List<String> get letters => widget.descending ? reversedLetters : allLetters;
 
   void onPointer(double y) {
-    final int idx =
+    final idx =
         ((y - railOuterPadding + letterSpacing) ~/
                 (letterHeight + letterSpacing))
             .clamp(0, letters.length - 1)
             .toInt();
-    final String newLetter = letters[idx];
-    final int existIndex = widget.existLetters.indexOf(newLetter);
-    final bool letterChanged = letter != newLetter;
+    final newLetter = letters[idx];
+    final existIndex = widget.existLetters.indexOf(newLetter);
+    final letterChanged = letter != newLetter;
 
     setState(() {
       dragPosition = y;
@@ -63,20 +63,20 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
   }
 
   double hinterOffset(double y) {
-    final double min = -hinterSize / 2;
-    final double max =
+    final min = -hinterSize / 2;
+    final max =
         (letterHeight + letterSpacing) * letters.length -
         letterSpacing +
         railOuterPadding * 2 -
         hinterSize / 2;
 
-    final double offset = y - hinterSize / 2;
+    final offset = y - hinterSize / 2;
 
     if (offset < min) {
-      final double d = min - offset;
+      final d = min - offset;
       return min - 8 * (1 - math.exp(-d / 20));
     } else if (offset > max) {
-      final double d = offset - max;
+      final d = offset - max;
       return max + 8 * (1 - math.exp(-d / 20));
     }
 

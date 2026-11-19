@@ -8,7 +8,6 @@ import 'package:linglun/data/track_scanner/utils/platforms/android_file_utils.da
 import 'package:linglun/data/track_scanner/utils/platforms/linux_file_utils.dart';
 import 'package:linglun/data/models/window_layout.dart';
 import 'package:linglun/data/models/drawer_state.dart';
-import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/states/tracks_provider.dart';
 import 'package:linglun/states/drawer_provider.dart';
 import 'package:linglun/ui/utils/show_snack_bar.dart';
@@ -32,7 +31,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
 
   Future<void> getPlatformPath() async {
     final result = await utils.getPlatformMusicPath();
-    String? path = result.path;
+    var path = result.path;
 
     if (context.mounted && path != null) {
       setState(
@@ -143,7 +142,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
               leading: const Icon(Icons.add),
               title: const Text('添加文件夹'),
               onTap: () async {
-                String? uri = await utils.getUri();
+                var uri = await utils.getUri();
                 if (uri == null) {
                   if (context.mounted) {
                     showSnackBar(context, Icons.warning, '未选择任何文件夹');
@@ -189,7 +188,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          final List<TrackInfo>? tracks = await showScanningDialog(context, {
+          final tracks = await showScanningDialog(context, {
             if (platformPath.ticked && platformPath.path != null)
               platformPath.path!,
             ...userUris.keys.where((element) => userUris[element] ?? false),

@@ -9,13 +9,13 @@ class AndroidFileUtils extends PlatformFileUtils {
   @override
   Stream<DiscoverEvent> discover(Set<String> rootUris) async* {
     final safUtil = SafUtil();
-    List<String> uris = rootUris.toList();
+    var uris = rootUris.toList();
 
     while (uris.isNotEmpty) {
       final uri = uris.last;
       uris.removeLast();
 
-      List<SafDocumentFile> files = [];
+      var files = <SafDocumentFile>[];
       try {
         files = await safUtil.list(uri);
       } catch (e) {
@@ -28,8 +28,14 @@ class AndroidFileUtils extends PlatformFileUtils {
           uris.add(item.uri);
           continue;
         }
+
+        final segments = Uri.parse(item.uri).pathSegments;
+        var docId = segments.indexOf('document') + 1;
+        if (docId == 0) docId = 3;
+
         yield FileDiscovered(
           uri: item.uri,
+          sourceKey: segments[docId],
           name: item.name,
           sizeBytes: item.length,
           editTime: DateTime.fromMillisecondsSinceEpoch(item.lastModified),
