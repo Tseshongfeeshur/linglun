@@ -1,10 +1,11 @@
+import 'package:linglun/data/track_scanner/utils/group_key_of.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:linglun/data/models/track_info.dart';
 
 enum TrackSort {
-  titleInLatin('标题', Icons.title, true),
-  artistsInLatin('艺术家', Icons.person, true),
-  albumInLatin('专辑', Icons.album, true),
+  title('标题', Icons.title, true),
+  artists('艺术家', Icons.person, true),
+  album('专辑', Icons.album, true),
 
   uri('文件路径', Icons.folder_copy, false),
 
@@ -22,9 +23,9 @@ enum TrackSort {
 
   /// 返回某指定 MusicInfo 的特定字段
   String? groupSource(TrackInfo m) => switch (this) {
-    TrackSort.titleInLatin => m.titleInLatin,
-    TrackSort.artistsInLatin => m.artistsInLatin,
-    TrackSort.albumInLatin => m.albumInLatin,
+    TrackSort.title => m.titleKey.sort,
+    TrackSort.artists => m.artistsKeys.first.sort,
+    TrackSort.album => m.albumKey.sort,
     _ => null,
   };
 }
@@ -41,12 +42,14 @@ class SortConfig {
 List<TrackInfo> sortMusicList(List<TrackInfo> list, SortConfig sortConfig) {
   final result = [...list];
   switch (sortConfig.method) {
-    case TrackSort.titleInLatin:
-      result.sort((a, b) => a.titleInLatin.compareTo(b.titleInLatin));
-    case TrackSort.artistsInLatin:
-      result.sort((a, b) => a.artistsInLatin.compareTo(b.artistsInLatin));
-    case TrackSort.albumInLatin:
-      result.sort((a, b) => a.albumInLatin.compareTo(b.albumInLatin));
+    case TrackSort.title:
+      result.sort((a, b) => compareKeys(a.titleKey, b.titleKey));
+    case TrackSort.artists:
+      result.sort(
+        (a, b) => compareKeys(a.artistsKeys.first, b.artistsKeys.first),
+      );
+    case TrackSort.album:
+      result.sort((a, b) => compareKeys(a.albumKey, b.albumKey));
 
     case TrackSort.uri:
       result.sort((a, b) => a.uri.compareTo(b.uri));

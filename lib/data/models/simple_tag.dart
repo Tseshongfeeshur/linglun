@@ -1,8 +1,8 @@
 class SimpleTag {
   final String? title;
-  final String? artists;
+  final List<String>? artists;
   final String? album;
-  final int? durationMs;
+  final int durationMs;
 
-  new({this.title, this.artists, this.album, this.durationMs});
+  new({this.title, this.artists, this.album, required this.durationMs});
 }

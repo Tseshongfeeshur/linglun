@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_taglib/flutter_taglib.dart';
 import 'package:linglun/data/models/simple_tag.dart';
+import 'package:linglun/data/track_scanner/utils/artist_splitter.dart';
 import 'package:path/path.dart' as p;
 import 'package:linglun/data/track_scanner/track_scanner.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
@@ -67,9 +68,9 @@ class LinuxFileUtils extends PlatformFileUtils {
     SimpleTag? tag;
     try {
       tag = SimpleTag(
-        title: file.title,
-        artists: file.artist,
-        album: file.album,
+        title: file.title.isEmpty ? null : file.title,
+        artists: file.artist.isEmpty ? null : splitArtists(file.artist),
+        album: file.album.isEmpty ? null : file.album,
         durationMs: file.duration.inMilliseconds,
       );
     } finally {

@@ -5,8 +5,7 @@ import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.d
 import 'package:path/path.dart' as p;
 
 import 'package:linglun/data/models/track_info.dart';
-import 'package:linglun/data/track_scanner/utils/string_to_latin.dart';
-import 'package:linglun/data/track_scanner/utils/artist_splitter.dart';
+import 'package:linglun/data/track_scanner/utils/group_key_of.dart';
 
 const _extensions = {
   '.mp3',
@@ -121,34 +120,19 @@ class TrackScanner {
         continue;
       }
 
-      var title = (() {
-        var str = tag.title ?? '';
-        if (str.isEmpty) str = p.basenameWithoutExtension(item.name);
-        return str;
-      })();
-      var artists = (() {
-        var str = tag.artists ?? '';
-        if (str.isEmpty) return null;
-        return splitArtists(str);
-      })();
-      var album = (() {
-        String? str = tag.album ?? '';
-        if (str.isEmpty) str = null;
-        return str;
-      })();
-
       final track = TrackInfo(
         sourceKey: item.sourceKey,
-        title: title,
-        titleInLatin: title.toLatin(),
-        artists: artists,
-        artistsInLatin: artists?.join('/').toLatin() ?? '#',
-        album: album,
-        albumInLatin: album?.toLatin() ?? '#',
+        title: tag.title ?? p.basenameWithoutExtension(item.name),
+        titleKey: keyOf(tag.title ?? p.basenameWithoutExtension(item.name)),
+        artists: tag.artists,
+        artistsKeys:
+            tag.artists?.map((i) => keyOf(i)).toList() ?? [keyOfNullable(null)],
+        album: tag.album,
+        albumKey: keyOfNullable(tag.album),
         uri: item.uri,
         fileName: item.name,
         sizeBytes: item.sizeBytes,
-        durationMs: tag.durationMs ?? 0,
+        durationMs: tag.durationMs,
         trackGainUpdated: false,
         editTime: item.editTime,
         playCount: existingTrack?.playCount ?? 0,

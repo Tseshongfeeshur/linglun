@@ -19,7 +19,7 @@ class TrackLib extends ConsumerStatefulWidget {
 }
 
 class _TrackLibState extends ConsumerState<TrackLib> {
-  SortConfig sortConfig = const SortConfig(TrackSort.titleInLatin, false);
+  SortConfig sortConfig = const SortConfig(TrackSort.title, false);
 
   @override
   Widget build(BuildContext context) {

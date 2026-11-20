@@ -1,15 +1,26 @@
+class TextKey {
+  final String group; // 分组键，如 'A'、'か'、'ㄱ'、'#'
+  final String sort; // 组内排序键
+
+  const new({required this.group, required this.sort});
+
+  TextKey copyWith({String? group, String? sort}) {
+    return TextKey(group: group ?? this.group, sort: sort ?? this.sort);
+  }
+}
+
 class TrackInfo {
   // final int id;
   final String sourceKey;
 
   final String title;
-  final String titleInLatin;
+  final TextKey titleKey;
 
   final List<String>? artists;
-  final String artistsInLatin;
+  final List<TextKey> artistsKeys;
 
   final String? album;
-  final String albumInLatin;
+  final TextKey albumKey;
 
   final String uri;
   final String fileName;
@@ -23,14 +34,14 @@ class TrackInfo {
   final DateTime addTime;
   final bool removed;
 
-  new({
+  const new({
     required this.sourceKey,
     required this.title,
-    required this.titleInLatin,
+    required this.titleKey,
     this.artists,
-    required this.artistsInLatin,
+    required this.artistsKeys,
     this.album,
-    required this.albumInLatin,
+    required this.albumKey,
     required this.uri,
     required this.fileName,
     required this.sizeBytes,
@@ -45,11 +56,11 @@ class TrackInfo {
   TrackInfo copyWith({
     String? sourceKey,
     String? title,
-    String? titleInLatin,
+    TextKey? titleKey,
     List<String>? artists,
-    String? artistsInLatin,
+    List<TextKey>? artistsKeys,
     String? album,
-    String? albumInLatin,
+    TextKey? albumKey,
     String? uri,
     String? fileName,
     int? sizeBytes,
@@ -63,11 +74,11 @@ class TrackInfo {
     return TrackInfo(
       sourceKey: sourceKey ?? this.sourceKey,
       title: title ?? this.title,
-      titleInLatin: titleInLatin ?? this.titleInLatin,
+      titleKey: titleKey ?? this.titleKey,
       artists: artists ?? this.artists,
-      artistsInLatin: artistsInLatin ?? this.artistsInLatin,
+      artistsKeys: artistsKeys ?? this.artistsKeys,
       album: album ?? this.album,
-      albumInLatin: albumInLatin ?? this.albumInLatin,
+      albumKey: albumKey ?? this.albumKey,
       uri: uri ?? this.uri,
       fileName: fileName ?? this.fileName,
       sizeBytes: sizeBytes ?? this.sizeBytes,

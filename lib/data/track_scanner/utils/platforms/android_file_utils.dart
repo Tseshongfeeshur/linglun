@@ -1,6 +1,7 @@
 import 'package:flutter_taglib/flutter_taglib.dart' hide Picture;
 import 'package:linglun/data/models/simple_tag.dart';
 import 'package:linglun/data/track_scanner/track_scanner.dart';
+import 'package:linglun/data/track_scanner/utils/artist_splitter.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
 import 'package:saf_util/saf_util.dart';
 import 'package:saf_util/saf_util_platform_interface.dart';
@@ -55,9 +56,9 @@ class AndroidFileUtils extends PlatformFileUtils {
     SimpleTag? tag;
     try {
       tag = SimpleTag(
-        title: file.title,
-        artists: file.artist,
-        album: file.album,
+        title: file.title.isEmpty ? file.title : null,
+        artists: file.artist.isEmpty ? splitArtists(file.artist) : null,
+        album: file.album.isEmpty ? file.album : null,
         durationMs: file.duration.inMilliseconds,
       );
     } finally {

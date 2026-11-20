@@ -1,13 +1,9 @@
 import 'package:material_ui/material_ui.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:linglun/data/track_scanner/utils/string_to_latin.dart';
 import 'package:linglun/ui/frame/frame.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  initRomanize();
   runApp(const ProviderScope(child: MainApp()));
 }
 
