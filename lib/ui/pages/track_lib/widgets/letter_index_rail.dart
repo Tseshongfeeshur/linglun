@@ -168,6 +168,7 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
                         final l = letters[letterIndexOf(slot, slotCount)];
 
                         return SizedBox(
+                          //TODO: 修复列表过长时丢项的问题，或优化紧凑方式
                           height: slotHeight,
                           child: Center(
                             child: showDot

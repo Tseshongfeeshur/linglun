@@ -23,9 +23,9 @@ enum TrackSort {
 
   /// 返回某指定 MusicInfo 的特定字段
   String? groupSource(TrackInfo m) => switch (this) {
-    TrackSort.title => m.titleKey.sort,
-    TrackSort.artists => m.artistsKeys.first.sort,
-    TrackSort.album => m.albumKey.sort,
+    TrackSort.title => m.titleKey.group,
+    TrackSort.artists => m.artistsKeys.first.group,
+    TrackSort.album => m.albumKey.group,
     _ => null,
   };
 }
@@ -79,12 +79,8 @@ Map<String, List<TrackInfo>> groupMusicList(
   }
   var result = <String, List<TrackInfo>>{};
   for (final element in sortedList) {
-    final sortSource = sortConfig.method.groupSource(element) ?? '';
-    var key = sortSource.isEmpty
-        ? '#'
-        : sortSource.characters.first.toUpperCase();
-    if (!RegExp(r'^[A-Z]$').hasMatch(key)) key = '#';
-    (result[key] ??= []).add(element);
+    final groupSource = sortConfig.method.groupSource(element) ?? '#';
+    (result[groupSource] ??= []).add(element);
   }
   return result;
 }
