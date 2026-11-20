@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
-import 'package:linglun/ui/utils/show_letter_selecting_dialog.dart';
 
 class LetterIndexRail extends StatefulWidget {
   //TODO: 键盘弹出时隐藏字母滚动条
@@ -26,25 +25,26 @@ class LetterIndexRail extends StatefulWidget {
 }
 
 class _LetterIndexRailState extends State<LetterIndexRail> {
-  static const double letterHeight = 12;
-  static const double letterSpacing = 6;
-  static const double railOuterPadding = 6;
-
+  static const double railPadding = 6;
+  static const double railOuterPadding = 4;
+  static const double slotMaxHeight = 20;
   static const double hinterSize = 52;
 
   bool isDragging = false;
   double dragPosition = 0;
   String letter = '';
 
-  static final List<String> reversedLetters = allLetters.reversed.toList();
-  List<String> get letters => widget.descending ? reversedLetters : allLetters;
+  List<String> get letters => widget.descending
+      ? widget.existLetters.reversed.toList()
+      : widget.existLetters;
 
-  void onPointer(double y) {
-    final idx =
-        ((y - railOuterPadding + letterSpacing) ~/
-                (letterHeight + letterSpacing))
-            .clamp(0, letters.length - 1)
-            .toInt();
+  // 第 i 个格子对应的字母下标
+  int letterIndexOf(int slot, int slotCount) =>
+      (slot * letters.length / slotCount).floor();
+
+  void onPointer(double y, double slotHeight, int slotCount) {
+    final slot = ((y - railPadding) ~/ slotHeight).clamp(0, slotCount - 1);
+    final idx = letterIndexOf(slot, slotCount);
     final newLetter = letters[idx];
     final existIndex = widget.existLetters.indexOf(newLetter);
     final letterChanged = letter != newLetter;
@@ -62,22 +62,18 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
     }
   }
 
-  double hinterOffset(double y) {
-    final min = -hinterSize / 2;
-    final max =
-        (letterHeight + letterSpacing) * letters.length -
-        letterSpacing +
-        railOuterPadding * 2 -
-        hinterSize / 2;
+  double hinterOffset(double y, double slotHeight, int slotCount) {
+    final minOffset = -hinterSize / 2;
+    final maxOffset = slotHeight * slotCount + railPadding * 2 - hinterSize / 2;
 
     final offset = y - hinterSize / 2;
 
-    if (offset < min) {
-      final d = min - offset;
-      return min - 8 * (1 - math.exp(-d / 20));
-    } else if (offset > max) {
-      final d = offset - max;
-      return max + 8 * (1 - math.exp(-d / 20));
+    if (offset < minOffset) {
+      final d = minOffset - offset;
+      return minOffset - 8 * (1 - math.exp(-d / 20));
+    } else if (offset > maxOffset) {
+      final d = offset - maxOffset;
+      return maxOffset + 8 * (1 - math.exp(-d / 20));
     }
 
     return offset;
@@ -85,97 +81,129 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 20,
-      children: [
-        if (isDragging)
-          Transform.translate(
-            offset: Offset(0, hinterOffset(dragPosition)),
-            child: Container(
-              width: hinterSize,
-              height: hinterSize,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Center(
-                child: Text(
-                  letter,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSecondaryContainer
-                        .withAlpha(
-                          widget.existLetters.contains(letter) ? 255 : 120,
-                        ),
-                    fontSize: hinterSize / 2,
-                    fontWeight: const FontWeight(600),
-                    height: 1,
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        if (widget.existLetters.isEmpty) return const SizedBox.shrink();
+
+        final railHeight = constraints.maxHeight - railOuterPadding * 2;
+        final availableHeight = math.max(0.0, railHeight - railPadding * 2 - 2);
+
+        final slotCount = (availableHeight ~/ 14).clamp(1, letters.length);
+        final slotHeight = math.min(availableHeight / slotCount, slotMaxHeight);
+
+        final sparse = slotCount < letters.length;
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 20,
+          children: [
+            if (isDragging)
+              Transform.translate(
+                offset: Offset(
+                  0,
+                  hinterOffset(dragPosition, slotHeight, slotCount),
+                ),
+                child: Container(
+                  width: hinterSize,
+                  height: hinterSize,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(999),
                   ),
-                  maxLines: 1,
+                  child: Center(
+                    child: Text(
+                      letter,
+                      style: TextStyle(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSecondaryContainer,
+                        fontSize: hinterSize / 2,
+                        fontWeight: const FontWeight(600),
+                        height: 1,
+                      ),
+                      maxLines: 1,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        GestureDetector(
-          // 令内部 padding 响应事件
-          behavior: HitTestBehavior.opaque,
-          onTapUp: (details) {
-            onPointer(details.localPosition.dy);
-          },
-          onVerticalDragUpdate: (details) {
-            isDragging = true;
-            onPointer(details.localPosition.dy);
-          },
-          onVerticalDragStart: (details) {
-            isDragging = true;
-            onPointer(details.localPosition.dy);
-          },
-          onVerticalDragEnd: (_) => setState(() => isDragging = false),
-          onVerticalDragCancel: () => setState(() => isDragging = false),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainer,
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                ),
-                borderRadius: BorderRadius.circular(999),
-              ),
+            GestureDetector(
+              // 令内部 padding 响应事件
+              behavior: HitTestBehavior.opaque,
+              onTapUp: (details) {
+                onPointer(details.localPosition.dy, slotHeight, slotCount);
+              },
+              onVerticalDragUpdate: (details) {
+                isDragging = true;
+                onPointer(details.localPosition.dy, slotHeight, slotCount);
+              },
+              onVerticalDragStart: (details) {
+                isDragging = true;
+                onPointer(details.localPosition.dy, slotHeight, slotCount);
+              },
+              onVerticalDragEnd: (_) => setState(() => isDragging = false),
+              onVerticalDragCancel: () => setState(() => isDragging = false),
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 2,
-                  vertical: railOuterPadding,
-                ),
-                child: Column(
-                  spacing: letterSpacing,
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: letters
-                      .map(
-                        (letter) => Text(
-                          letter,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface
-                                .withAlpha(
-                                  widget.existLetters.contains(letter)
-                                      ? 255
-                                      : 120,
-                                ),
-                            fontSize: letterHeight,
-                            height: 1,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainer,
+                    border: Border.all(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest,
+                    ),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 2,
+                      vertical: railPadding,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: List.generate(slotCount, (slot) {
+                        final showDot = sparse && slot.isOdd;
+                        final l = letters[letterIndexOf(slot, slotCount)];
+
+                        return SizedBox(
+                          height: slotHeight,
+                          child: Center(
+                            child: showDot
+                                ? Container(
+                                    width: 4,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withAlpha(120),
+                                    ),
+                                  )
+                                : Text(
+                                    l,
+                                    style: TextStyle(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                      fontSize: 12,
+                                      height: 1,
+                                    ),
+                                    maxLines: 1,
+                                  ),
                           ),
-                          maxLines: 1,
-                        ),
-                      )
-                      .toList(),
+                        );
+                      }),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }

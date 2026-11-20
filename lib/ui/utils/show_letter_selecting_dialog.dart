@@ -1,14 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:linglun/data/models/track_info.dart';
 
-List<String> allLetters = [
-  '#',
-  ...List.generate(
-    26,
-    (index) => String.fromCharCode('A'.codeUnitAt(0) + index),
-  ),
-];
-
 Future<String?> showLetterSelectingDialog(
   BuildContext context,
   Map<String, List<TrackInfo>> groupedTrackList,
@@ -28,11 +20,10 @@ Future<String?> showLetterSelectingDialog(
             crossAxisSpacing: 2,
             childAspectRatio: 1,
           ),
-          itemCount: allLetters.length,
+          itemCount: groupedTrackList.length,
           itemBuilder: (context, index) => _LetterCell(
-            letter: allLetters[index],
-            isCurrent: allLetters[index] == currentLetter,
-            isValid: groupedTrackList.containsKey(allLetters[index]),
+            letter: groupedTrackList.keys.toList()[index],
+            isCurrent: groupedTrackList.keys.toList()[index] == currentLetter,
           ),
         ),
       ),
@@ -49,13 +40,8 @@ Future<String?> showLetterSelectingDialog(
 class _LetterCell extends StatelessWidget {
   final String letter;
   final bool isCurrent;
-  final bool isValid;
 
-  const new({
-    required this.letter,
-    required this.isCurrent,
-    required this.isValid,
-  });
+  const new({required this.letter, required this.isCurrent});
 
   @override
   Widget build(BuildContext context) {
@@ -67,14 +53,12 @@ class _LetterCell extends StatelessWidget {
       ),
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: isValid ? () => Navigator.of(context).pop(letter) : null,
+        onTap: () => Navigator.of(context).pop(letter),
         child: Center(
           child: Text(
             letter,
             style: TextStyle(
-              color: isCurrent
-                  ? scheme.onPrimary
-                  : (isValid ? null : scheme.onSurface.withAlpha(100)),
+              color: isCurrent ? scheme.onPrimary : null,
               fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
