@@ -64,7 +64,7 @@ class _TrackLibState extends ConsumerState<TrackLib> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
           child: TrackListView(
-            groupedMusicList: groupedMusicList,
+            groupedTrackList: groupedMusicList,
             hasGroups: !groupedMusicList.keys.contains('default'),
             descending: sortConfig.descending,
           ),

@@ -1,5 +1,5 @@
 import 'package:diacritic/diacritic.dart';
-import 'package:lpinyin/lpinyin.dart';
+import 'package:pinyin/pinyin.dart';
 
 import 'package:linglun/data/models/track_info.dart';
 

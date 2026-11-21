@@ -10,13 +10,13 @@ import 'package:linglun/data/models/track_info.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class TrackListView extends StatefulWidget {
-  final Map<String, List<TrackInfo>> groupedMusicList;
+  final Map<String, List<TrackInfo>> groupedTrackList;
   final bool hasGroups;
   final bool descending;
 
   const new({
     super.key,
-    required this.groupedMusicList,
+    required this.groupedTrackList,
     required this.hasGroups,
     required this.descending,
   });
@@ -31,7 +31,7 @@ class _TrackListViewState extends State<TrackListView> {
   @override
   Widget build(BuildContext context) {
     if (widget.hasGroups) {
-      final entries = widget.groupedMusicList.entries;
+      final entries = widget.groupedTrackList.entries;
 
       final items = <Object>[];
       final keyIndexList = <int>[];
@@ -58,11 +58,11 @@ class _TrackListViewState extends State<TrackListView> {
               itemBuilder: (context, index) {
                 switch (items[index]) {
                   case TrackInfo musicInfo:
-                    return _MusicListItem(musicInfo: musicInfo);
+                    return _MusicListItem(trackInfo: musicInfo);
                   case String letter:
                     return _MusicListGroupHead(
                       letter: letter,
-                      groupedMusicList: widget.groupedMusicList,
+                      groupedMusicList: widget.groupedTrackList,
                       itemScrollController: itemScrollController,
                       keyIndexList: keyIndexList,
                     );
@@ -80,7 +80,7 @@ class _TrackListViewState extends State<TrackListView> {
               child: Align(
                 alignment: Alignment.centerRight,
                 child: LetterIndexRail(
-                  existLetters: widget.groupedMusicList.keys.toList(),
+                  groupedTrackList: widget.groupedTrackList,
                   itemScrollController: itemScrollController,
                   keyIndexList: keyIndexList,
                   descending: widget.descending,
@@ -91,9 +91,9 @@ class _TrackListViewState extends State<TrackListView> {
       );
     } else {
       return ListView.builder(
-        itemCount: widget.groupedMusicList['default']!.length,
+        itemCount: widget.groupedTrackList['default']!.length,
         itemBuilder: (context, index) => _MusicListItem(
-          musicInfo: widget.groupedMusicList['default']![index],
+          trackInfo: widget.groupedTrackList['default']![index],
         ),
       );
     }
@@ -147,41 +147,45 @@ class _MusicListGroupHead extends StatelessWidget {
 }
 
 class _MusicListItem extends StatelessWidget {
-  const new({required this.musicInfo});
+  const new({required this.trackInfo});
 
-  final TrackInfo musicInfo;
+  final TrackInfo trackInfo;
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          color: Theme.of(context).colorScheme.primary,
-        ),
-        child: Center(
-          child: Icon(
-            Icons.music_note,
-            color: Theme.of(context).colorScheme.surface,
+    var removed = trackInfo.removed;
+    return Opacity(
+      opacity: removed ? 0.6 : 1,
+      child: ListTile(
+        leading: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          child: Center(
+            child: Icon(
+              Icons.music_note,
+              color: Theme.of(context).colorScheme.surface,
+            ),
           ),
         ),
+        title: Text(
+          trackInfo.title,
+          maxLines: 1,
+          style: const TextStyle(overflow: TextOverflow.ellipsis),
+        ),
+        subtitle: Text(
+          // TODO: 使用富文本，淡化斜杠
+          trackInfo.artists?.join('/') ?? '未知艺术家',
+          maxLines: 1,
+          style: const TextStyle(overflow: TextOverflow.ellipsis),
+        ),
+        onTap: () {
+          showTrackInfoBottomSheet(context, trackInfo);
+        },
       ),
-      title: Text(
-        musicInfo.title,
-        maxLines: 1,
-        style: const TextStyle(overflow: TextOverflow.ellipsis),
-      ),
-      subtitle: Text(
-        // TODO: 使用富文本，淡化斜杠
-        musicInfo.artists?.join('/') ?? '未知艺术家',
-        maxLines: 1,
-        style: const TextStyle(overflow: TextOverflow.ellipsis),
-      ),
-      onTap: () {
-        showTrackInfoBottomSheet(context, musicInfo);
-      },
     );
   }
 }

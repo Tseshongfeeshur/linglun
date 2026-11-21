@@ -1,21 +1,86 @@
 import 'dart:math' as math;
+// import 'dart:nativewrappers/_internal/vm/lib/math_patch.dart';
 
 import 'package:flutter/services.dart';
+import 'package:linglun/data/models/track_info.dart';
+import 'package:linglun/data/track_scanner/utils/group_key_of.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+class _RailSlot {
+  final String display;
+  final int index;
+  new({required this.display, required this.index});
+}
+
+List<_RailSlot> _buildRailSlots(
+  Map<String, List<TrackInfo>> groupedTrackList,
+  List<int> keyIndexList,
+) {
+  if (groupedTrackList.isEmpty) return [];
+
+  var scriptCounts = <Script, int>{};
+
+  for (final group in groupedTrackList.keys) {
+    final script = scriptOf(group.runes.first);
+    final count = groupedTrackList[group]!.length;
+
+    scriptCounts[script] = (scriptCounts[script] ?? 0) + count;
+  }
+
+  var expandedScript = Script.latin;
+  var maxCount = 0;
+  for (var i = 0; i < scriptCounts.keys.length; i++) {
+    final count = scriptCounts.values.toList()[i];
+    if (count > maxCount) {
+      maxCount = count;
+      expandedScript = scriptCounts.keys.toList()[i];
+    }
+  }
+
+  var result = <_RailSlot>[];
+  final sampleOfScript = {
+    Script.cyrillic: 'Я',
+    Script.han: 'A',
+    Script.hangul: '가',
+    Script.kana: 'あ',
+    Script.latin: 'A',
+    Script.other: '#',
+  };
+  for (var i = 0; i < groupedTrackList.keys.length; i++) {
+    final group = groupedTrackList.keys.toList()[i];
+    final script = scriptOf(group.runes.first);
+
+    if (script == expandedScript) {
+      result.add(_RailSlot(display: group, index: keyIndexList[i]));
+    } else {
+      if (scriptOf(group.runes.first) ==
+          scriptOf(groupedTrackList.keys.toList()[i - 1].runes.first)) {
+        continue;
+      }
+      result.add(
+        _RailSlot(
+          display: sampleOfScript[script] ?? '#',
+          index: keyIndexList[i],
+        ),
+      );
+    }
+  }
+
+  return result;
+}
+
 class LetterIndexRail extends StatefulWidget {
-  //TODO: 键盘弹出时隐藏字母滚动条
   const new({
     super.key,
-    required this.existLetters,
+    required this.groupedTrackList,
     required this.itemScrollController,
     required this.keyIndexList,
     required this.descending,
   });
 
-  final List<String> existLetters;
+  final Map<String, List<TrackInfo>> groupedTrackList;
   final ItemScrollController itemScrollController;
   final List<int> keyIndexList;
   final bool descending;
@@ -32,21 +97,36 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
 
   bool isDragging = false;
   double dragPosition = 0;
+  List<_RailSlot> slotContents = [];
   String letter = '';
 
-  List<String> get letters => widget.descending
-      ? widget.existLetters.reversed.toList()
-      : widget.existLetters;
+  @override
+  void initState() {
+    super.initState();
+    slotContents = _buildRailSlots(
+      widget.groupedTrackList,
+      widget.keyIndexList,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant LetterIndexRail oldWidget) {
+    slotContents = _buildRailSlots(
+      widget.groupedTrackList,
+      widget.keyIndexList,
+    );
+
+    super.didUpdateWidget(oldWidget);
+  }
 
   // 第 i 个格子对应的字母下标
   int letterIndexOf(int slot, int slotCount) =>
-      (slot * letters.length / slotCount).floor();
+      (slot * slotContents.length / slotCount).floor();
 
   void onPointer(double y, double slotHeight, int slotCount) {
     final slot = ((y - railPadding) ~/ slotHeight).clamp(0, slotCount - 1);
     final idx = letterIndexOf(slot, slotCount);
-    final newLetter = letters[idx];
-    final existIndex = widget.existLetters.indexOf(newLetter);
+    final newLetter = slotContents[idx].display;
     final letterChanged = letter != newLetter;
 
     setState(() {
@@ -54,11 +134,9 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
       letter = newLetter;
     });
 
-    if (letterChanged && existIndex != -1) {
+    if (letterChanged) {
       HapticFeedback.selectionClick();
-      widget.itemScrollController.jumpTo(
-        index: widget.keyIndexList[existIndex],
-      );
+      widget.itemScrollController.jumpTo(index: slotContents[idx].index);
     }
   }
 
@@ -83,15 +161,15 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        if (widget.existLetters.isEmpty) return const SizedBox.shrink();
+        if (slotContents.isEmpty) return const SizedBox.shrink();
 
         final railHeight = constraints.maxHeight - railOuterPadding * 2;
         final availableHeight = math.max(0.0, railHeight - railPadding * 2 - 2);
 
-        final slotCount = (availableHeight ~/ 14).clamp(1, letters.length);
+        final slotCount = (availableHeight ~/ 14).clamp(1, slotContents.length);
         final slotHeight = math.min(availableHeight / slotCount, slotMaxHeight);
 
-        final sparse = slotCount < letters.length;
+        final sparse = slotCount < slotContents.length;
 
         return Row(
           mainAxisSize: MainAxisSize.min,
@@ -165,10 +243,10 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: List.generate(slotCount, (slot) {
                         final showDot = sparse && slot.isOdd;
-                        final l = letters[letterIndexOf(slot, slotCount)];
+                        final l = slotContents[letterIndexOf(slot, slotCount)]
+                            .display;
 
                         return SizedBox(
-                          //TODO: 修复列表过长时丢项的问题，或优化紧凑方式
                           height: slotHeight,
                           child: Center(
                             child: showDot
