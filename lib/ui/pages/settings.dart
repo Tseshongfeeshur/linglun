@@ -35,6 +35,7 @@ class Settings extends ConsumerWidget {
             : null,
         title: const Text('设置'),
       ),
+      // TODO: 页面内容尚未实现。
       body: const Center(child: Text('Settings')),
     );
   }

@@ -6,14 +6,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/track_scanner/models/scan_state.dart';
 
+/// 弹出阻塞式扫描对话框，扫描完成并确认后返回新的完整曲库；取消返回 null。
+/// 返回值 = 跳过的旧记录 + 新增/已变化/被标 removed 的记录；
+/// 解析失败的曲目不在其中（见 TrackScanner.parse 里的 FIXME）。
 Future<List<TrackInfo>?> showScanningDialog(
   BuildContext context,
   Set<String> uris,
   List<TrackInfo> existing,
 ) async {
+  // TODO: 补上泛型 showDialog<List<TrackInfo>>，现在返回值是 dynamic，
+  // 靠隐式转换才通过类型检查。
   return await showDialog(
     context: context,
     builder: (BuildContext context) => PopScope(
+      // 禁止返回键/点击外部关闭，只能通过对话框里的按钮退出
+      // （代码里调用的 Navigator.pop 不受 canPop 限制）。
       canPop: false,
       child: Dialog(
         child: _ScanningDialogFrame(urisToDiscover: uris, existing: existing),
@@ -37,6 +44,8 @@ class _ScanningDialogFrameState extends ConsumerState<_ScanningDialogFrame> {
   @override
   void initState() {
     super.initState();
+    // 对话框一出现就开始扫描；对话框关闭 → scanProvider（autoDispose）销毁
+    // → 扫描在下一个事件处停止，这就是"取消"。
     ref
         .read(scanProvider.notifier)
         .startScan(widget.urisToDiscover, widget.existing);
@@ -68,6 +77,11 @@ class _ContentAtScanning extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            // 左：阶段名；右：已处理数/已发现数。
+            // 注意：parse 结尾会把"库里有、磁盘上没有"的曲目也作为 TrackParsed 发出，
+            // 所以最后一瞬间已处理数可能超过已发现数（随即进入完成页，影响很小）。
+            // TODO: "已处理数"（updates+skips+errors 三项相加）这里写了两遍，
+            // 在 ScanState 里加一个 parsedCount getter。
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -127,6 +141,8 @@ class _ContentAtScanning extends StatelessWidget {
   }
 }
 
+/// 扫描完成页：三个汇总项（已更新/已跳过/已失败），点开看明细，
+/// 底部"更新曲库"把结果返回给调用方。
 class _ContentAtFinish extends StatelessWidget {
   const new({required this.scanState});
 
@@ -147,6 +163,9 @@ class _ContentAtFinish extends StatelessWidget {
             children: [
               const SizedBox(height: 4),
 
+              // TODO: 下面三个明细对话框结构几乎一样（各约 60 行），抽成一个
+              // _showDetailDialog(context, title, List<String> lines) 即可。
+              // 明细里的按钮文案"取消"也应是"关闭"。
               // 第一项：已更新
               ListTile(
                 leading: const Icon(Icons.update),
@@ -154,6 +173,9 @@ class _ContentAtFinish extends StatelessWidget {
                     ? null
                     : const Icon(Icons.keyboard_arrow_right),
                 title: Text(
+                  // 已更新 = 新增或已变化（不含被标记 removed 的）。
+                  // TODO: 被标记 removed 的曲目也会随"更新曲库"一起写回，但界面上没有单独
+                  // 展示它们的数量，用户不知道有多少首被标成了"已移除"。
                   '已更新 ${scanState.parseUpdates.where((item) => item.track.removed == false).length} 项',
                   style: const TextStyle(overflow: TextOverflow.ellipsis),
                   maxLines: 1,
@@ -184,6 +206,12 @@ class _ContentAtFinish extends StatelessWidget {
                                 Flexible(
                                   child: ListView.builder(
                                     shrinkWrap: true,
+                                    // FIXME: 性能 O(n²)：itemCount 里 where().length 算一遍，
+                                    // itemBuilder 里每一行又 where().toList()[index]
+                                    // 重新过滤、建一份完整列表。首次扫描曲目上万时，
+                                    // 打开这个明细会卡死。应在 build 外先
+                                    // final updated = parseUpdates.where(...).toList()
+                                    // 一次，itemBuilder 里直接 updated[index]。
                                     itemCount: scanState.parseUpdates
                                         .where(
                                           (item) => item.track.removed == false,
@@ -397,6 +425,8 @@ class _ContentAtFinish extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () {
+                  // 新的完整曲库 = 跳过的旧记录 + 新增/已变化/removed 的记录。
+                  // 解析失败的曲目不在其中，见 TrackScanner.parse 里的 FIXME。
                   Navigator.pop(context, <TrackInfo>[
                     ...scanState.parseSkips.map((item) => item.track),
                     ...scanState.parseUpdates.map((item) => item.track),

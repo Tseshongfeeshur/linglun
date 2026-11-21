@@ -4,6 +4,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:linglun/data/utils/track_sort.dart';
 
+/// AppBar 右侧的列表操作区：排序菜单、多选按钮、可展开的搜索框。
+/// 搜索框获得焦点或有文字时展开；窄屏展开时其他按钮折叠让位。
+/// 三者由同一个动画进度 progress（0~1）统一驱动。
 class ListPageActions extends StatefulWidget {
   final SortConfig sortConfig;
   final ValueChanged<SortConfig> onSortChanged;
@@ -14,11 +17,16 @@ class ListPageActions extends StatefulWidget {
 }
 
 class _ListPageActionsState extends State<ListPageActions> {
+  // TODO: 搜索文本目前只用来控制"展开/收起"，没有回传给页面做过滤
+  // （待办：搜索接入过滤逻辑）。接入时通过回调把 controller.text 传出去，
+  // 数据量大时考虑防抖。
   late TextEditingController searchBarController;
   late FocusNode searchBarFocusNode;
   final double searchBarPadding = 8;
   bool isSearchBarExtended = false;
 
+  // 展开条件：有焦点，或已输入文字（有文字时即使失焦也保持展开，
+  // 提示"当前列表正在被过滤"）。
   void updateExtendedState() => setState(
     () => isSearchBarExtended =
         searchBarFocusNode.hasFocus || searchBarController.text.isNotEmpty,
@@ -87,6 +95,7 @@ class _ListPageActionsState extends State<ListPageActions> {
   }
 }
 
+/// 窄屏时随搜索框展开而收起的按钮（宽度→0 + 渐隐 + 不再响应点击）；宽屏始终显示。
 class _Collapsible extends StatelessWidget {
   final Widget child;
   final double progress;
@@ -95,6 +104,8 @@ class _Collapsible extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // TODO: 断点 600 写死在这里（_SearchField 里还有一处），项目约定断点只看
+    // window_layout.dart：应写成 context.layout != WindowLayout.phone。
     final visible = MediaQuery.sizeOf(context).width >= 600
         ? 1.0
         : (1 - progress).clamp(0.0, 1.0);
@@ -134,6 +145,7 @@ class _SortButton extends StatelessWidget {
         reverseCurve: Curves.easeInOutCubic,
         reverseDuration: 140.ms,
       ),
+      // 点已选中的项 = 翻转升降序；点别的项 = 切换依据，并重置为升序。
       onSelected: (value) {
         if (sortConfig.method == value) {
           onSortChanged(
@@ -187,6 +199,7 @@ class _CheckButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
+      // TODO: 多选模式尚未实现（待办）。
       onPressed: () {},
       icon: const Icon(Icons.check_box_outlined),
       style: IconButton.styleFrom(
@@ -197,6 +210,7 @@ class _CheckButton extends StatelessWidget {
   }
 }
 
+/// 搜索框：收起时只是一个搜索图标按钮，展开时露出输入框和清除按钮。
 class _SearchField extends StatefulWidget {
   final Size buttonSize;
   final TextEditingController controller;
@@ -223,6 +237,11 @@ class _SearchFieldState extends State<_SearchField> {
 
   @override
   Widget build(BuildContext context) {
+    // 宽度 = 图标按钮宽 + 增量 × progress：宽屏展开到 +240；
+    // 窄屏展开到占满屏幕宽度（减去两侧 padding）。
+    // TODO: 上面说的断点 600 写死了，同 _Collapsible。
+    // TapRegion 的 groupId 与 TextField 相同，所以点击搜索框内部（含图标、清除按钮）
+    // 不算"点击外部"；点击外部则失焦（文本为空时随之收起）。
     return TapRegion(
       groupId: _groupId,
       child: Container(
@@ -276,6 +295,7 @@ class _SearchFieldState extends State<_SearchField> {
             Positioned(
               right: 0,
               child: Opacity(
+                // 清除按钮只在动画后半段（progress 0.5→1）淡入；前半段不响应点击。
                 opacity: ((widget.progress - 0.5) / 0.5).clamp(0, 1),
                 child: IgnorePointer(
                   ignoring: widget.progress < 0.5,

@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:linglun/data/models/track_info.dart';
 
+// TODO: 这两个样式函数是公开的顶层函数，名字很通用；加下划线私有化
+// （_headStyle / _descStyle），headStyle 的 context 参数也没用到。
 TextStyle headStyle(BuildContext context) =>
     const TextStyle(fontWeight: FontWeight(500));
 TextStyle descStyle(BuildContext context) => TextStyle(
@@ -8,6 +10,8 @@ TextStyle descStyle(BuildContext context) => TextStyle(
   fontSize: 12,
 );
 
+/// 曲目信息面板。目前是调试性质：括号里灰色的是各排序键（sort），
+/// 便于核对拉丁化/分组规则。
 void showTrackInfoBottomSheet(
   BuildContext context,
   TrackInfo track,
@@ -31,6 +35,8 @@ void showTrackInfoBottomSheet(
                 text: '（${track.titleKey.sort}）',
                 style: descStyle(context),
               ),
+              // 注意：artistsKeys 为空列表时下面的 .first 会抛异常
+              // （见 TrackScanner.parse 里的 FIXME）；这里也只显示第一个艺术家的排序键。
               TextSpan(text: '\n艺术家：', style: headStyle(context)),
               TextSpan(text: track.artists?.join(' / ')),
               TextSpan(
@@ -45,6 +51,7 @@ void showTrackInfoBottomSheet(
               ),
               TextSpan(text: '\n路径：', style: headStyle(context)),
               TextSpan(text: track.uri),
+              // TODO: sizeBytes 可能是 -1（平台未知），会显示成 "-0.00 MiB"。
               TextSpan(text: '\n文件体积：', style: headStyle(context)),
               TextSpan(
                 text:
@@ -56,6 +63,7 @@ void showTrackInfoBottomSheet(
               ),
               TextSpan(text: '\n时长：', style: headStyle(context)),
               TextSpan(
+                // TODO: 时长格式化抽成公共函数 formatDuration(int ms)，列表项和播放页也会用到。
                 text: (() {
                   var tmps = (track.durationMs ~/ 1000);
                   var h = tmps ~/ 60 ~/ 60;

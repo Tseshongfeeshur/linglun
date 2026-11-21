@@ -35,6 +35,7 @@ class Playlist extends ConsumerWidget {
             : null,
         title: const Text('歌单'),
       ),
+      // TODO: 页面内容尚未实现（歌单需要先有数据库里的歌单表）。
       body: const Center(child: Text('Playlist')),
     );
   }

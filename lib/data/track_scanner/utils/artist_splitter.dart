@@ -33,11 +33,18 @@ const List<String> _protectedArtistNames = [
   'Leo/need',
   // 含 、 的
   'ハロー、ハッピーワールド！',
+  // TODO: 这两项含的是半角逗号 ','，而默认分隔符里并没有逗号，所以目前其实
+  // 不需要保护，只有以后把 ',' 加进分隔符才会生效；上面注释写的"，"（全角）也与实际不符。
   // 含 ， 的
   'Tyler, The Creator',
   'Peter, Paul and Mary',
 ];
 
+/// 把一个艺术家标签字符串拆成多个艺术家。
+/// 算法：先在整串里找出保护名单里的名字（如 "AC/DC"）原样保留，
+/// 其余部分再按分隔符拆开。
+// TODO: 常见的 "feat." / "ft." / " x " / " and " / "," / "+" 没有作为分隔符；
+// 是否加入取决于对误拆的容忍度（比如 "Peter, Paul and Mary"）。
 class ArtistSplitter {
   new({
     required List<String> protectedNames,
@@ -76,6 +83,10 @@ class ArtistSplitter {
     );
   }
 
+  /// 注意：raw 为空白或只含分隔符时返回空列表，调用方必须把空列表
+  /// 当作"没有艺术家"处理（目前没有，见 TrackScanner.parse 里的 FIXME）。
+  /// 拆分只在扫描时做一次，结果存进 TrackInfo.artists，所以修改保护名单
+  /// 对已入库的曲目不生效。
   List<String> split(String raw) {
     // 没有分隔符就不跑正则
     if (!_separatorPattern.hasMatch(raw)) {

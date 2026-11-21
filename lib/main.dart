@@ -7,6 +7,8 @@ void main() {
   runApp(const ProviderScope(child: MainApp()));
 }
 
+// TODO: 主题（ThemeData / 深浅色）和路由都还没配置：目前靠 Frame 里的
+// pageIndex 切页。计划后续接 Go Router，届时由路由驱动页面切换。
 class MainApp extends StatelessWidget {
   const new({super.key});
 

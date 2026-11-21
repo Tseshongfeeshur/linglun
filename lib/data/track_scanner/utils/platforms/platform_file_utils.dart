@@ -1,9 +1,19 @@
 import 'package:linglun/data/models/simple_tag.dart';
 import 'package:linglun/data/track_scanner/track_scanner.dart';
 
+/// 平台相关的文件操作：遍历目录、读标签、选择目录。
+/// 各平台一个实现，TrackScanner 只保留一份平台无关的逻辑。
+// TODO: 接口里混着两类职责——"扫描"（discover/parse，以后还有标签回写）
+// 与"选目录/系统音乐目录"（带 UI 的选择器），可考虑拆成两个接口。
 abstract class PlatformFileUtils {
+  // 递归列出 rootUris 下的所有文件（不过滤扩展名，过滤在 TrackScanner 里做），
+  // 以 FileDiscoveredFinish 结束；单个目录/文件出错只发 FileDiscoveredError，不中断。
   Stream<DiscoverEvent> discover(Set<String> rootUris);
+  // 读取标签；读不了就抛异常（由 TrackScanner 转成 TrackParsedError）。
   Future<SimpleTag> parse(FileDiscovered item);
+  // 弹出系统的"选择文件夹"；返回目录的路径/URI，取消返回 null。
+  // TODO: 名字含糊，可改成 pickDirectory。
   Future<String?> getUri();
+  // 系统的"音乐目录"（用于来源页的默认勾选项）；没有则 path 为 null。
   Future<({String name, String? path})> getPlatformMusicPath();
 }

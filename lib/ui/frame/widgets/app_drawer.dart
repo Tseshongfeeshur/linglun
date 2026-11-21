@@ -5,9 +5,14 @@ import 'package:linglun/ui/frame/page_info.dart';
 
 import 'package:linglun/ui/widgets/reveal_icon.dart';
 
+/// 侧边抽屉。宽度、阴影、圆角都由布局和动画进度 animationProgress 决定
+/// （进度由 Frame 的动画给出）。
+// TODO: 这个 State 里没有任何状态，可以改成 StatelessWidget。
 class AppDrawer extends StatefulWidget {
   final int pageIndex;
   final List<PageInfo> pages;
+  // TODO: 裸的 `Function` 丢掉了类型检查（传错参数数量/类型也能编译，运行时才炸）。
+  // 改成 ValueChanged<int>。
   final Function onSelected;
 
   final WindowLayout layout;
@@ -15,6 +20,8 @@ class AppDrawer extends StatefulWidget {
   final double largeDrawerWidth;
   final bool extended;
   final double animationProgress;
+  // TODO: 同上，应为 void Function([bool? value])。
+  // 无参调用表示"切换"，传 true/false 表示指定目标（见 Frame 里的实现）。
   final Function onTapSwitch;
 
   const new({
@@ -40,6 +47,8 @@ class _AppDrawerState extends State<AppDrawer> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
+        // 阴影只在平板布局出现（展开的抽屉浮在页面之上，随动画进度淡入）；
+        // 圆角只在手机布局出现。桌面的抽屉会推开页面，不需要这两样。
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(
@@ -112,6 +121,7 @@ class _AppDrawerState extends State<AppDrawer> {
                           maxLines: 1,
                         ),
                       ),
+                      // 非桌面布局下，选了页面后自动收起抽屉。
                       onTap: () {
                         if (widget.layout != WindowLayout.desktop) {
                           widget.onTapSwitch(false);

@@ -16,6 +16,10 @@ import 'package:linglun/ui/pages/track_sources/track_sources.dart';
 import 'package:linglun/ui/pages/playlist.dart';
 import 'package:linglun/ui/pages/settings.dart';
 
+/// 应用外框：左侧抽屉 + 页面区。
+/// 页面放在 IndexedStack 里同时保活（切页不丢状态，如排序方式、滚动位置），
+/// 代价是所有页面在启动时就都会 build 一遍——任何页面在 initState 里抛异常，
+/// 整个应用启动就会崩（见 track_sources.dart 的 FIXME）。
 class Frame extends ConsumerStatefulWidget {
   const new({super.key});
 
@@ -70,10 +74,18 @@ class _FrameState extends ConsumerState<Frame> {
   Widget build(BuildContext context) {
     final drawerState = ref.watch<DrawerState>(drawerProvider);
     final layout = context.layout;
+    // 抽屉两种宽度：收起态 56（只有图标）、展开态 220。
     const double mediumDrawerWidth = 56, largeDrawerWidth = 220;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
+      // progress 是 0（收起）~ 1（展开）的动画进度。三种布局下抽屉的行为：
+      //   phone  ：抽屉(220)从左侧滑入并浮在页面上，页面不让位，背后有半透明遮罩；
+      //   tablet ：页面左侧固定留 56 给收起态抽屉；展开时抽屉在页面上方变宽（带阴影），
+      //            不推动页面；
+      //   desktop：抽屉常驻，页面左边距随动画在 56↔220 之间插值，推动页面。
+      // TODO: 这里的 `drawerState.extended[layout] ?? false` 与下面的
+      // drawerState.extendedAt(layout) 是同一件事，统一用 extendedAt。
       body: Animate(target: drawerState.extended[layout] ?? false ? 1 : 0)
           .custom(
             duration: 200.ms,
@@ -84,6 +96,7 @@ class _FrameState extends ConsumerState<Frame> {
                   padding: EdgeInsets.only(
                     left: layout == WindowLayout.phone
                         ? 0
+                        // TODO: 平板的左边距 56 与 mediumDrawerWidth 重复写了，改用常量。
                         : (layout == WindowLayout.tablet
                               ? 56
                               : mediumDrawerWidth +
@@ -95,11 +108,15 @@ class _FrameState extends ConsumerState<Frame> {
                     children: pages.map((pageInfo) => pageInfo.page).toList(),
                   ),
                 ),
+                // 遮罩：只在手机布局下有颜色。它始终在树里，靠 IgnorePointer 决定是否拦截点击：
+                // 手机且抽屉展开时才拦截（吸收对页面的点击），点击后由下面抽屉上的
+                // TapRegion.onTapOutside 负责把抽屉收起。
                 IgnorePointer(
                   ignoring:
                       !(layout == WindowLayout.phone &&
                           drawerState.extendedAt(layout)),
                   child: Container(
+                    // TODO: 想铺满整个 Stack 的话，用 Positioned.fill 或 SizedBox.expand 更简洁。
                     width: MediaQuery.sizeOf(context).width,
                     height: MediaQuery.sizeOf(context).height,
                     color: Theme.of(context).colorScheme.onSurface.withAlpha(
@@ -119,6 +136,9 @@ class _FrameState extends ConsumerState<Frame> {
                       ? largeDrawerWidth
                       : mediumDrawerWidth +
                             (largeDrawerWidth - mediumDrawerWidth) * progress,
+                  // 点击抽屉外部就收起抽屉（桌面端抽屉常驻，所以关掉）。
+                  // 注意：TapRegion 即使抽屉在屏幕外（手机收起态）也会对每次点击触发，
+                  // 见 drawer_provider.dart 里 switchExtendingAt 的 TODO。
                   child: TapRegion(
                     enabled: layout != WindowLayout.desktop,
                     onTapOutside: (event) => ref
