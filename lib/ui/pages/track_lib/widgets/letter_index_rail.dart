@@ -3,73 +3,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 import 'package:linglun/data/models/track_info.dart';
-import 'package:linglun/data/track_scanner/utils/group_key_of.dart';
+import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail_slot.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
-
-class _RailSlot {
-  final String display;
-  final int index;
-  new({required this.display, required this.index});
-}
-
-List<_RailSlot> _buildRailSlots(
-  Map<String, List<TrackInfo>> groupedTrackList,
-  List<int> keyIndexList,
-) {
-  if (groupedTrackList.isEmpty) return [];
-
-  var scriptCounts = <Script, int>{};
-
-  for (final group in groupedTrackList.keys) {
-    final script = scriptOf(group.runes.first);
-    final count = groupedTrackList[group]!.length;
-
-    scriptCounts[script] = (scriptCounts[script] ?? 0) + count;
-  }
-
-  var expandedScript = Script.latin;
-  var maxCount = 0;
-  for (var i = 0; i < scriptCounts.keys.length; i++) {
-    final count = scriptCounts.values.toList()[i];
-    if (count > maxCount) {
-      maxCount = count;
-      expandedScript = scriptCounts.keys.toList()[i];
-    }
-  }
-
-  var result = <_RailSlot>[];
-  final sampleOfScript = {
-    Script.cyrillic: 'Я',
-    Script.han: 'A',
-    Script.hangul: '가',
-    Script.kana: 'あ',
-    Script.latin: 'A',
-    Script.other: '#',
-  };
-  for (var i = 0; i < groupedTrackList.keys.length; i++) {
-    final group = groupedTrackList.keys.toList()[i];
-    final script = scriptOf(group.runes.first);
-
-    if (script == expandedScript) {
-      result.add(_RailSlot(display: group, index: keyIndexList[i]));
-    } else {
-      if (scriptOf(group.runes.first) ==
-          scriptOf(groupedTrackList.keys.toList()[i - 1].runes.first)) {
-        continue;
-      }
-      result.add(
-        _RailSlot(
-          display: sampleOfScript[script] ?? '#',
-          index: keyIndexList[i],
-        ),
-      );
-    }
-  }
-
-  return result;
-}
 
 class LetterIndexRail extends StatefulWidget {
   const new({
@@ -77,13 +14,11 @@ class LetterIndexRail extends StatefulWidget {
     required this.groupedTrackList,
     required this.itemScrollController,
     required this.keyIndexList,
-    required this.descending,
   });
 
   final Map<String, List<TrackInfo>> groupedTrackList;
   final ItemScrollController itemScrollController;
   final List<int> keyIndexList;
-  final bool descending;
 
   @override
   State<LetterIndexRail> createState() => _LetterIndexRailState();
@@ -97,24 +32,18 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
 
   bool isDragging = false;
   double dragPosition = 0;
-  List<_RailSlot> slotContents = [];
+  List<LetterIndexRailSlot> slotContents = [];
   String letter = '';
 
   @override
   void initState() {
     super.initState();
-    slotContents = _buildRailSlots(
-      widget.groupedTrackList,
-      widget.keyIndexList,
-    );
+    slotContents = buildRailSlots(widget.groupedTrackList, widget.keyIndexList);
   }
 
   @override
   void didUpdateWidget(covariant LetterIndexRail oldWidget) {
-    slotContents = _buildRailSlots(
-      widget.groupedTrackList,
-      widget.keyIndexList,
-    );
+    slotContents = buildRailSlots(widget.groupedTrackList, widget.keyIndexList);
 
     super.didUpdateWidget(oldWidget);
   }

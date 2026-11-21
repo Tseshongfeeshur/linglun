@@ -5,7 +5,7 @@ import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.d
 import 'package:path/path.dart' as p;
 
 import 'package:linglun/data/models/track_info.dart';
-import 'package:linglun/data/track_scanner/utils/group_key_of.dart';
+import 'package:linglun/data/utils/group_key_of.dart';
 
 const _extensions = {
   '.mp3',

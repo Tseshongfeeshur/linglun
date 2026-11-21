@@ -34,7 +34,7 @@ void showTrackInfoBottomSheet(
               TextSpan(text: '\n艺术家：', style: headStyle(context)),
               TextSpan(text: track.artists?.join(' / ')),
               TextSpan(
-                text: '（${track.artistsKeys.sort}）',
+                text: '（${track.artistsKeys.first.sort}）',
                 style: descStyle(context),
               ),
               TextSpan(text: '\n专辑：', style: headStyle(context)),

@@ -26,9 +26,9 @@ class _TrackLibState extends ConsumerState<TrackLib> {
     final drawerState = ref.watch<DrawerState>(drawerProvider);
     final layout = context.layout;
 
-    final originalMusicList = ref.watch(tracksProvider);
-    var groupedMusicList = groupMusicList(
-      sortMusicList(originalMusicList, sortConfig),
+    final originalTrackList = ref.watch(tracksProvider);
+    var groupedTrackList = groupTrackList(
+      sortTrackList(originalTrackList, sortConfig),
       sortConfig,
     );
 
@@ -64,8 +64,8 @@ class _TrackLibState extends ConsumerState<TrackLib> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
           child: TrackListView(
-            groupedTrackList: groupedMusicList,
-            hasGroups: !groupedMusicList.keys.contains('default'),
+            groupedTrackList: groupedTrackList,
+            hasGroups: !groupedTrackList.keys.contains('default'),
             descending: sortConfig.descending,
           ),
         ),

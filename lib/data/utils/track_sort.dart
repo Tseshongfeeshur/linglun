@@ -1,4 +1,4 @@
-import 'package:linglun/data/track_scanner/utils/group_key_of.dart';
+import 'package:linglun/data/utils/group_key_of.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:linglun/data/models/track_info.dart';
 
@@ -21,7 +21,7 @@ enum TrackSort {
   final IconData icon;
   final bool shouldBeGrouped;
 
-  /// 返回某指定 MusicInfo 的特定字段
+  /// 返回某指定 TrackInfo 的特定字段
   String? groupSource(TrackInfo m) => switch (this) {
     TrackSort.title => m.titleKey.group,
     TrackSort.artists => m.artistsKeys.first.group,
@@ -39,7 +39,7 @@ class SortConfig {
       SortConfig(method ?? this.method, descending ?? this.descending);
 }
 
-List<TrackInfo> sortMusicList(List<TrackInfo> list, SortConfig sortConfig) {
+List<TrackInfo> sortTrackList(List<TrackInfo> list, SortConfig sortConfig) {
   final result = [...list];
   switch (sortConfig.method) {
     case TrackSort.title:
@@ -69,7 +69,7 @@ List<TrackInfo> sortMusicList(List<TrackInfo> list, SortConfig sortConfig) {
   return sortConfig.descending ? result.reversed.toList() : result;
 }
 
-Map<String, List<TrackInfo>> groupMusicList(
+Map<String, List<TrackInfo>> groupTrackList(
   List<TrackInfo> sortedList,
   SortConfig sortConfig,
 ) {

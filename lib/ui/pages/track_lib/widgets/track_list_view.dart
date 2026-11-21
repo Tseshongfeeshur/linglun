@@ -2,7 +2,7 @@ import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import 'package:linglun/ui/utils/show_music_info_bottom_sheet.dart';
+import 'package:linglun/ui/utils/show_track_info_bottom_sheet.dart';
 import 'package:linglun/ui/utils/show_letter_selecting_dialog.dart';
 
 import 'package:linglun/data/models/track_info.dart';
@@ -57,12 +57,12 @@ class _TrackListViewState extends State<TrackListView> {
               itemCount: items.length,
               itemBuilder: (context, index) {
                 switch (items[index]) {
-                  case TrackInfo musicInfo:
-                    return _MusicListItem(trackInfo: musicInfo);
+                  case TrackInfo trackInfo:
+                    return _TrackListItem(trackInfo: trackInfo);
                   case String letter:
-                    return _MusicListGroupHead(
+                    return _TrackListGroupHead(
                       letter: letter,
-                      groupedMusicList: widget.groupedTrackList,
+                      groupedTrackList: widget.groupedTrackList,
                       itemScrollController: itemScrollController,
                       keyIndexList: keyIndexList,
                     );
@@ -83,7 +83,6 @@ class _TrackListViewState extends State<TrackListView> {
                   groupedTrackList: widget.groupedTrackList,
                   itemScrollController: itemScrollController,
                   keyIndexList: keyIndexList,
-                  descending: widget.descending,
                 ),
               ),
             ),
@@ -92,7 +91,7 @@ class _TrackListViewState extends State<TrackListView> {
     } else {
       return ListView.builder(
         itemCount: widget.groupedTrackList['default']!.length,
-        itemBuilder: (context, index) => _MusicListItem(
+        itemBuilder: (context, index) => _TrackListItem(
           trackInfo: widget.groupedTrackList['default']![index],
         ),
       );
@@ -100,15 +99,15 @@ class _TrackListViewState extends State<TrackListView> {
   }
 }
 
-class _MusicListGroupHead extends StatelessWidget {
+class _TrackListGroupHead extends StatelessWidget {
   final String letter;
-  final Map<String, List<TrackInfo>> groupedMusicList;
+  final Map<String, List<TrackInfo>> groupedTrackList;
   final ItemScrollController itemScrollController;
   final List<int> keyIndexList;
 
   const new({
     required this.letter,
-    required this.groupedMusicList,
+    required this.groupedTrackList,
     required this.itemScrollController,
     required this.keyIndexList,
   });
@@ -130,12 +129,12 @@ class _MusicListGroupHead extends StatelessWidget {
       onTap: () async {
         var selectedLetter = await showLetterSelectingDialog(
           context,
-          groupedMusicList,
+          groupedTrackList,
           letter,
         );
         if (selectedLetter == null) return;
 
-        final index = groupedMusicList.keys.toList().indexOf(selectedLetter);
+        final index = groupedTrackList.keys.toList().indexOf(selectedLetter);
         itemScrollController.scrollTo(
           index: keyIndexList[index],
           duration: 400.ms,
@@ -146,7 +145,7 @@ class _MusicListGroupHead extends StatelessWidget {
   }
 }
 
-class _MusicListItem extends StatelessWidget {
+class _TrackListItem extends StatelessWidget {
   const new({required this.trackInfo});
 
   final TrackInfo trackInfo;
