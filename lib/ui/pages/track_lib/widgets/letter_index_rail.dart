@@ -73,10 +73,6 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
     final slot = ((y - railPadding) ~/ slotHeight).clamp(0, slotCount - 1);
     final idx = letterIndexOf(slot, slotCount);
     final newLetter = slotContents[idx].display;
-    // FIXME: letter 在手指抬起后没有清空，导致"点/拖到某个字母 → 手动滚动列表 →
-    // 再点同一个字母"时 letterChanged 为 false，不会跳转。应在点击结束/
-    // onVerticalDragEnd 时把 letter 重置为 ''，或者点击时无条件跳转
-    // （只让震动依赖 letterChanged）。
     final letterChanged = letter != newLetter;
 
     setState(() {
@@ -167,6 +163,7 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
               behavior: HitTestBehavior.opaque,
               onTapUp: (details) {
                 onPointer(details.localPosition.dy, slotHeight, slotCount);
+                letter = '';
               },
               // 注意：这三个回调里先直接改 isDragging，再由 onPointer 里的 setState
               // 一起刷新（所以没有单独包 setState）；onTapUp 不设置 isDragging，所以点按没有气泡。
@@ -178,7 +175,10 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
                 isDragging = true;
                 onPointer(details.localPosition.dy, slotHeight, slotCount);
               },
-              onVerticalDragEnd: (_) => setState(() => isDragging = false),
+              onVerticalDragEnd: (_) {
+                setState(() => isDragging = false);
+                letter = '';
+              },
               onVerticalDragCancel: () => setState(() => isDragging = false),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),

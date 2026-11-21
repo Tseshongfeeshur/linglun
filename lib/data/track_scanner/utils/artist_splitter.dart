@@ -33,9 +33,7 @@ const List<String> _protectedArtistNames = [
   'Leo/need',
   // 含 、 的
   'ハロー、ハッピーワールド！',
-  // TODO: 这两项含的是半角逗号 ','，而默认分隔符里并没有逗号，所以目前其实
-  // 不需要保护，只有以后把 ',' 加进分隔符才会生效；上面注释写的"，"（全角）也与实际不符。
-  // 含 ， 的
+  // 含 , 的
   'Tyler, The Creator',
   'Peter, Paul and Mary',
 ];
@@ -43,12 +41,19 @@ const List<String> _protectedArtistNames = [
 /// 把一个艺术家标签字符串拆成多个艺术家。
 /// 算法：先在整串里找出保护名单里的名字（如 "AC/DC"）原样保留，
 /// 其余部分再按分隔符拆开。
-// TODO: 常见的 "feat." / "ft." / " x " / " and " / "," / "+" 没有作为分隔符；
-// 是否加入取决于对误拆的容忍度（比如 "Peter, Paul and Mary"）。
 class ArtistSplitter {
   new({
     required List<String> protectedNames,
-    List<String> separators = const ['、', ';', '/', '&', '；'],
+    List<String> separators = const [
+      '、',
+      '/',
+      '&',
+      ';',
+      '；',
+      'feat.',
+      'ft.',
+      ',',
+    ],
   }) : _separatorPattern = RegExp(separators.map(RegExp.escape).join('|')),
        _protectedPattern = _buildProtectedPattern(protectedNames),
        _canonicalByKey = {

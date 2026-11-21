@@ -144,34 +144,28 @@ class TrackScanner {
                   existingTrack.sizeBytes == item.sizeBytes) &&
               (existingTrack.editTime.millisecondsSinceEpoch != 0 &&
                   existingTrack.sizeBytes != -1)) {
-            // FIXME: 旧记录若 removed == true（上次没找到、这次又出现且未变化），
-            // 沿用旧记录会让它一直保持 removed，需要 copyWith(uri: item.uri, removed: false)。
-            // 例如 SD 卡/外接盘重新挂载后，曲目会一直显示为"已移除"。
-            yield TrackSkipped(track: existingTrack.copyWith(uri: item.uri));
+            yield TrackSkipped(
+              track: existingTrack.copyWith(uri: item.uri, removed: false),
+            );
             continue;
           }
         }
         tag = await utils.parse(item);
       } catch (e) {
-        // FIXME: 如果 item 是库里已有的曲目、重新解析失败（文件被改坏/截断），
-        // 它在上面已被从 existingMap 移除，这里又只发出错误事件；而"更新曲库"
-        // 的结果只取 parseSkips + parseUpdates，错误不在内 → 这首歌会从曲库里
-        // 凭空消失（连 playCount 一起丢）。应保留旧记录（沿用或标 removed/broken）。
+        // 如果 item 是库里已有的曲目、重新解析失败（文件被改坏/截断），保留旧记录。
+        if (existingTrack != null) {
+          yield TrackSkipped(track: existingTrack.copyWith(removed: true));
+        }
         yield TrackParsedError(file: item, detail: e.toString());
         continue;
       }
 
+      final title = tag.title ?? p.basenameWithoutExtension(item.name);
       final track = TrackInfo(
         sourceKey: item.sourceKey,
-        title: tag.title ?? p.basenameWithoutExtension(item.name),
-        // TODO: `tag.title ?? p.basenameWithoutExtension(item.name)` 算了两遍，
-        // 提成局部变量 title 更清楚。
-        titleKey: keyOf(tag.title ?? p.basenameWithoutExtension(item.name)),
+        title: title,
+        titleKey: keyOf(title),
         artists: tag.artists,
-        // FIXME: tag.artists 为"非 null 的空列表"时（标签是空白或纯分隔符，
-        // 如 " "、"；"，splitArtists 返回 []；Android 端判空写反时空标签也会如此），
-        // 这里 artistsKeys 会是空列表，之后排序/分组/详情页里的 artistsKeys.first
-        // 会抛 StateError。应在这里把空列表按 null 处理（或在 splitArtists 调用处）。
         artistsKeys:
             tag.artists?.map((i) => keyOf(i)).toList() ?? [keyOfNullable(null)],
         album: tag.album,
@@ -180,9 +174,8 @@ class TrackScanner {
         fileName: item.name,
         sizeBytes: item.sizeBytes,
         durationMs: tag.durationMs,
-        // TODO: 重新解析（文件变化）时 trackGainUpdated 被重置为 false，
-        // 而 playCount/addTime 却沿用旧值，策略不一致。若是有意的（文件变了，
-        // 标签里的增益可能已失效）请在此注明；另外应用自己回写增益也会改变文件修改时间，
+        // 文件变了，标签里的增益可能已失效
+        // TODO: 应用自己回写增益也会改变文件修改时间，
         // 回写后必须同步更新库里的 editTime，否则下次扫描会被当成"文件变了"。
         trackGainUpdated: false,
         editTime: item.editTime,
@@ -192,10 +185,6 @@ class TrackScanner {
       );
       yield TrackParsed(track: track);
     }
-    // 库里有、这次没发现的曲目：标记 removed 但保留（文件可能只是暂时不在）。
-    // TODO: 某个来源目录读取失败（discover 阶段报错）、或用户这次没勾选某个来源时，
-    // 其下的已有曲目也会被标成 removed——它们其实是"状态未知"而不是"已删除"。
-    // 至少应在没勾选任何来源时拒绝扫描（见 track_sources.dart 的 TODO）。
     for (var item in existingMap.values) {
       yield TrackParsed(track: item.copyWith(removed: true));
     }

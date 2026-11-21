@@ -25,9 +25,8 @@ class TrackInfo {
   final String title;
   final TextKey titleKey;
 
-  // 注意：artists 为 null 时 artistsKeys 里仍有一个"未知艺术家"占位键。
-  // 排序、分组、详情页都直接取 artistsKeys.first，所以 artistsKeys
-  // 必须永远非空（目前有一条路径做不到，见 TrackScanner.parse 里的 FIXME）。
+  // artists 为 null 时 artistsKeys 里仍有一个"未知艺术家"占位键。
+  // 排序、分组、详情页都直接取 artistsKeys.first，所以 artistsKeys 必须永远非空。
   final List<String>? artists;
   final List<TextKey> artistsKeys;
 

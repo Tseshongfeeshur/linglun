@@ -72,15 +72,11 @@ class AndroidFileUtils extends PlatformFileUtils {
 
     SimpleTag? tag;
     try {
-      // FIXME: title/artists/album 的判断写反了——这里是"为空才取值、非空反而是
-      // null"，与 LinuxFileUtils 相反。后果：Android 上有标签的曲目标题全部
-      // 回退成文件名、歌手/专辑全变"未知"；而空标签会被存进去，空歌手经
-      // splitArtists('') 得到 []，进而 artistsKeys 为空，排序/详情页 .first 崩溃。
-      // 应为 `file.title.isEmpty ? null : file.title`（artist/album 同理）。
+      var artistList = splitArtists(file.artist);
       tag = SimpleTag(
-        title: file.title.isEmpty ? file.title : null,
-        artists: file.artist.isEmpty ? splitArtists(file.artist) : null,
-        album: file.album.isEmpty ? file.album : null,
+        title: file.title.isEmpty ? null : file.title,
+        artists: artistList.isEmpty ? null : artistList,
+        album: file.album.isEmpty ? null : file.album,
         durationMs: file.duration.inMilliseconds,
       );
     } finally {
@@ -91,7 +87,7 @@ class AndroidFileUtils extends PlatformFileUtils {
   }
 
   @override
-  Future<String?> getUri() async {
+  Future<String?> pickDirectory() async {
     final safUtil = SafUtil();
     // writePermission：为日后"写回标签/增益"准备。
     // TODO: persistablePermission 是否真的让授权在重启后保留尚未验证；

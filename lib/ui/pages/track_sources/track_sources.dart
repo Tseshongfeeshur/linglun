@@ -50,18 +50,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
   @override
   void initState() {
     super.initState();
-
-    if (Platform.isLinux) {
-      utils = LinuxFileUtils();
-    } else if (Platform.isAndroid) {
-      utils = AndroidFileUtils();
-    } else {
-      // FIXME: 其他平台（Windows/macOS/iOS 等）在这里直接 throw。Frame 用 IndexedStack，
-      // 启动时就会构建所有页面，应用在这些平台上会在启动时直接崩溃。
-      // 应降级成"暂不支持"的提示，或实现对应平台。另外平台判断与
-      // scan_provider.dart 里重复了一份，建议抽成 createPlatformFileUtils() 工厂。
-      throw 'platform not supported';
-    }
+    utils = createPlatformFileUtils();
     getPlatformPath();
   }
 
@@ -156,7 +145,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
               leading: const Icon(Icons.add),
               title: const Text('添加文件夹'),
               onTap: () async {
-                var uri = await utils.getUri();
+                var uri = await utils.pickDirectory();
                 if (uri == null) {
                   if (context.mounted) {
                     showSnackBar(context, Icons.warning, '未选择任何文件夹');

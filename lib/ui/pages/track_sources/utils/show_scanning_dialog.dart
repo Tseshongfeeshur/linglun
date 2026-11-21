@@ -185,71 +185,65 @@ class _ContentAtFinish extends StatelessWidget {
                   style: TextStyle(overflow: TextOverflow.ellipsis),
                   maxLines: 2,
                 ),
-                onTap: () => scanState.parseUpdates.isEmpty
-                    ? null
-                    : showDialog(
-                        context: context,
-                        builder: (context) => Dialog(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 400),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: Text(
-                                    '更新明细',
-                                    style: TextStyle(fontSize: 24),
-                                  ),
-                                ),
-                                Flexible(
-                                  child: ListView.builder(
-                                    shrinkWrap: true,
-                                    // FIXME: 性能 O(n²)：itemCount 里 where().length 算一遍，
-                                    // itemBuilder 里每一行又 where().toList()[index]
-                                    // 重新过滤、建一份完整列表。首次扫描曲目上万时，
-                                    // 打开这个明细会卡死。应在 build 外先
-                                    // final updated = parseUpdates.where(...).toList()
-                                    // 一次，itemBuilder 里直接 updated[index]。
-                                    itemCount: scanState.parseUpdates
-                                        .where(
-                                          (item) => item.track.removed == false,
-                                        )
-                                        .length,
-                                    itemBuilder: (context, index) => ListTile(
-                                      dense: true,
-                                      title: Text(
-                                        scanState.parseUpdates
-                                            .where(
-                                              (item) =>
-                                                  item.track.removed == false,
-                                            )
-                                            .toList()[index]
-                                            .track
-                                            .fileName,
-                                        style: const TextStyle(height: 1.1),
-                                      ),
-                                      minTileHeight: 0,
-                                      minVerticalPadding: 4,
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Align(
-                                    alignment: Alignment.centerRight,
-                                    child: TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text('取消'),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                onTap: () {
+                  if (scanState.parseUpdates.isEmpty) {
+                    return;
+                  }
+
+                  final updated = scanState.parseUpdates
+                      .where((item) => item.track.removed == false)
+                      .toList();
+                  showDialog(
+                    context: context,
+                    builder: (context) => Dialog(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 400),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Text(
+                                '更新明细',
+                                style: TextStyle(fontSize: 24),
+                              ),
                             ),
-                          ),
+                            Flexible(
+                              child: ListView.builder(
+                                shrinkWrap: true,
+                                itemCount: scanState.parseUpdates
+                                    .where(
+                                      (item) => item.track.removed == false,
+                                    )
+                                    .length,
+                                itemBuilder: (context, index) => ListTile(
+                                  dense: true,
+                                  title: Text(
+                                    updated[index].track.fileName,
+                                    style: const TextStyle(height: 1.1),
+                                  ),
+                                  minTileHeight: 0,
+                                  minVerticalPadding: 4,
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('取消'),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                    ),
+                  );
+                },
               ),
 
               // 第二项：已跳过（已统一结构）

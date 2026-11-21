@@ -24,18 +24,7 @@ class _ScanNotifier extends Notifier<ScanState> {
   ) async {
     final trackScanner = TrackScanner();
 
-    // TODO: 平台选择在这里和 track_sources.dart 的 initState 里各写了一份。
-    // 抽成一个工厂函数（如 createPlatformFileUtils()），并在不支持的平台上
-    // 返回 null / 抛出明确的异常，而不是 throw 一个字符串
-    // （这里是 async 函数，抛出的错误没人接，会变成未处理异常）。
-    PlatformFileUtils utils;
-    if (Platform.isLinux) {
-      utils = LinuxFileUtils();
-    } else if (Platform.isAndroid) {
-      utils = AndroidFileUtils();
-    } else {
-      throw 'platform not supported';
-    }
+    final utils = createPlatformFileUtils();
 
     // 两阶段接力：先把发现阶段跑完，再把发现的文件交给解析阶段。
     // TODO: 没有防止重复调用 startScan（状态会交错），也不会在开始时重置状态；

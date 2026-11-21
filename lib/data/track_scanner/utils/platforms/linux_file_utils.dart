@@ -75,9 +75,10 @@ class LinuxFileUtils extends PlatformFileUtils {
 
     SimpleTag? tag;
     try {
+      var artistList = splitArtists(file.artist);
       tag = SimpleTag(
         title: file.title.isEmpty ? null : file.title,
-        artists: file.artist.isEmpty ? null : splitArtists(file.artist),
+        artists: artistList.isEmpty ? null : artistList,
         album: file.album.isEmpty ? null : file.album,
         durationMs: file.duration.inMilliseconds,
       );
@@ -89,7 +90,7 @@ class LinuxFileUtils extends PlatformFileUtils {
   }
 
   @override
-  Future<String?> getUri() {
+  Future<String?> pickDirectory() {
     return FilePicker.getDirectoryPath();
   }
 
