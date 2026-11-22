@@ -7,18 +7,20 @@ import 'package:path/path.dart' as p;
 import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/utils/group_key_of.dart';
 
-// 只按扩展名过滤，不看文件内容。
-// TODO: 名单写死在这里，且不含 TagLib 支持的 .aif/.aiff/.wv/.dsf/.mka 等格式；
-// 应与播放器（media_kit/mpv）实际能播的格式保持一致，必要时做成可配置。
+// 只按扩展名过滤。
 const _extensions = {
+  // 高频有损 / 流媒体
   '.mp3',
-  '.flac',
   '.m4a',
+  '.aac',
   '.ogg',
   '.opus',
-  '.wav',
-  '.aac',
   '.wma',
+  // 无损 / 未压缩
+  '.flac',
+  '.wav',
+  '.aif',
+  '.aiff',
   '.ape',
 };
 
@@ -132,22 +134,21 @@ class TrackScanner {
 
       try {
         if (existingTrack != null) {
-          existingMap.remove(item.sourceKey);
-          // 路径身份(sourceKey)、修改时间、大小都相同 → 认为文件没变，跳过解析。
-          // editTime 为 0 或 sizeBytes 为 -1 说明平台没给出可靠信息，不能据此判断
-          // "没变"，必须重新解析。
-          // TODO: 这里只看"文件是否变化"。artistSplitter 的保护名单/分隔符、keyOf 的
-          // 分组规则、拼音库升级之后，已入库的曲目不会重新计算，要等文件变化才会更新。
-          // 可以给规则加一个版本号存进 TrackInfo，版本不一致就强制重解析
-          // （forceReparse 之前决定暂不做，这里仅留记录）。
-          if ((existingTrack.editTime == item.editTime &&
-                  existingTrack.sizeBytes == item.sizeBytes) &&
-              (existingTrack.editTime.millisecondsSinceEpoch != 0 &&
-                  existingTrack.sizeBytes != -1)) {
-            yield TrackSkipped(
-              track: existingTrack.copyWith(uri: item.uri, removed: false),
-            );
-            continue;
+          // 若曲库数据版本过时，不管文件是否被修改都重新解析。
+          if (existingTrack.version == TrackInfo.currentVersion) {
+            existingMap.remove(item.sourceKey);
+            // 路径身份(sourceKey)、修改时间、大小都相同 → 认为文件没变，跳过解析。
+            // editTime 为 0 或 sizeBytes 为 -1 说明平台没给出可靠信息，不能据此判断
+            // "没变"，必须重新解析。
+            if ((existingTrack.editTime == item.editTime &&
+                    existingTrack.sizeBytes == item.sizeBytes) &&
+                (existingTrack.editTime.millisecondsSinceEpoch != 0 &&
+                    existingTrack.sizeBytes != -1)) {
+              yield TrackSkipped(
+                track: existingTrack.copyWith(uri: item.uri, removed: false),
+              );
+              continue;
+            }
           }
         }
         tag = await utils.parse(item);

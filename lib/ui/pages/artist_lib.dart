@@ -9,6 +9,7 @@ class ArtistLib extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         leading: context.layout == WindowLayout.phone
             ? const DrawerMenuButton()

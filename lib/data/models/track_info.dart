@@ -17,6 +17,12 @@ class TrackInfo {
   // 在那之前由 sourceKey 充当唯一标识（同时承担"标识"与"去重"两个职责，
   // 日后若发现两者需要分开，再拆成两个字段）。
   // final int id;
+
+  /// TrackInfo 最新版本号，若解析方式/数据结构发生变化需要修改。
+  static const int currentVersion = 1; // 或保留 static int get version => 1;
+  /// 版本号
+  final int version;
+
   /// 曲目的"身份"，用来在多次扫描之间认出同一个文件：
   /// Linux 为绝对路径；Android 为 SAF 的 document id（与通过哪个目录授权无关）。
   /// 注意它和 uri 不是一回事——uri 可能因授权方式不同而变化。
@@ -52,6 +58,7 @@ class TrackInfo {
   final bool removed;
 
   const new({
+    this.version = currentVersion,
     required this.sourceKey,
     required this.title,
     required this.titleKey,

@@ -7,8 +7,6 @@ import 'package:linglun/data/track_scanner/utils/platforms/linux_file_utils.dart
 
 /// 平台相关的文件操作：遍历目录、读标签、选择目录。
 /// 各平台一个实现，TrackScanner 只保留一份平台无关的逻辑。
-// TODO: 接口里混着两类职责——"扫描"（discover/parse，以后还有标签回写）
-// 与"选目录/系统音乐目录"（带 UI 的选择器），可考虑拆成两个接口。
 abstract class PlatformFileUtils {
   // 递归列出 rootUris 下的所有文件（不过滤扩展名，过滤在 TrackScanner 里做），
   // 以 FileDiscoveredFinish 结束；单个目录/文件出错只发 FileDiscoveredError，不中断。

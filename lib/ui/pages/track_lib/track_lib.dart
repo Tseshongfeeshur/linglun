@@ -27,6 +27,7 @@ class _TrackLibState extends ConsumerState<TrackLib> {
     final groupedTracks = ref.watch(groupedTracksProvider(sortConfig));
 
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         leading: context.layout == WindowLayout.phone
             ? const DrawerMenuButton()

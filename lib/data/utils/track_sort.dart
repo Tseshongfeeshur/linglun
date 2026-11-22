@@ -9,10 +9,7 @@ enum TrackSort {
   artists('艺术家', Icons.person, true),
   album('专辑', Icons.album, true),
 
-  // TODO: Android 上 uri 是 content://，按它排序并不等于按"路径"排序，
-  // 和这个"文件路径"的标签也对不上。可考虑改用 sourceKey
-  // （Android 是 "primary:Music/a/b.mp3" 这样的路径形式）。
-  uri('文件路径', Icons.folder_copy, false),
+  sourceKey('文件路径', Icons.folder_copy, false),
 
   sizeBytes('文件体积', Icons.storage, false),
   durationMs('时长', Icons.timer, false),
@@ -74,8 +71,8 @@ List<TrackInfo> sortTrackList(List<TrackInfo> list, SortConfig sortConfig) {
     case TrackSort.album:
       result.sort((a, b) => compareKeys(a.albumKey, b.albumKey));
 
-    case TrackSort.uri:
-      result.sort((a, b) => a.uri.compareTo(b.uri));
+    case TrackSort.sourceKey:
+      result.sort((a, b) => a.sourceKey.compareTo(b.sourceKey));
 
     case TrackSort.sizeBytes:
       result.sort((a, b) => a.sizeBytes.compareTo(b.sizeBytes));
@@ -89,8 +86,6 @@ List<TrackInfo> sortTrackList(List<TrackInfo> list, SortConfig sortConfig) {
       result.sort((a, b) => a.editTime.compareTo(b.editTime));
   }
 
-  // TODO: 降序是把整个升序结果倒过来：'#' 组和"未知艺术家/专辑"（sort 为 \uffff）
-  // 会跑到最前面，二级顺序也一并倒转。是否希望降序时仍把"未知"放最后，需要决定。
   return sortConfig.descending ? result.reversed.toList() : result;
 }
 
