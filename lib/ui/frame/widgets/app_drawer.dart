@@ -7,22 +7,19 @@ import 'package:linglun/ui/widgets/reveal_icon.dart';
 
 /// 侧边抽屉。宽度、阴影、圆角都由布局和动画进度 animationProgress 决定
 /// （进度由 Frame 的动画给出）。
-// TODO: 这个 State 里没有任何状态，可以改成 StatelessWidget。
-class AppDrawer extends StatefulWidget {
+class AppDrawer extends StatelessWidget {
   final int pageIndex;
   final List<PageInfo> pages;
-  // TODO: 裸的 `Function` 丢掉了类型检查（传错参数数量/类型也能编译，运行时才炸）。
-  // 改成 ValueChanged<int>。
-  final Function onSelected;
+  final ValueChanged<int> onSelected;
 
   final WindowLayout layout;
   final double mediumDrawerWidth;
   final double largeDrawerWidth;
   final bool extended;
   final double animationProgress;
-  // TODO: 同上，应为 void Function([bool? value])。
-  // 无参调用表示"切换"，传 true/false 表示指定目标（见 Frame 里的实现）。
-  final Function onTapSwitch;
+  // Function 声明需要同时声明类型，避免运行时类型不匹配而崩溃。
+  // 无参调用表示"切换"，传 true/false 表示指定目标。
+  final Function([bool? value]) onTapSwitch;
 
   const new({
     super.key,
@@ -39,11 +36,6 @@ class AppDrawer extends StatefulWidget {
   });
 
   @override
-  State<AppDrawer> createState() => _AppDrawerState();
-}
-
-class _AppDrawerState extends State<AppDrawer> {
-  @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
@@ -52,10 +44,7 @@ class _AppDrawerState extends State<AppDrawer> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(
-              (48 *
-                      (widget.layout == WindowLayout.tablet
-                          ? widget.animationProgress
-                          : 0))
+              (48 * (layout == WindowLayout.tablet ? animationProgress : 0))
                   .toInt()
                   .clamp(0, 48),
             ),
@@ -64,20 +53,15 @@ class _AppDrawerState extends State<AppDrawer> {
           ),
         ],
         borderRadius: BorderRadius.only(
-          topRight: Radius.circular(
-            widget.layout == WindowLayout.phone ? 16 : 0,
-          ),
-          bottomRight: Radius.circular(
-            widget.layout == WindowLayout.phone ? 16 : 0,
-          ),
+          topRight: Radius.circular(layout == WindowLayout.phone ? 16 : 0),
+          bottomRight: Radius.circular(layout == WindowLayout.phone ? 16 : 0),
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      width: widget.layout == WindowLayout.phone
-          ? widget.largeDrawerWidth
-          : widget.mediumDrawerWidth +
-                (widget.largeDrawerWidth - widget.mediumDrawerWidth) *
-                    widget.animationProgress,
+      width: layout == WindowLayout.phone
+          ? largeDrawerWidth
+          : mediumDrawerWidth +
+                (largeDrawerWidth - mediumDrawerWidth) * animationProgress,
       child: Material(
         color: Theme.of(context).colorScheme.surfaceContainer,
         child: SafeArea(
@@ -85,20 +69,23 @@ class _AppDrawerState extends State<AppDrawer> {
             children: [
               Align(
                 alignment: Alignment.centerLeft,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: IconButton(
-                    onPressed: () => widget.onTapSwitch(),
-                    icon: RevealIcon(
-                      isFilled: widget.extended,
-                      outlineIcon: Icons.menu,
-                      filledIcon: Icons.menu_open,
-                      outlineIconColor: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant,
-                      filledIconColor: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant,
+                child: SizedBox(
+                  height: 56,
+                  width: 56,
+                  child: Center(
+                    child: IconButton(
+                      onPressed: () => onTapSwitch(),
+                      icon: RevealIcon(
+                        isFilled: extended,
+                        outlineIcon: Icons.menu,
+                        filledIcon: Icons.menu_open,
+                        outlineIconColor: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
+                        filledIconColor: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
+                      ),
                     ),
                   ),
                 ),
@@ -106,29 +93,29 @@ class _AppDrawerState extends State<AppDrawer> {
               Expanded(
                 child: ListView(
                   children: List.generate(
-                    widget.pages.length,
+                    pages.length,
                     (currentIndex) => ListTile(
                       leading: RevealIcon(
-                        isFilled: widget.pageIndex == currentIndex,
-                        outlineIcon: widget.pages[currentIndex].icon,
-                        filledIcon: widget.pages[currentIndex].selectedIcon,
+                        isFilled: pageIndex == currentIndex,
+                        outlineIcon: pages[currentIndex].icon,
+                        filledIcon: pages[currentIndex].selectedIcon,
                       ),
                       title: Padding(
                         padding: const EdgeInsets.only(left: 4),
                         child: Text(
-                          widget.pages[currentIndex].title,
+                          pages[currentIndex].title,
                           style: const TextStyle(overflow: TextOverflow.clip),
                           maxLines: 1,
                         ),
                       ),
                       // 非桌面布局下，选了页面后自动收起抽屉。
                       onTap: () {
-                        if (widget.layout != WindowLayout.desktop) {
-                          widget.onTapSwitch(false);
+                        if (layout != WindowLayout.desktop) {
+                          onTapSwitch(false);
                         }
-                        widget.onSelected(currentIndex);
+                        onSelected(currentIndex);
                       },
-                      selected: widget.pageIndex == currentIndex,
+                      selected: pageIndex == currentIndex,
                       selectedTileColor: Theme.of(context)
                           .colorScheme
                           .surfaceContainerHigh,

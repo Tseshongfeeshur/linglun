@@ -88,11 +88,9 @@ class ArtistSplitter {
     );
   }
 
-  /// 注意：raw 为空白或只含分隔符时返回空列表，调用方必须把空列表
-  /// 当作"没有艺术家"处理（目前没有，见 TrackScanner.parse 里的 FIXME）。
   /// 拆分只在扫描时做一次，结果存进 TrackInfo.artists，所以修改保护名单
   /// 对已入库的曲目不生效。
-  List<String> split(String raw) {
+  List<String>? split(String raw) {
     // 没有分隔符就不跑正则
     if (!_separatorPattern.hasMatch(raw)) {
       final single = raw.trim();
@@ -111,7 +109,7 @@ class ArtistSplitter {
       }
     }
     _addSplitParts(raw.substring(cursor), result);
-    return result;
+    return result.isEmpty ? null : result;
   }
 
   void _addSplitParts(String segment, List<String> out) {
@@ -127,4 +125,4 @@ final ArtistSplitter artistSplitter = ArtistSplitter(
   protectedNames: _protectedArtistNames,
 );
 
-List<String> splitArtists(String raw) => artistSplitter.split(raw);
+List<String>? splitArtists(String raw) => artistSplitter.split(raw);

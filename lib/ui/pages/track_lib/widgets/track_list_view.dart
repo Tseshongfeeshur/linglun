@@ -13,17 +13,10 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 /// [组头(String), 曲目, 曲目, ..., 组头, 曲目, ...]，交给 ScrollablePositionedList
 /// 渲染，右侧叠一个字母索引栏；不分组时用普通 ListView。
 class TrackListView extends StatefulWidget {
-  final Map<String, List<TrackInfo>> groupedTrackList;
+  final Map<String, List<TrackInfo>> groupedTracks;
   final bool hasGroups;
-  // TODO: descending 在本文件里没有被使用，要么删掉，要么用上。
-  final bool descending;
 
-  const new({
-    super.key,
-    required this.groupedTrackList,
-    required this.hasGroups,
-    required this.descending,
-  });
+  const new({super.key, required this.groupedTracks, required this.hasGroups});
 
   @override
   State<TrackListView> createState() => _TrackListViewState();
@@ -41,7 +34,7 @@ class _TrackListViewState extends State<TrackListView> {
       // 字母索引栏、组头又各自靠"遍历 groupedTrackList 的顺序与 keyIndexList 一致"
       // 来对应，一旦错位就跳错位置。可引入 TrackGroup{key, startIndex, tracks}
       // 之类的结构，一次算好、各处共用。
-      final entries = widget.groupedTrackList.entries;
+      final entries = widget.groupedTracks.entries;
 
       final items = <Object>[];
       final keyIndexList = <int>[];
@@ -62,10 +55,8 @@ class _TrackListViewState extends State<TrackListView> {
         children: [
           ScrollConfiguration(
             // 分组模式下关闭系统滚动条（右侧由字母索引栏代替）。
-            // TODO: 这个分支里 hasGroups 恒为 true，`!widget.hasGroups` 就是 false，
-            // 下面的 `if (widget.hasGroups)` 也是多余的，可直接写 false / 去掉 if。
             behavior: ScrollConfiguration.of(context)
-                .copyWith(scrollbars: !widget.hasGroups),
+                .copyWith(scrollbars: false),
             // TODO: 待办"排序变化时列表项以动画移动位置"：需要给每项稳定的 key
             // （如 ValueKey(track.sourceKey)）；而 ScrollablePositionedList 本身没有
             // 重排动画能力，多半得换方案（如自己实现，或改用别的列表）——复杂度不小，
@@ -79,7 +70,7 @@ class _TrackListViewState extends State<TrackListView> {
                   case String letter:
                     return _TrackListGroupHead(
                       letter: letter,
-                      groupedTrackList: widget.groupedTrackList,
+                      groupedTrackList: widget.groupedTracks,
                       itemScrollController: itemScrollController,
                       keyIndexList: keyIndexList,
                     );
@@ -91,28 +82,26 @@ class _TrackListViewState extends State<TrackListView> {
             ),
           ),
           // 字母索引栏，叠在列表右侧。
-          if (widget.hasGroups)
-            Positioned(
-              top: 0,
-              bottom: 0,
-              right: 0,
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: LetterIndexRail(
-                  groupedTrackList: widget.groupedTrackList,
-                  itemScrollController: itemScrollController,
-                  keyIndexList: keyIndexList,
-                ),
+          Positioned(
+            top: 0,
+            bottom: 0,
+            right: 0,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: LetterIndexRail(
+                groupedTrackList: widget.groupedTracks,
+                itemScrollController: itemScrollController,
+                keyIndexList: keyIndexList,
               ),
             ),
+          ),
         ],
       );
     } else {
       return ListView.builder(
-        itemCount: widget.groupedTrackList['default']!.length,
-        itemBuilder: (context, index) => _TrackListItem(
-          trackInfo: widget.groupedTrackList['default']![index],
-        ),
+        itemCount: widget.groupedTracks['default']!.length,
+        itemBuilder: (context, index) =>
+            _TrackListItem(trackInfo: widget.groupedTracks['default']![index]),
       );
     }
   }
@@ -181,7 +170,7 @@ class _TrackListItem extends StatelessWidget {
     return Opacity(
       opacity: removed ? 0.6 : 1,
       child: ListTile(
-        // TODO: 占位封面（圆形 + 音符），之后换成真实专辑封面。
+        // TODO: 占位封面（圆形 + 音符），之后换成真实专辑封面，首次读取后缓存。
         leading: Container(
           width: 36,
           height: 36,

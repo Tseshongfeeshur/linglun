@@ -1,6 +1,4 @@
 import 'dart:math' as math;
-// TODO: 删掉这行被注释掉的、IDE 误加的内部库 import。
-// import 'dart:nativewrappers/_internal/vm/lib/math_patch.dart';
 
 import 'package:flutter/services.dart';
 import 'package:linglun/data/models/track_info.dart';
@@ -53,12 +51,10 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
 
   @override
   void didUpdateWidget(covariant LetterIndexRail oldWidget) {
+    super.didUpdateWidget(oldWidget);
     // 每次父级重建都重算一遍（只是 O(分组数)，很便宜）。
-    // TODO: 惯例是先调用 super.didUpdateWidget 再做自己的事；
     // 也可以只在 groupedTrackList/keyIndexList 真正变化时才重算。
     slotContents = buildRailSlots(widget.groupedTrackList, widget.keyIndexList);
-
-    super.didUpdateWidget(oldWidget);
   }
 
   // 第 i 个格子对应的字母下标

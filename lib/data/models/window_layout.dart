@@ -2,8 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 /// 窗口布局档位，只看窗口宽度（Material 3 的窗口尺寸分档）：
 /// < 600 手机；< 840 平板；其余桌面。
-// 注意：全项目的断点都应出自这里，不要在别处再写死 600
-// （list_page_actions.dart 里目前就有两处，已标 TODO）。
+// 注意：全项目的断点都应出自这里。
 enum WindowLayout { phone, tablet, desktop }
 
 extension WindowLayoutContext on BuildContext {

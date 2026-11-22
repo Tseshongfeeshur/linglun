@@ -1,8 +1,7 @@
-import 'package:flutter_taglib/flutter_taglib.dart' hide Picture;
 import 'package:linglun/data/models/simple_tag.dart';
 import 'package:linglun/data/track_scanner/track_scanner.dart';
-import 'package:linglun/data/track_scanner/utils/artist_splitter.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
+import 'package:linglun/data/track_scanner/utils/platforms/utils/read_simple_tag.dart';
 import 'package:saf_util/saf_util.dart';
 import 'package:saf_util/saf_util_platform_interface.dart';
 
@@ -39,16 +38,16 @@ class AndroidFileUtils extends PlatformFileUtils {
         // sourceKey 取 <docId>（如 "primary:Music/a.mp3"）：它与"通过哪个目录授权/
         // 浏览到这里"无关，所以同时选了父目录和子目录时同一文件的 sourceKey 相同，
         // 可据此去重（而 uri 不同）。
-        // TODO: 变量 docId 实际是"下标"而不是 id，名字有误导性；indexOf 找不到时
-        // 回退到写死的 3，若 segments 不足 4 段会 RangeError，把整个 discover 流
-        // 搞崩。应改成：找不到就 yield FileDiscoveredError 并跳过该项。
         final segments = Uri.parse(item.uri).pathSegments;
-        var docId = segments.indexOf('document') + 1;
-        if (docId == 0) docId = 3;
+        var docIdIndex = segments.indexOf('document') + 1;
+        if (docIdIndex == 0) {
+          // 如果找不到字段
+          yield FileDiscoveredError(uri: uri, detail: 'file not found');
+        }
 
         yield FileDiscovered(
           uri: item.uri,
-          sourceKey: segments[docId],
+          sourceKey: segments[docIdIndex],
           name: item.name,
           // 注意：SAF 对未知大小可能给 -1、lastModified 可能为 0，
           // TrackScanner.parse 的增量判断依赖这两个约定。
@@ -62,28 +61,7 @@ class AndroidFileUtils extends PlatformFileUtils {
 
   @override
   Future<SimpleTag> parse(FileDiscovered item) async {
-    // TODO: 这个 parse 与 LinuxFileUtils.parse 几乎逐行重复（只有 open 的参数不同）。
-    // 抽成一个共用函数（如 readSimpleTag(String pathOrUri)）放到 platform 目录下，
-    // 下面这类"复制粘贴后改错一边"的 bug 就不会出现。
-    final file = await TagLibFile.openAsync(item.uri);
-    if (file == null) {
-      throw 'failed to open file';
-    }
-
-    SimpleTag? tag;
-    try {
-      var artistList = splitArtists(file.artist);
-      tag = SimpleTag(
-        title: file.title.isEmpty ? null : file.title,
-        artists: artistList.isEmpty ? null : artistList,
-        album: file.album.isEmpty ? null : file.album,
-        durationMs: file.duration.inMilliseconds,
-      );
-    } finally {
-      file.close();
-    }
-
-    return tag;
+    return readSimpleTag(item.uri);
   }
 
   @override

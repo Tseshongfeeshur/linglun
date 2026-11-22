@@ -1,3 +1,4 @@
+import 'package:linglun/data/models/window_layout.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
@@ -52,11 +53,6 @@ class _ListPageActionsState extends State<ListPageActions> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final base = 48.0;
-    final adj = theme.visualDensity.baseSizeAdjustment;
-    final buttonSize = Size(base + adj.dx, base + adj.dy);
-
     return Animate(target: isSearchBarExtended ? 1 : 0).custom(
       duration: 200.ms,
       curve: Curves.easeInOutCubic,
@@ -71,17 +67,12 @@ class _ListPageActionsState extends State<ListPageActions> {
             _Collapsible(
               progress: progress,
               child: _SortButton(
-                buttonSize: buttonSize,
                 sortConfig: widget.sortConfig,
                 onSortChanged: widget.onSortChanged,
               ),
             ),
-            _Collapsible(
-              progress: progress,
-              child: _CheckButton(buttonSize: buttonSize),
-            ),
+            _Collapsible(progress: progress, child: _CheckButton()),
             _SearchField(
-              buttonSize: buttonSize,
               controller: searchBarController,
               focusNode: searchBarFocusNode,
               searchBarPadding: searchBarPadding,
@@ -104,15 +95,14 @@ class _Collapsible extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: 断点 600 写死在这里（_SearchField 里还有一处），项目约定断点只看
-    // window_layout.dart：应写成 context.layout != WindowLayout.phone。
-    final visible = MediaQuery.sizeOf(context).width >= 600
+    final visible = context.layout != WindowLayout.phone
         ? 1.0
         : (1 - progress).clamp(0.0, 1.0);
     return ClipRect(
       child: Align(
         alignment: Alignment.centerLeft,
         widthFactor: visible,
+        heightFactor: 1,
         child: Opacity(
           opacity: visible,
           child: IgnorePointer(ignoring: visible < 0.5, child: child),
@@ -123,23 +113,14 @@ class _Collapsible extends StatelessWidget {
 }
 
 class _SortButton extends StatelessWidget {
-  final Size buttonSize;
   final SortConfig sortConfig;
   final ValueChanged<SortConfig> onSortChanged;
 
-  const new({
-    required this.buttonSize,
-    required this.sortConfig,
-    required this.onSortChanged,
-  });
+  const new({required this.sortConfig, required this.onSortChanged});
 
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<TrackSort>(
-      style: IconButton.styleFrom(
-        minimumSize: buttonSize,
-        maximumSize: buttonSize,
-      ),
       popUpAnimationStyle: AnimationStyle(
         curve: Curves.easeInOutCubic,
         reverseCurve: Curves.easeInOutCubic,
@@ -192,9 +173,7 @@ class _SortButton extends StatelessWidget {
 }
 
 class _CheckButton extends StatelessWidget {
-  const new({required this.buttonSize});
-
-  final Size buttonSize;
+  const new();
 
   @override
   Widget build(BuildContext context) {
@@ -202,17 +181,12 @@ class _CheckButton extends StatelessWidget {
       // TODO: 多选模式尚未实现（待办）。
       onPressed: () {},
       icon: const Icon(Icons.check_box_outlined),
-      style: IconButton.styleFrom(
-        minimumSize: buttonSize,
-        maximumSize: buttonSize,
-      ),
     );
   }
 }
 
 /// 搜索框：收起时只是一个搜索图标按钮，展开时露出输入框和清除按钮。
 class _SearchField extends StatefulWidget {
-  final Size buttonSize;
   final TextEditingController controller;
   final FocusNode focusNode;
   final double searchBarPadding;
@@ -220,7 +194,6 @@ class _SearchField extends StatefulWidget {
   final double progress;
 
   const new({
-    required this.buttonSize,
     required this.controller,
     required this.focusNode,
     required this.searchBarPadding,
@@ -235,84 +208,93 @@ class _SearchField extends StatefulWidget {
 class _SearchFieldState extends State<_SearchField> {
   final _groupId = Object();
 
+  final _iconKey = GlobalKey();
+  double _iconWidth = 48; // 首帧的估计值，量到真实值后替换
+
+  void _measureIcon() {
+    final w = _iconKey.currentContext?.size?.width;
+    if (mounted && w != null && w != _iconWidth) setState(() => _iconWidth = w);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureIcon());
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 宽度 = 图标按钮宽 + 增量 × progress：宽屏展开到 +240；
-    // 窄屏展开到占满屏幕宽度（减去两侧 padding）。
-    // TODO: 上面说的断点 600 写死了，同 _Collapsible。
+    final fieldWidth = context.layout == WindowLayout.phone
+        ? MediaQuery.sizeOf(context).width -
+              widget.searchBarPadding * 2 -
+              _iconWidth
+        : 240.0;
     // TapRegion 的 groupId 与 TextField 相同，所以点击搜索框内部（含图标、清除按钮）
     // 不算"点击外部"；点击外部则失焦（文本为空时随之收起）。
     return TapRegion(
       groupId: _groupId,
       child: Container(
-        width:
-            widget.buttonSize.width +
-            (MediaQuery.sizeOf(context).width >= 600
-                    ? 240
-                    : (MediaQuery.sizeOf(context).width -
-                              widget.searchBarPadding * 2) -
-                          widget.buttonSize.width) *
-                widget.progress,
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainer
               .withAlpha((255 * widget.progress).toInt().clamp(0, 255)),
           borderRadius: BorderRadius.circular(999),
         ),
-        child: Stack(
-          alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min, // 收起时宽度 = 一个按钮
           children: [
             IconButton(
+              key: _iconKey,
               onPressed: () => widget.focusNode.requestFocus(),
               icon: const Icon(Icons.search),
-              style: IconButton.styleFrom(
-                minimumSize: widget.buttonSize,
-                maximumSize: widget.buttonSize,
-              ),
             ),
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: widget.buttonSize.width,
-              ),
-              child: TextField(
-                groupId: _groupId,
-                controller: widget.controller,
-                focusNode: widget.focusNode,
-                onTapOutside: (_) => widget.focusNode.unfocus(),
-                decoration: InputDecoration(
-                  hintText: '搜索',
-                  hintStyle: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface
-                        .withAlpha((160 * widget.progress).toInt()),
-                    fontSize: 16,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  border: InputBorder.none,
-                  isDense: true,
-                ),
-              ),
-            ),
-            Positioned(
-              right: 0,
-              child: Opacity(
-                // 清除按钮只在动画后半段（progress 0.5→1）淡入；前半段不响应点击。
-                opacity: ((widget.progress - 0.5) / 0.5).clamp(0, 1),
-                child: IgnorePointer(
-                  ignoring: widget.progress < 0.5,
-                  child: IconButton(
-                    onPressed: () {
-                      if (widget.controller.text.isEmpty) {
-                        widget.focusNode.unfocus();
-                      } else {
-                        widget.controller.clear();
-                        widget.focusNode.requestFocus();
-                      }
-                    },
-                    icon: const Icon(Icons.clear),
-                    style: IconButton.styleFrom(
-                      minimumSize: widget.buttonSize,
-                      maximumSize: widget.buttonSize,
-                    ),
+            ClipRect(
+              child: Align(
+                heightFactor: 1,
+                alignment: Alignment.centerLeft,
+                widthFactor: widget.progress, // 0 → 1：这一段宽度从 0 长到 fieldWidth
+                child: SizedBox(
+                  width: fieldWidth,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          groupId: _groupId,
+                          controller: widget.controller,
+                          focusNode: widget.focusNode,
+                          onTapOutside: (_) => widget.focusNode.unfocus(),
+                          decoration: InputDecoration(
+                            hintText: '搜索',
+                            hintStyle: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface
+                                  .withAlpha((160 * widget.progress).toInt()),
+                              fontSize: 16,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      Opacity(
+                        // 清除按钮只在动画后半段（progress 0.5→1）淡入；前半段不响应点击。
+                        opacity: ((widget.progress - 0.5) / 0.5).clamp(0, 1),
+                        child: IgnorePointer(
+                          ignoring: widget.progress < 0.5,
+                          child: IconButton(
+                            onPressed: () {
+                              if (widget.controller.text.isEmpty) {
+                                widget.focusNode.unfocus();
+                              } else {
+                                widget.controller.clear();
+                                widget.focusNode.requestFocus();
+                              }
+                            },
+                            icon: const Icon(Icons.clear),
+                          ),
+                        ),
+                      ), // 原来 Positioned 的清除按钮
+                    ],
                   ),
                 ),
               ),

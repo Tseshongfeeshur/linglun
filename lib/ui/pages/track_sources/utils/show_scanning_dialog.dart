@@ -8,7 +8,6 @@ import 'package:linglun/data/track_scanner/models/scan_state.dart';
 
 /// 弹出阻塞式扫描对话框，扫描完成并确认后返回新的完整曲库；取消返回 null。
 /// 返回值 = 跳过的旧记录 + 新增/已变化/被标 removed 的记录；
-/// 解析失败的曲目不在其中（见 TrackScanner.parse 里的 FIXME）。
 Future<List<TrackInfo>?> showScanningDialog(
   BuildContext context,
   Set<String> uris,
@@ -420,7 +419,6 @@ class _ContentAtFinish extends StatelessWidget {
               TextButton(
                 onPressed: () {
                   // 新的完整曲库 = 跳过的旧记录 + 新增/已变化/removed 的记录。
-                  // 解析失败的曲目不在其中，见 TrackScanner.parse 里的 FIXME。
                   Navigator.pop(context, <TrackInfo>[
                     ...scanState.parseSkips.map((item) => item.track),
                     ...scanState.parseUpdates.map((item) => item.track),

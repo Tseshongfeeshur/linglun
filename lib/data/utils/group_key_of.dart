@@ -50,17 +50,41 @@ final _asciiLetter = RegExp(r'[a-z]');
 final _spaces = RegExp(r'\s+');
 
 // 半角片假名（U+FF66 起，共 58 个）对应的全角字符
-// TODO: 半角浊点（ﾞ）和半角半浊点（ﾟ）只被映射成独立的 ゛ ゜，没有与前一个
-// 假名合并，所以 ｶﾞ 会变成 "か゛" 而不是 "が"。只影响组内排序键，分组不受影响；
-// 半角片假名很少见，先记下。
+// 末尾的 ゛ ゜ 只是兜底：半角浊点、半角半浊点正常情况下会在 _fold 里
+// 与前一个假名合并，只有前面没有可合并的假名时才会保留成独立符号。
 const _halfKana = 'ヲァィゥェォャュョッーアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン゛゜';
 
-/// 全角 ASCII → 半角，半角片假名 → 全角，片假名 → 平假名
+// 能加浊点的平假名（码点 +1 即为浊音），以及能加半浊点的（码点 +2 即为半浊音）
+final Set<int> _voicedBase = 'かきくけこさしすせそたちつてとはひふへほ'.runes.toSet();
+final Set<int> _semiVoicedBase = 'はひふへほ'.runes.toSet();
+
+/// 把浊点/半浊点合并进前一个平假名；前一个字符不能合并时返回 null
+int? _combineKana(int base, {required bool semi}) {
+  if (semi) return _semiVoicedBase.contains(base) ? base + 2 : null;
+  if (base == 0x3046) return 0x3094; // う → ゔ
+  return _voicedBase.contains(base) ? base + 1 : null;
+}
+
+/// 统一字符形态：
+/// - 全角空格 → 空格，全角 ASCII → 半角
+/// - 半角片假名 → 全角，片假名 → 平假名
+/// - 浊点/半浊点（半角 ﾞ ﾟ，或 macOS 文件名常见的组合记号 U+3099 U+309A）与前一个假名合并
+/// - 分解形式的韩文（Jamo 序列，NFD）重新组合成预组合音节
 String _fold(String s) {
-  final b = StringBuffer();
+  final out = <int>[];
   for (var c in s.runes) {
-    // 先把半角/全角统一（全角空格→空格，半角片假名→全角，全角 ASCII→半角），
-    // 再统一把片假名转成平假名（所以半角片假名最终也变成平假名）。
+    // 1. 浊点、半浊点：合并进前一个字符（此时前一个字符已经是平假名）
+    if (c == 0xFF9E || c == 0x3099 || c == 0xFF9F || c == 0x309A) {
+      if (out.isNotEmpty) {
+        final merged = _combineKana(out.last, semi: c == 0xFF9F || c == 0x309A);
+        if (merged != null) {
+          out.last = merged;
+          continue;
+        }
+      }
+    }
+
+    // 2. 半角/全角统一，再把片假名转成平假名
     if (c == 0x3000) {
       c = 0x20;
     } else if (c >= 0xFF66 && c <= 0xFF9F) {
@@ -69,9 +93,28 @@ String _fold(String s) {
       c -= 0xFEE0;
     }
     if (c >= 0x30A1 && c <= 0x30F6) c -= 0x60;
-    b.writeCharCode(c);
+
+    // 3. 韩文 Jamo 组合：初声(1100–1112)+中声(1161–1175) → 音节，
+    //    再遇到终声(11A8–11C2) 且该音节还没有终声 → 补上终声
+    if (out.isNotEmpty) {
+      final last = out.last;
+      if (c >= 0x1161 && c <= 0x1175 && last >= 0x1100 && last <= 0x1112) {
+        out.last = 0xAC00 + ((last - 0x1100) * 21 + (c - 0x1161)) * 28;
+        continue;
+      }
+      if (c >= 0x11A8 &&
+          c <= 0x11C2 &&
+          last >= 0xAC00 &&
+          last <= 0xD7A3 &&
+          (last - 0xAC00) % 28 == 0) {
+        out.last = last + (c - 0x11A7);
+        continue;
+      }
+    }
+
+    out.add(c);
   }
-  return b.toString();
+  return String.fromCharCodes(out);
 }
 
 /// 去掉开头的空白和符号，直到第一个字母或数字
@@ -148,6 +191,24 @@ final Map<int, String> _kanaRowOf = {
 // 初声下标 = (音节码点 - 0xAC00) ~/ 588，其中 588 = 21 个中声 × 28 个终声（含无终声）。
 const _hangulInitials = 'ㄱㄱㄴㄷㄷㄹㅁㅂㅂㅅㅅㅇㅈㅈㅊㅋㅌㅍㅎ';
 
+// 兼容字母（U+3131–U+314E，共 30 个辅音，如单独输入的 "ㄱ"）对应的分组：
+// 双辅音和辅音丛并入首个辅音（ㄳ→ㄱ，ㄵㄶ→ㄴ，ㄺ…ㅀ→ㄹ，ㅄ→ㅂ）。
+const _hangulCompatGroups = 'ㄱㄱㄱㄴㄴㄴㄷㄷㄹㄹㄹㄹㄹㄹㄹㄹㅁㅂㅂㅂㅅㅅㅇㅈㅈㅊㅋㅌㅍㅎ';
+
+/// 韩文首字符对应的分组：预组合音节取初声，单独的初声 Jamo、兼容字母直接映射，
+/// 其余（如单独的元音）归 '#'。分解形式（NFD）的音节已在 _fold 里重新组合。
+String _hangulGroup(int c) {
+  if (c >= 0xAC00 && c <= 0xD7A3) return _hangulInitials[(c - 0xAC00) ~/ 588];
+  if (c >= 0x1100 && c <= 0x1112) return _hangulInitials[c - 0x1100];
+  if (c >= 0x3131 && c <= 0x314E) return _hangulCompatGroups[c - 0x3131];
+  return '#';
+}
+
+// 西里尔字母的分组顺序：以俄语为主，并按各语言惯例把乌克兰语（Ґ Є І Ї）、
+// 塞尔维亚语（Ђ Ј Љ Њ Ћ Џ）的字母插到相应位置；Ё 并入 Е、Й 并入 И，所以不在表里。
+// 表外的西里尔字母排在表内字母之后，按码点排。
+const _cyrillicOrder = 'АБВГҐДЂЕЄЖЗИІЇЈКЛЉМНЊОПРСТЋУФХЦЧЏШЩЪЫЬЭЮЯ';
+
 // ====== 对外接口 ======
 
 /// 计算一个名字的分组键与组内排序键，扫描时调用
@@ -179,25 +240,16 @@ TextKey keyOf(String text) {
       return TextKey(group: _kanaRowOf[first] ?? '#', sort: tidy);
 
     case Script.hangul:
-      // TODO: 只处理了预组合音节（U+AC00–U+D7A3）。以 Jamo（U+1100 区）或
-      // 兼容字母（U+3131 区，如单独的 "ㄱ"）开头、或标签是 NFD 分解形式时
-      // code 为负数，会落进 '#' 组。可对输入先做 NFC 规范化，并补上兼容字母的映射。
-      final code = first - 0xAC00;
-      final head = (code >= 0 && first <= 0xD7A3)
-          ? _hangulInitials[code ~/ 588]
-          : '#';
-      return TextKey(group: head, sort: tidy);
+      return TextKey(group: _hangulGroup(first), sort: tidy);
 
-    // TODO: 分组名上 Й 并入了 И、Ё 并入了 Е，但 sort 里只替换了 ё→е，没替换 й→и，
-    // 于是组内 й 开头的排在所有 и 开头的之后。若想与分组规则一致，sort 里也替换 й→и
-    // （代价是丢掉 й/и 的区别，按需取舍）。
     case Script.cyrillic:
       var head = String.fromCharCode(first).toUpperCase();
       if (head == 'Ё') head = 'Е';
       if (head == 'Й') head = 'И';
+      // sort 里同样把 ё→е、й→и，使组内顺序与分组规则一致（й 开头的和 и 开头的混排）
       return TextKey(
         group: head,
-        sort: tidy.toLowerCase().replaceAll('ё', 'е'),
+        sort: tidy.toLowerCase().replaceAll('ё', 'е').replaceAll('й', 'и'),
       );
 
     case Script.other:
@@ -213,16 +265,14 @@ TextKey keyOfNullable(String? text) {
   return keyOf(text);
 }
 
-/// 分组的先后顺序：A-Z、假名、韩文、西里尔、'#'；同类内按码点
-/// （假名行首、韩文初声、西里尔大写字母的码点顺序恰好就是各自的惯例顺序）
+/// 分组的先后顺序：A-Z、假名、韩文、西里尔、'#'；同类内：
+/// 拉丁、假名行首、韩文初声的码点顺序恰好就是各自的惯例顺序，直接按码点；
+/// 西里尔按 _cyrillicOrder 里的位置（表外的排在表内之后，按码点）。
 int groupRank(String group) {
   // 分组键保证非空（keyOf 总会返回 '#' 兜底），否则这里会抛 StateError。
-  // TODO: 下面"西里尔码点顺序即惯例顺序"只对俄语成立。乌克兰语的 Є(U+0404)
-  // І(U+0406) Ї(U+0407) 码点在 А 之前、Ґ(U+0490) 在 Я 之后，塞尔维亚语等
-  // 的 Ђ Љ Њ Ћ Џ 也在 А 之前，按码点排会不符合各自惯例。要么补一张顺序表，
-  // 要么接受"只保证俄语正确"。
   final c = group.runes.first;
-  final bucket = switch (scriptOf(c)) {
+  final script = scriptOf(c);
+  final bucket = switch (script) {
     Script.latin => 0,
     Script.kana => 1,
     Script.hangul => 2,
@@ -230,9 +280,15 @@ int groupRank(String group) {
     Script.han => 4,
     Script.other => 9,
   };
-  // 0x200000 > 最大码点 0x10FFFF，所以文字系统(bucket)优先，其次才比首字符码点。
+  // 组内位置：西里尔查顺序表，其余直接用码点（最大 0x10FFFF）
+  var inner = c;
+  if (script == Script.cyrillic) {
+    final i = _cyrillicOrder.indexOf(group[0]);
+    inner = i >= 0 ? i : 0x10000 + c;
+  }
+  // 0x200000 > 最大码点 0x10FFFF，所以文字系统(bucket)优先，其次才比组内位置。
   // Script.han 在上面的 switch 里实际不会出现：汉字都已转成拼音首字母。
-  return bucket * 0x200000 + c;
+  return bucket * 0x200000 + inner;
 }
 
 /// 先比分组，再比组内排序键

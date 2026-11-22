@@ -71,10 +71,8 @@ class ScanState {
       case FileDiscoveredError():
         return copyWith(
           discoverErrors: [...discoverErrors, event],
-          // TODO: Android 的 uri 是 content://...，p.basename 取到的是百分号编码的
-          // document id（如 primary%3AMusic%2F...），显示前应 Uri.decodeComponent
-          // 并取最后一段。
-          current: p.basename(event.uri),
+          // 需要针对 Android 的 Document ID 解码。
+          current: p.basename(Uri.decodeComponent(event.uri)),
         );
       case FileDiscoveredFinish():
         return copyWith(discoverFinished: true);

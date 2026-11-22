@@ -1,12 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/track_scanner/models/scan_state.dart';
 import 'package:linglun/data/track_scanner/track_scanner.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
-import 'package:linglun/data/track_scanner/utils/platforms/android_file_utils.dart';
-import 'package:linglun/data/track_scanner/utils/platforms/linux_file_utils.dart';
 
 /// 一次扫描的进度。autoDispose：扫描弹窗关闭（没人监听了）后自动销毁，
 /// 而 startScan 在每个事件处检查 ref.mounted——这就是"取消"的实现方式。
@@ -35,8 +31,7 @@ class _ScanNotifier extends Notifier<ScanState> {
       state = state.applyDiscover(event);
     }
 
-    // TODO: 弹窗已关闭（!ref.mounted）时应直接 return，而不是继续走 parse：
-    // 现在会以空列表启动 parse 流，再在第一个事件处 break。
+    if (!ref.mounted) return;
     var tracksToParse = <FileDiscovered>[];
     if (ref.mounted) {
       tracksToParse = state.discoverResult;

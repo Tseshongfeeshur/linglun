@@ -1,9 +1,8 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_taglib/flutter_taglib.dart';
 import 'package:linglun/data/models/simple_tag.dart';
-import 'package:linglun/data/track_scanner/utils/artist_splitter.dart';
+import 'package:linglun/data/track_scanner/utils/platforms/utils/read_simple_tag.dart';
 import 'package:path/path.dart' as p;
 import 'package:linglun/data/track_scanner/track_scanner.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
@@ -67,26 +66,7 @@ class LinuxFileUtils extends PlatformFileUtils {
 
   @override
   Future<SimpleTag> parse(FileDiscovered item) async {
-    // 与 AndroidFileUtils.parse 重复，抽取共用函数的 TODO 见那边。
-    final file = await TagLibFile.openAsync(item.uri);
-    if (file == null) {
-      throw 'failed to open file';
-    }
-
-    SimpleTag? tag;
-    try {
-      var artistList = splitArtists(file.artist);
-      tag = SimpleTag(
-        title: file.title.isEmpty ? null : file.title,
-        artists: artistList.isEmpty ? null : artistList,
-        album: file.album.isEmpty ? null : file.album,
-        durationMs: file.duration.inMilliseconds,
-      );
-    } finally {
-      file.close();
-    }
-
-    return tag;
+    return readSimpleTag(item.uri);
   }
 
   @override
@@ -98,14 +78,17 @@ class LinuxFileUtils extends PlatformFileUtils {
   Future<({String name, String? path})> getPlatformMusicPath() async {
     // 在 sh 里 source ~/.config/user-dirs.dirs（其中的 $HOME 会被展开），
     // 再打印 XDG_MUSIC_DIR。
-    // TODO: 文件不存在或没定义该变量时直接返回 null，可回退到 ~/Music；
-    // 也可以自己解析这个文件，省掉起一个 shell 进程。
     final result = await Process.run('sh', [
       '-c',
       '. "\$HOME/.config/user-dirs.dirs"; printf "%s" "\$XDG_MUSIC_DIR"',
     ]);
 
-    if (result.exitCode != 0) return (name: 'XDG 音乐目录', path: null);
+    if (result.exitCode != 0) {
+      return (
+        name: 'XDG 音乐目录',
+        path: p.join(Platform.environment['HOME'] ?? '/root', 'Music'),
+      );
+    }
 
     final path = (result.stdout as String).trim();
     return (name: 'XDG 音乐目录', path: path.isNotEmpty ? path : null);

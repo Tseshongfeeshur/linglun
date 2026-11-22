@@ -37,13 +37,25 @@ enum TrackSort {
 }
 
 /// 排序依据 + 是否降序。合成一个值在页面与控件之间传递（只用一个回调回写）。
+@immutable
 class SortConfig {
   final TrackSort method;
   final bool descending;
   const new(this.method, this.descending);
 
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is SortConfig &&
+        method == other.method &&
+        descending == other.descending;
+  }
+
   SortConfig copyWith({TrackSort? method, bool? descending}) =>
       SortConfig(method ?? this.method, descending ?? this.descending);
+
+  @override
+  int get hashCode => Object.hash(method, descending);
 }
 
 /// 返回排好序的新列表（不修改入参）。
