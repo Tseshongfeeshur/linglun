@@ -111,7 +111,7 @@ class _FrameState extends ConsumerState<Frame> {
                       drawerState.extendedAt(layout)),
               child: Positioned.fill(
                 child: Container(
-                  color: Theme.of(context).colorScheme.onSurface.withAlpha(
+                  color: Colors.black.withAlpha(
                     (120 * (layout == WindowLayout.phone ? progress : 0))
                         .toInt()
                         .clamp(0, 120),

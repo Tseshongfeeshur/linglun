@@ -28,7 +28,7 @@ class LetterIndexRail extends StatefulWidget {
 
 class _LetterIndexRailState extends State<LetterIndexRail> {
   // 栏内部上下内边距。
-  static const double railPadding = 6;
+  static const double railPadding = 4;
   // 栏上下外侧的留白。TODO: 它只从可用高度里扣掉了，并没有真的画出来
   // （靠 Align 居中才形成留白），命名和实现不太对应。
   static const double railOuterPadding = 4;
