@@ -1,4 +1,5 @@
 import 'package:linglun/data/models/window_layout.dart';
+import 'package:linglun/ui/pages/track_sources/track_sources.dart';
 import 'package:linglun/ui/widgets/drawer_menu_button.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,19 +42,29 @@ class _TrackLibState extends ConsumerState<TrackLib> {
         ],
       ),
       // 列表限宽 960 并顶部居中（TrackSources 页里没有居中，两页不一致）。
-      // TODO: 曲库为空时没有空状态提示，应引导用户去"歌曲来源"页扫描。
-      body: Align(
-        alignment: AlignmentGeometry.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: TrackListView(
-            groupedTracks: groupedTracks,
-            // TODO: 靠"有没有 'default' 这个键"反推是否分组，见 track_sort.dart
-            // 里 groupTrackList 的 TODO。
-            hasGroups: !groupedTracks.keys.contains('default'),
-          ),
-        ),
-      ),
+      body: groupedTracks.isEmpty
+          ? Center(
+              child: FilledButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: ((context) =>
+                        const TrackSources(hideDrawerButton: true)),
+                  ),
+                ),
+                child: const Text('扫描歌曲'),
+              ),
+            )
+          : Align(
+              alignment: AlignmentGeometry.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 960),
+                child: TrackListView(
+                  groupedTracks: groupedTracks,
+                  sortConfig: sortConfig,
+                ),
+              ),
+            ),
     );
   }
 }

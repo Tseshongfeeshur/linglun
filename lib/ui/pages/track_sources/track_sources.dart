@@ -11,7 +11,8 @@ import 'package:linglun/ui/pages/track_sources/utils/show_scanning_dialog.dart';
 /// 歌曲来源页：勾选扫描哪些目录（系统音乐目录 + 自定义目录），
 /// 点右下角按钮开始扫描，结果整体替换全局曲库。
 class TrackSources extends ConsumerStatefulWidget {
-  const new({super.key});
+  final bool? hideDrawerButton;
+  const new({super.key, this.hideDrawerButton});
 
   @override
   ConsumerState<TrackSources> createState() => _TrackSourcesState();
@@ -53,7 +54,9 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        leading: context.layout == WindowLayout.phone
+        leading:
+            (context.layout == WindowLayout.phone &&
+                widget.hideDrawerButton != true)
             ? const DrawerMenuButton()
             : null,
         title: const Text('歌曲来源'),

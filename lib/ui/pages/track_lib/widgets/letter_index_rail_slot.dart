@@ -1,5 +1,5 @@
-import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/utils/group_key_of.dart';
+import 'package:linglun/data/utils/track_sort.dart';
 
 /// 索引栏上的一个条目：display 是栏上显示的字符，
 /// index 是点击后要跳转到的一维列表下标。
@@ -13,7 +13,7 @@ class LetterIndexRailSlot {
 /// 其余文字系统各折叠成一个代表字符（假名→'あ'，韩文→'가'，西里尔→'Я'，其他→'#'），
 /// 点击代表字符跳到该文字系统的第一个组——避免稀有文字把索引栏撑得太长。
 List<LetterIndexRailSlot> buildRailSlots(
-  Map<String, List<TrackInfo>> groupedTrackList,
+  List<TrackListItemType> groupedTrackList,
   List<int> keyIndexList,
 ) {
   if (groupedTrackList.isEmpty) return [];
@@ -22,12 +22,23 @@ List<LetterIndexRailSlot> buildRailSlots(
   // 依赖 groupedTrackList 的遍历顺序与 keyIndexList 一一对应。
   var scriptCounts = <Script, int>{};
 
-  for (final entry in groupedTrackList.entries) {
-    final group = entry.key;
-    final script = scriptOf(group.runes.first);
-    final count = entry.value.length;
+  Script script;
+  for (var i = 0; i < groupedTrackList.length; i++) {
+    final item = groupedTrackList[i];
+    if (item is TrackListGroupHead) {
+      final group = item.group;
+      script = scriptOf(group.runes.first);
 
-    scriptCounts[script] = (scriptCounts[script] ?? 0) + count;
+      var count = 1;
+      for (
+        ;
+        i + count < groupedTrackList.length &&
+            groupedTrackList[i + count] is TrackListItem;
+        count++
+      ) {}
+
+      scriptCounts[script] = (scriptCounts[script] ?? 0) + count;
+    }
   }
 
   var expandedScript = Script.latin;
@@ -52,10 +63,12 @@ List<LetterIndexRailSlot> buildRailSlots(
   // 同一文字系统的多个组在列表里是连续的（groupRank 保证，降序时也连续），
   // 所以折叠时只需与上一个被折叠的文字系统比较。
   Script? lastFoldedScript;
-  // TODO: keyIndexList 与 groupedTrackList 是并行结构，见 track_list_view.dart。
-  for (final (i, entry) in groupedTrackList.entries.indexed) {
-    final group = entry.key; // 分组名
-    final target = keyIndexList[i]; // 这个分组在一维列表里的位置
+  for (var i = 0; i < groupedTrackList.length; i++) {
+    final item = groupedTrackList[i];
+    if (item is! TrackListGroupHead) continue;
+
+    final group = item.group; // 分组名
+    final target = item.index; // 这个分组在一维列表里的位置
     final script = scriptOf(group.runes.first);
 
     if (script == expandedScript) {

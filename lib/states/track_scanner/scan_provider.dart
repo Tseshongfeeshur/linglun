@@ -9,6 +9,8 @@ import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.d
 /// 注意取消是在"下一个事件到来时"才生效，不是立即停止
 /// （discover 卡在某个慢目录时不会马上停）。
 class _ScanNotifier extends Notifier<ScanState> {
+  bool _running = false;
+
   @override
   ScanState build() {
     return ScanState();
@@ -18,29 +20,34 @@ class _ScanNotifier extends Notifier<ScanState> {
     Set<String> urisToDiscover,
     List<TrackInfo> existing,
   ) async {
-    final trackScanner = TrackScanner();
+    if (_running) return; // 已经在扫描，忽略重复调用
+    _running = true;
 
-    final utils = createPlatformFileUtils();
+    try {
+      final trackScanner = TrackScanner();
 
-    // 两阶段接力：先把发现阶段跑完，再把发现的文件交给解析阶段。
-    // TODO: 没有防止重复调用 startScan（状态会交错），也不会在开始时重置状态；
-    // 目前靠"每次弹窗新建一个 autoDispose 的 provider"规避。
-    final discoverStream = trackScanner.discover(utils, urisToDiscover);
-    await for (final event in discoverStream) {
-      if (!ref.mounted) break;
-      state = state.applyDiscover(event);
-    }
+      final utils = createPlatformFileUtils();
 
-    if (!ref.mounted) return;
-    var tracksToParse = <FileDiscovered>[];
-    if (ref.mounted) {
-      tracksToParse = state.discoverResult;
-    }
+      // 两阶段接力：先把发现阶段跑完，再把发现的文件交给解析阶段。
+      final discoverStream = trackScanner.discover(utils, urisToDiscover);
+      await for (final event in discoverStream) {
+        if (!ref.mounted) break;
+        state = state.applyDiscover(event);
+      }
 
-    final parseStream = trackScanner.parse(utils, tracksToParse, existing);
-    await for (final ParseEvent event in parseStream) {
-      if (!ref.mounted) break;
-      state = state.applyParse(event);
+      if (!ref.mounted) return;
+      var tracksToParse = <FileDiscovered>[];
+      if (ref.mounted) {
+        tracksToParse = state.discoverResult;
+      }
+
+      final parseStream = trackScanner.parse(utils, tracksToParse, existing);
+      await for (final ParseEvent event in parseStream) {
+        if (!ref.mounted) break;
+        state = state.applyParse(event);
+      }
+    } finally {
+      _running = false; // 正常结束、被取消、抛异常时复位
     }
   }
 }

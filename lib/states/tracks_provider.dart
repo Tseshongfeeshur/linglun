@@ -20,7 +20,7 @@ final tracksProvider = NotifierProvider<_TracksNotifier, List<TrackInfo>>(
 );
 
 final groupedTracksProvider = Provider.autoDispose
-    .family<Map<String, List<TrackInfo>>, SortConfig>((ref, sortConfig) {
+    .family<List<TrackListItemType>, SortConfig>((ref, sortConfig) {
       final tracks = ref.watch(tracksProvider);
       return groupTrackList(sortTrackList(tracks, sortConfig), sortConfig);
     });

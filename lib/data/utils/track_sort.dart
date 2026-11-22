@@ -89,25 +89,44 @@ List<TrackInfo> sortTrackList(List<TrackInfo> list, SortConfig sortConfig) {
   return sortConfig.descending ? result.reversed.toList() : result;
 }
 
+sealed class TrackListItemType {}
+
+class TrackListGroupHead extends TrackListItemType {
+  final String group;
+  final int index;
+
+  new({required this.group, required this.index});
+}
+
+class TrackListItem extends TrackListItemType {
+  final TrackInfo track;
+
+  new({required this.track});
+}
+
 /// 把已排好序的列表按分组键切成若干组。要求同组元素在 sortedList 里连续
 /// （排序保证了这一点）。返回的 Map 保持插入顺序，也就是各组在列表里的先后。
-Map<String, List<TrackInfo>> groupTrackList(
+List<TrackListItemType> groupTrackList(
   List<TrackInfo> sortedList,
   SortConfig sortConfig,
 ) {
+  List<TrackListItemType> result = <TrackListItemType>[
+    for (final t in sortedList) TrackListItem(track: t),
+  ];
   if (!sortConfig.method.shouldBeGrouped) {
-    // TODO: 一个 Map 同时表示"分组"和"不分组"两种形态，靠魔法键 'default'
-    // 区分，TrackLib 还得用 keys.contains('default') 反推 hasGroups，耦合很脆弱。
-    // 可以返回 sealed class / record（如 分组: List<TrackGroup>? 与 平铺: List<TrackInfo>），
-    // 或者不分组时让调用方根本不调用本函数。
-    // TODO: 'default' 作为键是否需要修改
-    return {'default': sortedList};
+    return result;
   }
-  var result = <String, List<TrackInfo>>{};
-  for (final element in sortedList) {
-    // 分组依据的 shouldBeGrouped 为 true 时 groupSource 必有值，'#' 只是兜底。
-    final groupSource = sortConfig.method.groupSource(element) ?? '#';
-    (result[groupSource] ??= []).add(element);
+  var lastGroup = '';
+  for (var i = 0; i < result.length; i++) {
+    final current = result[i];
+    if (current is! TrackListItem) continue;
+
+    final group = sortConfig.method.groupSource(current.track) ?? '#';
+    if (lastGroup == group) continue;
+
+    result.insert(i, TrackListGroupHead(group: group, index: i));
+    i++;
+    lastGroup = group;
   }
   return result;
 }

@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
-import 'package:linglun/data/models/track_info.dart';
+import 'package:linglun/data/utils/track_sort.dart';
 import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail_slot.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -18,7 +18,7 @@ class LetterIndexRail extends StatefulWidget {
     required this.keyIndexList,
   });
 
-  final Map<String, List<TrackInfo>> groupedTrackList;
+  final List<TrackListItemType> groupedTrackList;
   final ItemScrollController itemScrollController;
   final List<int> keyIndexList;
 
