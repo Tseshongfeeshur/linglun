@@ -13,9 +13,7 @@ Future<List<TrackInfo>?> showScanningDialog(
   Set<String> uris,
   List<TrackInfo> existing,
 ) async {
-  // TODO: 补上泛型 showDialog<List<TrackInfo>>，现在返回值是 dynamic，
-  // 靠隐式转换才通过类型检查。
-  return await showDialog(
+  return await showDialog<List<TrackInfo>>(
     context: context,
     builder: (BuildContext context) => PopScope(
       // 禁止返回键/点击外部关闭，只能通过对话框里的按钮退出

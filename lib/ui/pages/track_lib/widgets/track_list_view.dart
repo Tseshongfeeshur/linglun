@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:linglun/data/utils/track_sort.dart';
 import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail.dart';
+import 'package:linglun/ui/utils/load_cover.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -56,8 +59,23 @@ class _TrackListViewState extends State<TrackListView> {
                 case TrackListGroupHead trackListGroupHead:
                   return _TrackListGroupHead(
                     letter: trackListGroupHead.group,
-                    groupedTracks: items,
-                    itemScrollController: itemScrollController,
+                    onTap: () async {
+                      var selectedLetter = await showLetterSelectingDialog(
+                        context,
+                        items,
+                        trackListGroupHead.group,
+                      );
+                      if (selectedLetter == null) return;
+
+                      itemScrollController.scrollTo(
+                        index: (items.firstWhere((item) {
+                          if (item is! TrackListGroupHead) return false;
+                          return item.group == selectedLetter;
+                        }) as TrackListGroupHead).index,
+                        duration: 400.ms,
+                        curve: Curves.easeInOutCubic,
+                      );
+                    },
                   );
               }
             },
@@ -85,18 +103,11 @@ class _TrackListViewState extends State<TrackListView> {
 }
 
 /// 组头。点击后弹出分组选择框，选中后跳转到该组。
-// TODO: 这里把整个 groupedTrackList、itemScrollController、keyIndexList 都传进来，
-// 只为在 onTap 里做一次跳转。让上层传一个 onTap 回调，组头只管显示更干净。
 class _TrackListGroupHead extends StatelessWidget {
   final String letter;
-  final List<TrackListItemType> groupedTracks;
-  final ItemScrollController itemScrollController;
+  final Function() onTap;
 
-  const new({
-    required this.letter,
-    required this.groupedTracks,
-    required this.itemScrollController,
-  });
+  const new({required this.letter, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -114,23 +125,7 @@ class _TrackListGroupHead extends StatelessWidget {
       ),
       // 注意：keyIndexList 必须与 groupedTrackList.keys 同序（都由 TrackListView
       // 的 build 生成）。selectedLetter 来自弹窗，必在 keys 里，indexOf 不会是 -1。
-      onTap: () async {
-        var selectedLetter = await showLetterSelectingDialog(
-          context,
-          groupedTracks,
-          letter,
-        );
-        if (selectedLetter == null) return;
-
-        itemScrollController.scrollTo(
-          index: (groupedTracks.firstWhere((item) {
-            if (item is! TrackListGroupHead) return false;
-            return item.group == selectedLetter;
-          }) as TrackListGroupHead).index,
-          duration: 400.ms,
-          curve: Curves.easeInOutCubic,
-        );
-      },
+      onTap: onTap,
     );
   }
 }
@@ -144,23 +139,35 @@ class _TrackListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var removed = trackInfo.removed;
+    Uint8List? coverBytes;
+    if (!removed) coverBytes = loadCover(trackInfo.uri)?.coverBytes;
+
+    Widget buildFailIcon(BuildContext context) => Container(
+      color: Theme.of(context).colorScheme.primary,
+      child: Center(
+        child: Icon(
+          Icons.music_note,
+          color: Theme.of(context).colorScheme.surface,
+        ),
+      ),
+    );
+
     return Opacity(
       opacity: removed ? 0.6 : 1,
       child: ListTile(
-        // TODO: 占位封面（圆形 + 音符），之后换成真实专辑封面，首次读取后缓存。
         leading: Container(
           width: 36,
           height: 36,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          child: Center(
-            child: Icon(
-              Icons.music_note,
-              color: Theme.of(context).colorScheme.surface,
-            ),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(36)),
+          clipBehavior: Clip.antiAlias,
+          child: coverBytes == null
+              ? buildFailIcon(context)
+              : Image.memory(
+                  coverBytes,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) =>
+                      buildFailIcon(context),
+                ),
         ),
         title: Text(
           trackInfo.title,

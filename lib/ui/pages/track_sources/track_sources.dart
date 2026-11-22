@@ -38,8 +38,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
   }
 
   // 自定义来源：路径/URI → 是否勾选。
-  // TODO: 来源列表和勾选状态只在内存里，重启就没了。在接 Drift 之前，
-  // 也可先存一份本地配置（JSON/shared_preferences），否则每次启动都要重新选目录。
+  // TODO: 来源列表和勾选状态只在内存里，后续需要接入 Drift。
   Map<String, bool> userUris = {};
 
   @override
@@ -153,9 +152,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
                   onDismissed: (_) => setState(() => userUris.remove(uri)),
                   child: CheckboxListTile(
                     secondary: const Icon(Icons.folder),
-                    // TODO: Android 上 uri 是 content://...tree/primary%3AMusic 这样的字符串，
-                    // 直接显示很难读；应解码后显示成 "primary:Music" 或更友好的名字。
-                    title: Text(uri),
+                    title: Text(utils.getSourceKeyFromUri(uri) ?? uri),
                     value: userUris[uri],
                     onChanged: (value) {
                       setState(() {
@@ -172,17 +169,13 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          // TODO: 1) 没有勾选任何来源时，现有曲库里的曲目会全部被标成 removed
-          //          （parse 末尾把"库里有、这次没发现"的都标 removed），应拦截并提示；
-          //       2) await 之后又用了 ref/context，若页面此时已销毁会抛异常，
-          //          应先判断 mounted。
           // 弹窗取消时返回 null，tracksProvider.update 会忽略它。
           final tracks = await showScanningDialog(context, {
             if (platformPath.ticked && platformPath.path != null)
               platformPath.path!,
             ...userUris.keys.where((element) => userUris[element] ?? false),
           }, ref.read(tracksProvider));
-          if (tracks != null) {
+          if (tracks != null && mounted) {
             ref.read(tracksProvider.notifier).replaceAll(tracks);
           }
         },

@@ -38,16 +38,14 @@ class AndroidFileUtils extends PlatformFileUtils {
         // sourceKey 取 <docId>（如 "primary:Music/a.mp3"）：它与"通过哪个目录授权/
         // 浏览到这里"无关，所以同时选了父目录和子目录时同一文件的 sourceKey 相同，
         // 可据此去重（而 uri 不同）。
-        final segments = Uri.parse(item.uri).pathSegments;
-        var docIdIndex = segments.indexOf('document') + 1;
-        if (docIdIndex == 0) {
-          // 如果找不到字段
+        final sourceKey = getSourceKeyFromUri(item.uri);
+        if (sourceKey == null) {
           yield FileDiscoveredError(uri: uri, detail: 'file not found');
         }
 
         yield FileDiscovered(
           uri: item.uri,
-          sourceKey: segments[docIdIndex],
+          sourceKey: sourceKey!,
           name: item.name,
           // 注意：SAF 对未知大小可能给 -1、lastModified 可能为 0，
           // TrackScanner.parse 的增量判断依赖这两个约定。
@@ -82,5 +80,13 @@ class AndroidFileUtils extends PlatformFileUtils {
     // Android 没有可直接遍历的"系统音乐目录"（统一走 SAF 授权），
     // 返回 null，来源页就不显示这一项。
     return (name: '', path: null);
+  }
+
+  @override
+  String? getSourceKeyFromUri(String uri) {
+    final segments = Uri.parse(uri).pathSegments;
+    var docIdIndex = segments.indexOf('document') + 1;
+    if (docIdIndex == 0) return null;
+    return segments[docIdIndex];
   }
 }

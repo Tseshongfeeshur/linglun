@@ -186,7 +186,7 @@ class _LetterIndexRailState extends State<LetterIndexRail> {
                           .colorScheme
                           .surfaceContainerHighest,
                     ),
-                    borderRadius: BorderRadius.circular(999),
+                    borderRadius: BorderRadius.circular(hinterSize),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(

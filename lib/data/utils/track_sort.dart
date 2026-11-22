@@ -110,7 +110,7 @@ List<TrackListItemType> groupTrackList(
   List<TrackInfo> sortedList,
   SortConfig sortConfig,
 ) {
-  List<TrackListItemType> result = <TrackListItemType>[
+  var result = <TrackListItemType>[
     for (final t in sortedList) TrackListItem(track: t),
   ];
   if (!sortConfig.method.shouldBeGrouped) {

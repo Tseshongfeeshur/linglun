@@ -93,4 +93,9 @@ class LinuxFileUtils extends PlatformFileUtils {
     final path = (result.stdout as String).trim();
     return (name: 'XDG 音乐目录', path: path.isNotEmpty ? path : null);
   }
+
+  @override
+  String? getSourceKeyFromUri(String uri) {
+    return uri;
+  }
 }
