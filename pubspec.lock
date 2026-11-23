@@ -589,10 +589,9 @@ packages:
   system_theme:
     dependency: "direct main"
     description:
-      name: system_theme
-      sha256: "03525aaeead2bfc0d81b84ceee1dbafb90cbf9886efd861489b7c20fdf466479"
-      url: "https://pub.dev"
-    source: hosted
+      path: "plugins/system_theme/system_theme"
+      relative: true
+    source: path
     version: "3.3.0"
   system_theme_web:
     dependency: transitive

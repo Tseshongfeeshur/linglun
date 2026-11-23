@@ -239,12 +239,16 @@ class _CoverImageState extends ConsumerState<CoverImage> {
     }
   }
 
-  Widget buildFailIcon(BuildContext context) => Container(
-    color: Theme.of(context).colorScheme.primary,
+  Widget buildIcon(BuildContext context, {bool loading = false}) => Container(
+    color: loading
+        ? Theme.of(context).colorScheme.surfaceContainerHigh
+        : Theme.of(context).colorScheme.primary,
     child: Center(
       child: Icon(
         Icons.music_note,
-        color: Theme.of(context).colorScheme.surface,
+        color: loading
+            ? Theme.of(context).colorScheme.onSurface.withAlpha(120)
+            : Theme.of(context).colorScheme.surface,
       ),
     ),
   );
@@ -253,22 +257,23 @@ class _CoverImageState extends ConsumerState<CoverImage> {
   Widget build(BuildContext context) {
     if (coverMemoryCache != null) {
       return cache.isNoCover(coverMemoryCache)
-          ? buildFailIcon(context)
+          ? buildIcon(context)
           : Image.file(
               coverMemoryCache!,
-              errorBuilder: (context, error, stackTrace) =>
-                  buildFailIcon(context),
+              errorBuilder: (context, error, stackTrace) => buildIcon(context),
+              fit: BoxFit.cover,
             );
     }
     return FutureBuilder(
       future: coverFuture,
       builder: (BuildContext context, AsyncSnapshot<File?> snapshot) {
         if (snapshot.data == null || snapshot.hasError) {
-          return buildFailIcon(context);
+          return buildIcon(context, loading: true);
         }
         return Image.file(
           snapshot.data!,
-          errorBuilder: (context, error, stackTrace) => buildFailIcon(context),
+          errorBuilder: (context, error, stackTrace) => buildIcon(context),
+          fit: BoxFit.cover,
         );
       },
     );

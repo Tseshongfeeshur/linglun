@@ -162,13 +162,16 @@ class TrackScanner {
       }
 
       final title = tag.title ?? p.basenameWithoutExtension(item.name);
+      final artists = (tag.artists?.isEmpty ?? false) ? null : tag.artists;
+      final artistsKeys = tag.artists?.map((i) => keyOf(i)).toList();
       final track = TrackInfo(
         sourceKey: item.sourceKey,
         title: title,
         titleKey: keyOf(title),
-        artists: tag.artists,
-        artistsKeys:
-            tag.artists?.map((i) => keyOf(i)).toList() ?? [keyOfNullable(null)],
+        artists: artists,
+        artistsKeys: (artistsKeys != null && artistsKeys.isNotEmpty)
+            ? artistsKeys
+            : [keyOfNullable(null)],
         album: tag.album,
         albumKey: keyOfNullable(tag.album),
         uri: item.uri,

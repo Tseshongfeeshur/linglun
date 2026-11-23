@@ -105,7 +105,7 @@ class CoverCache {
   // 根据 key 加载封面，用来在被调用处去重
   Future<File?> _loadOrCreate(String key, TrackInfo track) async {
     // 尝试命中缓存
-    final coverCache = await _loadCoverFromCache(_coverKeyOf(track));
+    final coverCache = await _loadCoverFromCache(key);
 
     // 命中
     if (coverCache != null) {
@@ -136,17 +136,17 @@ class CoverCache {
         if (thumbnail == null) {
           _memory[key] = _noCover;
           // 没有封面的情况下写入缓存
-          await _saveCoverToCache(_coverKeyOf(track), null);
+          await _saveCoverToCache(key, null);
           return null;
         }
 
-        final saved = await _saveCoverToCache(_coverKeyOf(track), thumbnail);
+        final saved = await _saveCoverToCache(key, thumbnail);
         _memory[key] = saved;
         return saved;
       } else {
         _memory[key] = _noCover;
         // 没有封面的情况下写入缓存
-        await _saveCoverToCache(_coverKeyOf(track), null);
+        await _saveCoverToCache(key, null);
         return null;
       }
     } finally {

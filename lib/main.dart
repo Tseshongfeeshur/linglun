@@ -52,6 +52,8 @@ void main() async {
         // Android: 被系统重载
         // Linux: 可以接收改变，但不能应用
         // Windows: null
+        // macOS: null
+        // iOS: null
         builder: (context, color) {
           return MaterialApp(
             theme: buildLightTheme(color.accent),
