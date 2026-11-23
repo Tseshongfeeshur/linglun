@@ -10,6 +10,11 @@ import 'package:linglun/data/models/track_info.dart';
 import 'package:path_provider/path_provider.dart';
 
 class CoverCache {
+  // 内存缓存
+  final _memory = <String, File?>{};
+  static final _noCover = File('no_cover');
+  bool isNoCover(File? file) => identical(file, _noCover);
+
   String _coverKeyOf(TrackInfo track) {
     // TODO: 旧文件被更新后，旧 coverKey 命名的缓存文件需要删除
     final source =
@@ -19,18 +24,20 @@ class CoverCache {
     return md5.convert(utf8.encode(source)).toString();
   }
 
+  Directory? _coverCacheDir;
   Future<Directory> _getCoverCacheDir() async {
-    // TODO: _getCoverCacheDir() 每次调用都要走一次平台通道，列表里每一项都会调用，应该缓存成成员变量。
+    if (_coverCacheDir != null) return _coverCacheDir!;
+
     final cacheDir = await getApplicationCacheDirectory();
     final coverCachePath = p.join(cacheDir.path, 'covers');
     final coverCacheDir = await Directory(coverCachePath)
         .create(recursive: true);
 
+    _coverCacheDir = coverCacheDir;
     return coverCacheDir;
   }
 
   Future<File?> _loadCoverFromCache(String fileName) async {
-    print('开始解析 $fileName');
     final dir = await _getCoverCacheDir();
     final file = File(p.join(dir.path, fileName));
     final exist = await file.exists();
@@ -97,8 +104,6 @@ class CoverCache {
 
   // 根据 key 加载封面，用来在被调用处去重
   Future<File?> _loadOrCreate(String key, TrackInfo track) async {
-    // TODO: 先尝试在内存访问
-
     // 尝试命中缓存
     final coverCache = await _loadCoverFromCache(_coverKeyOf(track));
 
@@ -106,9 +111,14 @@ class CoverCache {
     if (coverCache != null) {
       final coverSize = (await coverCache.stat()).size;
       // 若无封面，则返回空
-      if (coverSize == 0) return null;
+      if (coverSize == 0) {
+        // 没有封面的情况下写入内存
+        _memory[key] = _noCover;
+        return null;
+      }
 
-      // 否则返回图片文件
+      // 否则返回图片文件并写入内存
+      _memory[key] = coverCache;
       return coverCache;
     }
 
@@ -116,7 +126,6 @@ class CoverCache {
     final file = TagLibFile.open(track.uri);
     // 若读取文件失败
     if (file == null) {
-      // TODO: 在内存标记
       // 文件读取失败不写入缓存，因为下次重新读取可能成功
       return null;
     }
@@ -125,15 +134,17 @@ class CoverCache {
         final data = file.coverData;
         final thumbnail = await _makeThumbnail(data);
         if (thumbnail == null) {
-          // TODO: 在内存标记
+          _memory[key] = _noCover;
           // 没有封面的情况下写入缓存
           await _saveCoverToCache(_coverKeyOf(track), null);
           return null;
         }
 
-        return await _saveCoverToCache(_coverKeyOf(track), thumbnail);
+        final saved = await _saveCoverToCache(_coverKeyOf(track), thumbnail);
+        _memory[key] = saved;
+        return saved;
       } else {
-        // TODO: 在内存标记
+        _memory[key] = _noCover;
         // 没有封面的情况下写入缓存
         await _saveCoverToCache(_coverKeyOf(track), null);
         return null;
@@ -145,14 +156,25 @@ class CoverCache {
 
   final _tasks = <String, Future<File?>>{};
 
+  // 通过缓存或者读取标签获取封面
   Future<File?> getCoverFile(TrackInfo track) {
     final key = _coverKeyOf(track);
-
     return _tasks.putIfAbsent(
       key,
       () => _loadOrCreate(key, track).whenComplete(() {
         _tasks.remove(key);
       }),
     );
+  }
+
+  // 通过读内存同步地获取已知封面
+  File? peekCoverFile(TrackInfo track) {
+    final key = _coverKeyOf(track);
+    // 查内存缓存
+    if (_memory.containsKey(key)) {
+      final file = _memory[key];
+      return file;
+    }
+    return null;
   }
 }

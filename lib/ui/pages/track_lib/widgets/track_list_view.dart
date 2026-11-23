@@ -1,6 +1,8 @@
 import 'dart:io';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linglun/data/utils/track_sort.dart';
+import 'package:linglun/states/cover_cache_provider.dart';
 import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail.dart';
 import 'package:linglun/ui/utils/cover_cache.dart';
 import 'package:material_ui/material_ui.dart';
@@ -132,12 +134,10 @@ class _TrackListGroupHead extends StatelessWidget {
 
 /// 一首歌的列表项。已被标记 removed（磁盘上找不到）的半透明显示。
 class _TrackListItem extends StatelessWidget {
-  new({required this.trackInfo});
+  const new({required this.trackInfo});
 
   final TrackInfo trackInfo;
   final coverSize = 46.0;
-
-  final cache = CoverCache();
 
   @override
   Widget build(BuildContext context) {
@@ -153,7 +153,7 @@ class _TrackListItem extends StatelessWidget {
             borderRadius: BorderRadius.circular(coverSize),
           ),
           clipBehavior: Clip.antiAlias,
-          child: CoverImage(track: trackInfo, cache: cache),
+          child: CoverImage(track: trackInfo),
         ),
         title: Text(
           trackInfo.title,
@@ -199,24 +199,30 @@ class _TrackListItem extends StatelessWidget {
   }
 }
 
-class CoverImage extends StatefulWidget {
-  const new({super.key, required this.track, required this.cache});
+class CoverImage extends ConsumerStatefulWidget {
+  const new({super.key, required this.track});
 
   final TrackInfo track;
-  final CoverCache cache;
 
   @override
-  State<CoverImage> createState() => _CoverImageState();
+  ConsumerState<CoverImage> createState() => _CoverImageState();
 }
 
-class _CoverImageState extends State<CoverImage> {
-  late Future<File?> coverFuture;
+class _CoverImageState extends ConsumerState<CoverImage> {
+  late CoverCache cache;
+  File? coverMemoryCache;
+  Future<File?>? coverFuture;
 
   @override
   void initState() {
     super.initState();
+    cache = ref.read(coverCacheProvider);
+
     // 只在创建时发起一次请求
-    coverFuture = widget.cache.getCoverFile(widget.track);
+    coverMemoryCache = cache.peekCoverFile(widget.track);
+    if (coverMemoryCache == null) {
+      coverFuture = cache.getCoverFile(widget.track);
+    }
   }
 
   @override
@@ -224,7 +230,12 @@ class _CoverImageState extends State<CoverImage> {
     super.didUpdateWidget(oldWidget);
     // 同一个 State 被复用来显示另一首歌时，才重新请求
     if (oldWidget.track.sourceKey != widget.track.sourceKey) {
-      coverFuture = widget.cache.getCoverFile(widget.track);
+      coverMemoryCache = cache.peekCoverFile(widget.track);
+      if (coverMemoryCache != null) {
+        coverFuture = null;
+      } else {
+        coverFuture = cache.getCoverFile(widget.track);
+      }
     }
   }
 
@@ -240,11 +251,21 @@ class _CoverImageState extends State<CoverImage> {
 
   @override
   Widget build(BuildContext context) {
+    if (coverMemoryCache != null) {
+      return cache.isNoCover(coverMemoryCache)
+          ? buildFailIcon(context)
+          : Image.file(
+              coverMemoryCache!,
+              errorBuilder: (context, error, stackTrace) =>
+                  buildFailIcon(context),
+            );
+    }
     return FutureBuilder(
       future: coverFuture,
       builder: (BuildContext context, AsyncSnapshot<File?> snapshot) {
-        if (snapshot.data == null || snapshot.hasError)
+        if (snapshot.data == null || snapshot.hasError) {
           return buildFailIcon(context);
+        }
         return Image.file(
           snapshot.data!,
           errorBuilder: (context, error, stackTrace) => buildFailIcon(context),

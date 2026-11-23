@@ -48,6 +48,10 @@ void main() async {
   runApp(
     ProviderScope(
       child: SystemThemeBuilder(
+        // TODO: 测试各端监听是否生效
+        // Android: 被系统重载
+        // Linux: 可以接收改变，但不能应用
+        // Windows: null
         builder: (context, color) {
           return MaterialApp(
             theme: buildLightTheme(color.accent),
