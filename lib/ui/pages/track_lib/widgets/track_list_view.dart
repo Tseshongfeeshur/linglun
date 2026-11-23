@@ -1,8 +1,8 @@
-import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:linglun/data/utils/track_sort.dart';
 import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail.dart';
-import 'package:linglun/ui/utils/load_cover.dart';
+import 'package:linglun/ui/utils/cover_cache.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -132,42 +132,28 @@ class _TrackListGroupHead extends StatelessWidget {
 
 /// 一首歌的列表项。已被标记 removed（磁盘上找不到）的半透明显示。
 class _TrackListItem extends StatelessWidget {
-  const new({required this.trackInfo});
+  new({required this.trackInfo});
 
   final TrackInfo trackInfo;
+  final coverSize = 46.0;
+
+  final cache = CoverCache();
 
   @override
   Widget build(BuildContext context) {
     var removed = trackInfo.removed;
-    Uint8List? coverBytes;
-    if (!removed) coverBytes = loadCover(trackInfo.uri)?.coverBytes;
-
-    Widget buildFailIcon(BuildContext context) => Container(
-      color: Theme.of(context).colorScheme.primary,
-      child: Center(
-        child: Icon(
-          Icons.music_note,
-          color: Theme.of(context).colorScheme.surface,
-        ),
-      ),
-    );
 
     return Opacity(
       opacity: removed ? 0.6 : 1,
       child: ListTile(
         leading: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(36)),
+          width: coverSize,
+          height: coverSize,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(coverSize),
+          ),
           clipBehavior: Clip.antiAlias,
-          child: coverBytes == null
-              ? buildFailIcon(context)
-              : Image.memory(
-                  coverBytes,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) =>
-                      buildFailIcon(context),
-                ),
+          child: CoverImage(track: trackInfo, cache: cache),
         ),
         title: Text(
           trackInfo.title,
@@ -209,6 +195,61 @@ class _TrackListItem extends StatelessWidget {
           showTrackInfoBottomSheet(context, trackInfo);
         },
       ),
+    );
+  }
+}
+
+class CoverImage extends StatefulWidget {
+  const new({super.key, required this.track, required this.cache});
+
+  final TrackInfo track;
+  final CoverCache cache;
+
+  @override
+  State<CoverImage> createState() => _CoverImageState();
+}
+
+class _CoverImageState extends State<CoverImage> {
+  late Future<File?> coverFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // 只在创建时发起一次请求
+    coverFuture = widget.cache.getCoverFile(widget.track);
+  }
+
+  @override
+  void didUpdateWidget(CoverImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 同一个 State 被复用来显示另一首歌时，才重新请求
+    if (oldWidget.track.sourceKey != widget.track.sourceKey) {
+      coverFuture = widget.cache.getCoverFile(widget.track);
+    }
+  }
+
+  Widget buildFailIcon(BuildContext context) => Container(
+    color: Theme.of(context).colorScheme.primary,
+    child: Center(
+      child: Icon(
+        Icons.music_note,
+        color: Theme.of(context).colorScheme.surface,
+      ),
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: coverFuture,
+      builder: (BuildContext context, AsyncSnapshot<File?> snapshot) {
+        if (snapshot.data == null || snapshot.hasError)
+          return buildFailIcon(context);
+        return Image.file(
+          snapshot.data!,
+          errorBuilder: (context, error, stackTrace) => buildFailIcon(context),
+        );
+      },
     );
   }
 }

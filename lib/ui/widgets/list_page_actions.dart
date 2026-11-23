@@ -71,7 +71,7 @@ class _ListPageActionsState extends State<ListPageActions> {
                 onSortChanged: widget.onSortChanged,
               ),
             ),
-            _Collapsible(progress: progress, child: _CheckButton()),
+            _Collapsible(progress: progress, child: const _CheckButton()),
             _SearchField(
               controller: searchBarController,
               focusNode: searchBarFocusNode,

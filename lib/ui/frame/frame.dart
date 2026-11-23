@@ -105,11 +105,11 @@ class _FrameState extends ConsumerState<Frame> {
             // 遮罩：只在手机布局下有颜色。它始终在树里，靠 IgnorePointer 决定是否拦截点击：
             // 手机且抽屉展开时才拦截（吸收对页面的点击），点击后由下面抽屉上的
             // TapRegion.onTapOutside 负责把抽屉收起。
-            IgnorePointer(
-              ignoring:
-                  !(layout == WindowLayout.phone &&
-                      drawerState.extendedAt(layout)),
-              child: Positioned.fill(
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring:
+                    !(layout == WindowLayout.phone &&
+                        drawerState.extendedAt(layout)),
                 child: Container(
                   color: Colors.black.withAlpha(
                     (120 * (layout == WindowLayout.phone ? progress : 0))

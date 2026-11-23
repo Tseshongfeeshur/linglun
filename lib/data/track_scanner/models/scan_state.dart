@@ -13,6 +13,8 @@ class ScanState {
   final List<TrackParsed> parseUpdates;
   final List<TrackSkipped> parseSkips;
   final List<TrackParsedError> parseErrors;
+  int get parsedCount =>
+      parseUpdates.length + parseSkips.length + parseErrors.length;
   final bool parseFinished;
 
   // 正在处理的文件名，仅用于界面显示。
