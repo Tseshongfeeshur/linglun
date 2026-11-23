@@ -267,8 +267,10 @@ class _CoverImageState extends ConsumerState<CoverImage> {
     return FutureBuilder(
       future: coverFuture,
       builder: (BuildContext context, AsyncSnapshot<File?> snapshot) {
-        if (snapshot.data == null || snapshot.hasError) {
+        if (snapshot.connectionState != ConnectionState.done) {
           return buildIcon(context, loading: true);
+        } else if (snapshot.data == null || snapshot.hasError) {
+          return buildIcon(context);
         }
         return Image.file(
           snapshot.data!,
