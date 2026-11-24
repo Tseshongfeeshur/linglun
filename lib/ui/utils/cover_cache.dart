@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -13,6 +14,8 @@ class CoverCache {
   // 内存缓存
   final _memory = <String, File?>{};
   static final _noCover = File('no_cover');
+  static final _limiter = Limiter(maxRunning: 2);
+
   bool isNoCover(File? file) => identical(file, _noCover);
 
   String _coverKeyOf(TrackInfo track) {
@@ -50,7 +53,9 @@ class CoverCache {
   }
 
   Future<File> _saveCoverToCache(String fileName, Uint8List? data) async {
-    final dir = await _getCoverCacheDir();
+    // create() 用于确保目录存在
+    final dir = await _getCoverCacheDir()
+      ..create();
     // TODO: 清理 .tmp 文件
     final file = File(p.join(dir.path, '$fileName.tmp'));
 
@@ -102,33 +107,14 @@ class CoverCache {
     }
   }
 
-  // 根据 key 加载封面，用来在被调用处去重
-  Future<File?> _loadOrCreate(String key, TrackInfo track) async {
-    // 尝试命中缓存
-    final coverCache = await _loadCoverFromCache(key);
-
-    // 命中
-    if (coverCache != null) {
-      final coverSize = (await coverCache.stat()).size;
-      // 若无封面，则返回空
-      if (coverSize == 0) {
-        // 没有封面的情况下写入内存
-        _memory[key] = _noCover;
-        return null;
-      }
-
-      // 否则返回图片文件并写入内存
-      _memory[key] = coverCache;
-      return coverCache;
-    }
-
-    // 未命中，读取文件并缓存
+  Future<File?> _createThumbnailFromTag(String key, TrackInfo track) async {
     final file = TagLibFile.open(track.uri);
     // 若读取文件失败
     if (file == null) {
       // 文件读取失败不写入缓存，因为下次重新读取可能成功
       return null;
     }
+
     try {
       if (file.hasCover) {
         final data = file.coverData;
@@ -154,6 +140,30 @@ class CoverCache {
     }
   }
 
+  // 根据 key 加载封面，用来在被调用处去重
+  Future<File?> _loadOrCreate(String key, TrackInfo track) async {
+    // 尝试命中缓存
+    final coverCache = await _loadCoverFromCache(key);
+
+    // 命中
+    if (coverCache != null) {
+      final coverSize = (await coverCache.stat()).size;
+      // 若无封面，则返回空
+      if (coverSize == 0) {
+        // 没有封面的情况下写入内存
+        _memory[key] = _noCover;
+        return null;
+      }
+
+      // 否则返回图片文件并写入内存
+      _memory[key] = coverCache;
+      return coverCache;
+    }
+
+    // 未命中，读取文件并缓存，用 Limiter 节流
+    return _limiter.run(() => _createThumbnailFromTag(key, track));
+  }
+
   final _tasks = <String, Future<File?>>{};
 
   // 通过缓存或者读取标签获取封面
@@ -176,5 +186,42 @@ class CoverCache {
       return file;
     }
     return null;
+  }
+}
+
+// 节流器，减少由并发产生的卡顿
+class Limiter {
+  final int maxRunning;
+  new({required this.maxRunning}) : assert(maxRunning > 0);
+
+  // 并行任务数
+  var _running = 0;
+  // 等待栈，后进先出，防止一直滑动时后等前
+  final _taskStack = <Completer>[];
+
+  Future<T> run<T>(Future<T> Function() task) async {
+    // 如果并行任务未满
+    if (_running < maxRunning) {
+      _running++;
+      // 立即执行 try-finally
+    } else {
+      // 无法继续并行，因此创建等待器
+      final completer = Completer<void>();
+      _taskStack.add(completer);
+      // 等待等待器被结束
+      await completer.future;
+    }
+
+    try {
+      return await task();
+    } finally {
+      // 如果还有任务在排队
+      if (_taskStack.isNotEmpty) {
+        // 立刻结束等待器，从而转交名额，因此 _running 不变
+        _taskStack.removeLast().complete();
+      } else {
+        _running--;
+      }
+    }
   }
 }

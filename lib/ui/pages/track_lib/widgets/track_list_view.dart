@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:linglun/data/models/window_layout.dart';
 import 'package:linglun/data/utils/track_sort.dart';
 import 'package:linglun/states/cover_cache_provider.dart';
 import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail.dart';
