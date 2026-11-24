@@ -4,21 +4,30 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:linglun/ui/utils/task_limiter.dart';
 import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart';
 import 'package:flutter_taglib/flutter_taglib.dart';
 import 'package:linglun/data/models/track_info.dart';
 import 'package:path_provider/path_provider.dart';
 
-class CoverCache {
+sealed class CoverResult {}
+
+class CoverFound extends CoverResult {
+  final File file;
+  new(this.file);
+}
+
+class CoverNone extends CoverResult {}
+
+class CoverFailed extends CoverResult {}
+
+class CoverThumbnailCache {
   // 内存缓存
-  final _memory = <String, File?>{};
-  static final _noCover = File('no_cover');
-  static final _limiter = Limiter(maxRunning: 2);
+  final _memory = <String, CoverResult>{};
+  static final _limiter = TaskLimiter(maxRunning: 2);
 
-  bool isNoCover(File? file) => identical(file, _noCover);
-
-  String _coverKeyOf(TrackInfo track) {
+  String coverThumbnailKeyOf(TrackInfo track) {
     // TODO: 旧文件被更新后，旧 coverKey 命名的缓存文件需要删除
     final source =
         track.sourceKey +
@@ -40,22 +49,15 @@ class CoverCache {
     return coverCacheDir;
   }
 
-  Future<File?> _loadCoverFromCache(String fileName) async {
+  Future<File> _cacheFileOf(String fileName) async {
     final dir = await _getCoverCacheDir();
     final file = File(p.join(dir.path, fileName));
-    final exist = await file.exists();
 
-    if (exist) {
-      return file;
-    } else {
-      return null;
-    }
+    return file;
   }
 
   Future<File> _saveCoverToCache(String fileName, Uint8List? data) async {
-    // create() 用于确保目录存在
-    final dir = await _getCoverCacheDir()
-      ..create();
+    final dir = await _getCoverCacheDir();
     // TODO: 清理 .tmp 文件
     final file = File(p.join(dir.path, '$fileName.tmp'));
 
@@ -68,8 +70,8 @@ class CoverCache {
     return await file.rename(p.join(dir.path, fileName));
   }
 
-  // 大图转缩略图
-  Future<Uint8List?> _makeThumbnail(Uint8List? data) async {
+  /// 大图转缩略图
+  Future<Uint8List?> _toThumbnail(Uint8List? data) async {
     if (data == null) {
       return null;
     }
@@ -107,121 +109,90 @@ class CoverCache {
     }
   }
 
-  Future<File?> _createThumbnailFromTag(String key, TrackInfo track) async {
+  /// 从文件获取缩略图
+  Future<CoverResult> _createThumbnailFromTag(
+    String key,
+    TrackInfo track,
+  ) async {
     final file = TagLibFile.open(track.uri);
     // 若读取文件失败
     if (file == null) {
       // 文件读取失败不写入缓存，因为下次重新读取可能成功
-      return null;
+      return CoverFailed();
     }
 
     try {
       if (file.hasCover) {
         final data = file.coverData;
-        final thumbnail = await _makeThumbnail(data);
+        final thumbnail = await _toThumbnail(data);
         if (thumbnail == null) {
-          _memory[key] = _noCover;
           // 没有封面的情况下写入缓存
           await _saveCoverToCache(key, null);
-          return null;
+          return CoverNone();
         }
 
         final saved = await _saveCoverToCache(key, thumbnail);
-        _memory[key] = saved;
-        return saved;
+        return CoverFound(saved);
       } else {
-        _memory[key] = _noCover;
         // 没有封面的情况下写入缓存
         await _saveCoverToCache(key, null);
-        return null;
+        return CoverNone();
       }
     } finally {
       file.close();
     }
   }
 
-  // 根据 key 加载封面，用来在被调用处去重
-  Future<File?> _loadOrCreate(String key, TrackInfo track) async {
+  /// 根据 key 加载封面，用来在被调用处去重
+  Future<CoverResult> _loadOrCreate(String key, TrackInfo track) async {
     // 尝试命中缓存
-    final coverCache = await _loadCoverFromCache(key);
+    final file = await _cacheFileOf(key);
+    final stat = await file.stat();
 
     // 命中
-    if (coverCache != null) {
-      final coverSize = (await coverCache.stat()).size;
+    if (stat.type == FileSystemEntityType.file) {
+      final coverSize = stat.size;
       // 若无封面，则返回空
       if (coverSize == 0) {
-        // 没有封面的情况下写入内存
-        _memory[key] = _noCover;
-        return null;
+        // 没有封面
+        return CoverNone();
       }
 
-      // 否则返回图片文件并写入内存
-      _memory[key] = coverCache;
-      return coverCache;
+      // 否则返回图片文件
+      return CoverFound(file);
     }
 
     // 未命中，读取文件并缓存，用 Limiter 节流
     return _limiter.run(() => _createThumbnailFromTag(key, track));
   }
 
-  final _tasks = <String, Future<File?>>{};
+  /// 去重
+  final _tasks = <String, Future<CoverResult>>{};
 
-  // 通过缓存或者读取标签获取封面
-  Future<File?> getCoverFile(TrackInfo track) {
-    final key = _coverKeyOf(track);
-    return _tasks.putIfAbsent(
-      key,
-      () => _loadOrCreate(key, track).whenComplete(() {
-        _tasks.remove(key);
-      }),
-    );
-  }
-
-  // 通过读内存同步地获取已知封面
-  File? peekCoverFile(TrackInfo track) {
-    final key = _coverKeyOf(track);
-    // 查内存缓存
-    if (_memory.containsKey(key)) {
-      final file = _memory[key];
-      return file;
-    }
-    return null;
-  }
-}
-
-// 节流器，减少由并发产生的卡顿
-class Limiter {
-  final int maxRunning;
-  new({required this.maxRunning}) : assert(maxRunning > 0);
-
-  // 并行任务数
-  var _running = 0;
-  // 等待栈，后进先出，防止一直滑动时后等前
-  final _taskStack = <Completer>[];
-
-  Future<T> run<T>(Future<T> Function() task) async {
-    // 如果并行任务未满
-    if (_running < maxRunning) {
-      _running++;
-      // 立即执行 try-finally
-    } else {
-      // 无法继续并行，因此创建等待器
-      final completer = Completer<void>();
-      _taskStack.add(completer);
-      // 等待等待器被结束
-      await completer.future;
-    }
-
+  /// 获取封面并写入内存
+  Future<CoverResult> _loadAndRemember(String key, TrackInfo track) async {
     try {
-      return await task();
+      final result = await _loadOrCreate(key, track);
+      // 非失败才写入内存
+      if (result is! CoverFailed) _memory[key] = result;
+      return result;
     } finally {
-      // 如果还有任务在排队
-      if (_taskStack.isNotEmpty) {
-        // 立刻结束等待器，从而转交名额，因此 _running 不变
-        _taskStack.removeLast().complete();
-      } else {
-        _running--;
-      }
+      _tasks.remove(key);
     }
+  }
+
+  /// 通过缓存或者读取标签获取封面
+  Future<CoverResult> getCoverThumbnail(TrackInfo track) {
+    final key = coverThumbnailKeyOf(track);
+
+    if (_tasks.containsKey(key)) return _tasks[key]!;
+    return _tasks[key] = _loadAndRemember(key, track);
+  }
+
+  /// 通过读内存同步地获取已知封面
+  CoverResult? peekCoverThumbnail(TrackInfo track) {
+    final key = coverThumbnailKeyOf(track);
+    // 查内存缓存
+    return _memory[key];
   }
 }

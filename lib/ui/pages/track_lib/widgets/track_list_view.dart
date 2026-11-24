@@ -1,10 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linglun/data/utils/track_sort.dart';
 import 'package:linglun/states/cover_cache_provider.dart';
 import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail.dart';
-import 'package:linglun/ui/utils/cover_cache.dart';
+import 'package:linglun/ui/utils/cover_thumbnail_cache.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -42,6 +40,7 @@ class _TrackListViewState extends State<TrackListView> {
         .toList();
 
     return Stack(
+      fit: StackFit.expand,
       children: [
         ScrollConfiguration(
           // 分组模式下关闭系统滚动条（右侧由字母索引栏代替）。
@@ -219,34 +218,47 @@ class CoverImage extends ConsumerStatefulWidget {
 }
 
 class _CoverImageState extends ConsumerState<CoverImage> {
-  late CoverCache cache;
-  File? coverMemoryCache;
-  Future<File?>? coverFuture;
+  late CoverThumbnailCache cache;
+  CoverResult? coverResult;
+
+  Future<void> _load() async {
+    final track = widget.track;
+    // 先尝试命中内存
+    coverResult = cache.peekCoverThumbnail(track);
+    if (coverResult == null) {
+      // 内存中没有则找缓存和源文件
+      try {
+        final result = await cache.getCoverThumbnail(track);
+        // 检查组件是否还在，要显示的歌曲是否没变
+        if (mounted &&
+            cache.coverThumbnailKeyOf(widget.track) ==
+                cache.coverThumbnailKeyOf(track)) {
+          setState(() => coverResult = result);
+        }
+      } catch (e) {
+        if (mounted &&
+            cache.coverThumbnailKeyOf(widget.track) ==
+                cache.coverThumbnailKeyOf(track)) {
+          setState(() => coverResult = CoverFailed());
+        }
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     cache = ref.read(coverCacheProvider);
-
-    // 只在创建时发起一次请求，先尝试命中内存
-    coverMemoryCache = cache.peekCoverFile(widget.track);
-    // 内存中没有则找缓存和源文件
-    if (coverMemoryCache == null) {
-      coverFuture = cache.getCoverFile(widget.track);
-    }
+    _load();
   }
 
   @override
   void didUpdateWidget(CoverImage oldWidget) {
     super.didUpdateWidget(oldWidget);
     // 同一个 State 被复用来显示另一首歌时，才重新请求
-    if (oldWidget.track.sourceKey != widget.track.sourceKey) {
-      coverMemoryCache = cache.peekCoverFile(widget.track);
-      if (coverMemoryCache != null) {
-        coverFuture = null;
-      } else {
-        coverFuture = cache.getCoverFile(widget.track);
-      }
+    if (cache.coverThumbnailKeyOf(oldWidget.track) !=
+        cache.coverThumbnailKeyOf(widget.track)) {
+      _load();
     }
   }
 
@@ -274,42 +286,32 @@ class _CoverImageState extends ConsumerState<CoverImage> {
 
   @override
   Widget build(BuildContext context) {
-    if (coverMemoryCache != null) {
-      return cache.isNoCover(coverMemoryCache)
-          ? buildIcon(context)
-          : Image.file(
-              coverMemoryCache!,
-              errorBuilder: (context, error, stackTrace) => buildIcon(context),
-              fit: BoxFit.cover,
-            );
-    }
-    return FutureBuilder(
-      future: coverFuture,
-      builder: (BuildContext context, AsyncSnapshot<File?> snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return buildIcon(context, loading: true);
-        } else if (snapshot.data == null || snapshot.hasError) {
-          return buildIcon(context);
-        }
-        return Stack(
-          children: [
-            buildIcon(context, loading: true),
-            Image.file(
-              snapshot.data!,
-              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                if (wasSynchronouslyLoaded) return child;
-                return AnimatedOpacity(
+    switch (coverResult) {
+      case CoverFound found:
+        return Image.file(
+          found.file,
+          frameBuilder: (context, child, frame, sync) {
+            if (sync) return child;
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                buildIcon(context, loading: true),
+                AnimatedOpacity(
                   opacity: frame == null ? 0 : 1,
                   duration: 100.ms,
                   child: child,
-                );
-              },
-              errorBuilder: (context, error, stackTrace) => buildIcon(context),
-              fit: BoxFit.cover,
-            ),
-          ],
+                ),
+              ],
+            );
+          },
+          errorBuilder: (context, error, stackTrace) => buildIcon(context),
+          fit: BoxFit.cover,
         );
-      },
-    );
+      case CoverNone() || CoverFailed():
+        return buildIcon(context);
+
+      case null:
+        return buildIcon(context, loading: true);
+    }
   }
 }
