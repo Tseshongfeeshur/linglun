@@ -149,9 +149,7 @@ class _TrackListItem extends StatelessWidget {
         leading: Container(
           width: coverSize,
           height: coverSize,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(coverSize),
-          ),
+          decoration: const BoxDecoration(shape: BoxShape.circle),
           clipBehavior: Clip.antiAlias,
           child: CoverImage(track: trackInfo),
         ),
@@ -239,16 +237,24 @@ class _CoverImageState extends ConsumerState<CoverImage> {
     }
   }
 
-  Widget buildIcon(BuildContext context, {bool loading = false}) => Container(
-    color: loading
-        ? Theme.of(context).colorScheme.surfaceContainerHigh
-        : Theme.of(context).colorScheme.primary,
-    child: Center(
-      child: Icon(
-        Icons.music_note,
+  Widget buildIcon(BuildContext context, {bool loading = false}) => Padding(
+    // 防止上层抗锯齿混色
+    padding: const EdgeInsets.all(1),
+    child: Container(
+      decoration: BoxDecoration(
         color: loading
-            ? Theme.of(context).colorScheme.onSurface.withAlpha(120)
-            : Theme.of(context).colorScheme.surface,
+            ? Theme.of(context).colorScheme.surfaceContainerHigh
+            : Theme.of(context).colorScheme.primary,
+        shape: BoxShape.circle,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Center(
+        child: Icon(
+          Icons.music_note,
+          color: loading
+              ? Theme.of(context).colorScheme.onSurface.withAlpha(120)
+              : Theme.of(context).colorScheme.surface,
+        ),
       ),
     ),
   );
@@ -272,10 +278,23 @@ class _CoverImageState extends ConsumerState<CoverImage> {
         } else if (snapshot.data == null || snapshot.hasError) {
           return buildIcon(context);
         }
-        return Image.file(
-          snapshot.data!,
-          errorBuilder: (context, error, stackTrace) => buildIcon(context),
-          fit: BoxFit.cover,
+        return Stack(
+          children: [
+            buildIcon(context, loading: true),
+            Image.file(
+              snapshot.data!,
+              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                if (wasSynchronouslyLoaded) return child;
+                return AnimatedOpacity(
+                  opacity: frame == null ? 0 : 1,
+                  duration: 100.ms,
+                  child: child,
+                );
+              },
+              errorBuilder: (context, error, stackTrace) => buildIcon(context),
+              fit: BoxFit.cover,
+            ),
+          ],
         );
       },
     );
