@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:linglun/data/models/window_layout.dart';
 import 'package:linglun/data/utils/track_sort.dart';
 import 'package:linglun/states/cover_cache_provider.dart';
 import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail.dart';
@@ -162,6 +163,10 @@ class _TrackListItem extends StatelessWidget {
             ? const Text('未知艺术家')
             : RichText(
                 text: TextSpan(
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
                   children: [
                     for (var i = 0; i < trackInfo.artists!.length; i++)
                       TextSpan(
@@ -174,12 +179,20 @@ class _TrackListItem extends StatelessWidget {
                                     .withAlpha(120),
                               ),
                             ),
+                          TextSpan(text: trackInfo.artists![i]),
+                        ],
+                      ),
+                    if (trackInfo.album != null)
+                      TextSpan(
+                        children: [
                           TextSpan(
-                            text: trackInfo.artists![i],
+                            text: ' - ',
                             style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
+                              color: Theme.of(context).colorScheme.onSurface
+                                  .withAlpha(120),
                             ),
                           ),
+                          TextSpan(text: trackInfo.album),
                         ],
                       ),
                   ],
@@ -216,8 +229,9 @@ class _CoverImageState extends ConsumerState<CoverImage> {
     super.initState();
     cache = ref.read(coverCacheProvider);
 
-    // 只在创建时发起一次请求
+    // 只在创建时发起一次请求，先尝试命中内存
     coverMemoryCache = cache.peekCoverFile(widget.track);
+    // 内存中没有则找缓存和源文件
     if (coverMemoryCache == null) {
       coverFuture = cache.getCoverFile(widget.track);
     }
