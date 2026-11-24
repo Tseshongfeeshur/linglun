@@ -18,7 +18,7 @@ abstract class PlatformFileUtils {
   // 系统的"音乐目录"（用于来源页的默认勾选项）；没有则 path 为 null。
   Future<({String name, String? path})> getPlatformMusicPath();
   // 从 Uri 拿到显示/排序友好的 SourceKey。
-  String? getSourceKeyFromUri(String uri);
+  String getSourceKeyFromUri(String uri);
 }
 
 PlatformFileUtils createPlatformFileUtils() {

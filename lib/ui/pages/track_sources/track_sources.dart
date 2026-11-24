@@ -7,6 +7,7 @@ import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.d
 import 'package:linglun/states/tracks_provider.dart';
 import 'package:linglun/ui/utils/show_snack_bar.dart';
 import 'package:linglun/ui/pages/track_sources/utils/show_scanning_dialog.dart';
+import 'package:path/path.dart' as p;
 
 /// 歌曲来源页：勾选扫描哪些目录（系统音乐目录 + 自定义目录），
 /// 点右下角按钮开始扫描，结果整体替换全局曲库。
@@ -152,7 +153,8 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
                   onDismissed: (_) => setState(() => userUris.remove(uri)),
                   child: CheckboxListTile(
                     secondary: const Icon(Icons.folder),
-                    title: Text(utils.getSourceKeyFromUri(uri) ?? uri),
+                    title: Text(p.basename(uri)),
+                    subtitle: Text(utils.getSourceKeyFromUri(uri)),
                     value: userUris[uri],
                     onChanged: (value) {
                       setState(() {

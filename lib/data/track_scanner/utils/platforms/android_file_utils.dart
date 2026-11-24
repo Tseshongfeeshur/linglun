@@ -39,13 +39,10 @@ class AndroidFileUtils extends PlatformFileUtils {
         // 浏览到这里"无关，所以同时选了父目录和子目录时同一文件的 sourceKey 相同，
         // 可据此去重（而 uri 不同）。
         final sourceKey = getSourceKeyFromUri(item.uri);
-        if (sourceKey == null) {
-          yield FileDiscoveredError(uri: uri, detail: 'file not found');
-        }
 
         yield FileDiscovered(
           uri: item.uri,
-          sourceKey: sourceKey!,
+          sourceKey: sourceKey,
           name: item.name,
           // 注意：SAF 对未知大小可能给 -1、lastModified 可能为 0，
           // TrackScanner.parse 的增量判断依赖这两个约定。
@@ -83,10 +80,10 @@ class AndroidFileUtils extends PlatformFileUtils {
   }
 
   @override
-  String? getSourceKeyFromUri(String uri) {
+  String getSourceKeyFromUri(String uri) {
     final segments = Uri.parse(uri).pathSegments;
     var docIdIndex = segments.indexOf('document') + 1;
-    if (docIdIndex == 0) return null;
+    if (docIdIndex == 0) return uri;
     return segments[docIdIndex];
   }
 }

@@ -95,7 +95,7 @@ class LinuxFileUtils extends PlatformFileUtils {
   }
 
   @override
-  String? getSourceKeyFromUri(String uri) {
+  String getSourceKeyFromUri(String uri) {
     return uri;
   }
 }
