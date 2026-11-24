@@ -589,9 +589,11 @@ packages:
   system_theme:
     dependency: "direct main"
     description:
-      path: "plugins/system_theme/system_theme"
-      relative: true
-    source: path
+      path: system_theme
+      ref: f6a745e5b2846f2b40d58d91dedab6f6aa10539d
+      resolved-ref: f6a745e5b2846f2b40d58d91dedab6f6aa10539d
+      url: "https://github.com/Abdurrahman98XX/system_theme"
+    source: git
     version: "3.3.0"
   system_theme_web:
     dependency: transitive

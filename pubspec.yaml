@@ -28,8 +28,11 @@ dependencies:
 
   material_ui: ^1.8.0
   # system_theme: ^3.3.0
-  system_theme: 
-    path: plugins/system_theme/system_theme
+  system_theme:
+    git:
+      url: https://github.com/Abdurrahman98XX/system_theme
+      ref: f6a745e5b2846f2b40d58d91dedab6f6aa10539d
+      path: system_theme
   flex_color_scheme: ^9.0.0
 
   flutter_animate: ^4.5.2
