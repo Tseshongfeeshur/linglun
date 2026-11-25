@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:linglun/data/models/simple_tag.dart';
+import 'package:linglun/data/track_scanner/models/discover_event.dart';
+import 'package:linglun/data/track_scanner/models/parse_event.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:linglun/data/models/track_info.dart';
-import 'package:linglun/data/utils/group_key_of.dart';
+import 'package:linglun/data/track_scanner/utils/group_key_of.dart';
 
 // 只按扩展名过滤。
 const _extensions = {
@@ -23,61 +25,6 @@ const _extensions = {
   '.aiff',
   '.ape',
 };
-
-// ===== 发现阶段（遍历目录，只列文件，不读标签，很快）的事件 =====
-sealed class DiscoverEvent {}
-
-/// 发现了一个文件（还没有解析标签）。
-class FileDiscovered extends DiscoverEvent {
-  final String uri;
-  // 身份键，用于去重与增量比对，含义见 TrackInfo.sourceKey。
-  final String sourceKey;
-  final String name;
-  // 平台取不到时 sizeBytes 可能是 -1、editTime 可能是 epoch 0；
-  // TrackScanner.parse 会据此放弃"未变化→跳过"的判断。
-  final int sizeBytes;
-  final DateTime editTime;
-
-  new({
-    required this.uri,
-    required this.sourceKey,
-    required this.name,
-    required this.sizeBytes,
-    required this.editTime,
-  });
-}
-
-class FileDiscoveredError extends DiscoverEvent {
-  final String uri;
-  final String detail;
-
-  new({required this.uri, required this.detail});
-}
-
-class FileDiscoveredFinish extends DiscoverEvent {}
-
-// ===== 解析阶段（读标签，较慢）的事件 =====
-sealed class ParseEvent {}
-
-/// 新增或已变化的曲目（也用于"库里有、这次没发现"的曲目，此时 removed == true）。
-class TrackParsed extends ParseEvent {
-  final TrackInfo track;
-  new({required this.track});
-}
-
-/// 与库里记录一致、无需重新解析的曲目（沿用旧记录）。
-class TrackSkipped extends ParseEvent {
-  final TrackInfo track;
-  new({required this.track});
-}
-
-class TrackParsedError extends ParseEvent {
-  final FileDiscovered file;
-  final String detail;
-  new({required this.file, required this.detail});
-}
-
-class TrackParsedFinish extends ParseEvent {}
 
 /// 两阶段扫描：
 ///   1. discover：遍历来源目录，列出音频文件（去重、按扩展名过滤）；

@@ -1,8 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:linglun/data/cover_thumbnail/cover_result.dart';
 import 'package:linglun/data/utils/track_sort.dart';
 import 'package:linglun/states/cover_cache_provider.dart';
 import 'package:linglun/ui/pages/track_lib/widgets/letter_index_rail.dart';
-import 'package:linglun/ui/utils/cover_thumbnail_cache.dart';
+import 'package:linglun/data/cover_thumbnail/cover_thumbnail_cache.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 

@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:linglun/data/models/simple_tag.dart';
-import 'package:linglun/data/track_scanner/track_scanner.dart';
+import 'package:linglun/data/track_scanner/models/discover_event.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/android_file_utils.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/linux_file_utils.dart';
 

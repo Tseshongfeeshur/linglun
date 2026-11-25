@@ -4,23 +4,13 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:linglun/ui/utils/task_limiter.dart';
+import 'package:linglun/data/cover_thumbnail/cover_result.dart';
+import 'package:linglun/data/utils/task_limiter.dart';
 import 'package:path/path.dart' as p;
 import 'package:crypto/crypto.dart';
 import 'package:flutter_taglib/flutter_taglib.dart';
 import 'package:linglun/data/models/track_info.dart';
 import 'package:path_provider/path_provider.dart';
-
-sealed class CoverResult {}
-
-class CoverFound extends CoverResult {
-  final File file;
-  new(this.file);
-}
-
-class CoverNone extends CoverResult {}
-
-class CoverFailed extends CoverResult {}
 
 class CoverThumbnailCache {
   // 内存缓存

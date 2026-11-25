@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:linglun/data/models/simple_tag.dart';
+import 'package:linglun/data/track_scanner/models/discover_event.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/utils/read_simple_tag.dart';
 import 'package:path/path.dart' as p;
-import 'package:linglun/data/track_scanner/track_scanner.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
 
 /// Linux 实现：直接用 dart:io 遍历目录，路径即 uri，也即 sourceKey。

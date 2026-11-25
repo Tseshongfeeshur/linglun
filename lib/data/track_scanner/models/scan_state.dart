@@ -1,5 +1,6 @@
+import 'package:linglun/data/track_scanner/models/discover_event.dart';
+import 'package:linglun/data/track_scanner/models/parse_event.dart';
 import 'package:path/path.dart' as p;
-import 'package:linglun/data/track_scanner/track_scanner.dart';
 
 /// 一次扫描的进度与结果快照（不可变）。发现阶段与解析阶段各自累积事件，
 /// 扫描弹窗据此显示进度和结果；"更新曲库"时取 parseSkips + parseUpdates。

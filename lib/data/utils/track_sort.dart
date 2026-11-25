@@ -1,4 +1,4 @@
-import 'package:linglun/data/utils/group_key_of.dart';
+import 'package:linglun/data/track_scanner/utils/group_key_of.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:linglun/data/models/track_info.dart';
 

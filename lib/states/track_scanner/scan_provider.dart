@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linglun/data/models/track_info.dart';
+import 'package:linglun/data/track_scanner/models/discover_event.dart';
+import 'package:linglun/data/track_scanner/models/parse_event.dart';
 import 'package:linglun/data/track_scanner/models/scan_state.dart';
 import 'package:linglun/data/track_scanner/track_scanner.dart';
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
