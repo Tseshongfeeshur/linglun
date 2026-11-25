@@ -47,5 +47,5 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 
-# 本地插件
-/plugins/
+# 代码生成产物
+*.g.dart

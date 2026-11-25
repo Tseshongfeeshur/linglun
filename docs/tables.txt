@@ -1,0 +1,32 @@
+表名：tracks
+字段：int id, String sourceKey, String title, String titleGroup, String titleSort, int? albumId, String uri, String fileName, int sizeBytes, int durationMs, DateTime editTime, bool trackGainUpdated, int playCount, DateTime addTime, bool removed
+主键：id
+唯一约束：sourceKey
+外键指向：albumId -> albums.id
+
+表名：artists
+字段：int id, String name, String nameGroup, String nameSort
+主键：id
+唯一约束：name
+
+表名：track_artists
+字段：int trackId, int artistId, int position // position 记这个艺术家在这首歌里排第几
+主键：trackId, artistId
+外键指向：trackId -> tracks.id, artistId -> artists.id
+
+表名：albums
+字段：int id, String title, String titleGroup, String titleSort,
+String albumKey, // '$title$albumArtistString'
+int? albumArtistId,
+主键：id
+唯一约束：albumKey
+
+表名：playlists
+字段：int id, String label, DateTime createTime
+主键：id
+唯一约束：label
+
+表名：track_playlists
+字段：int trackId, int playlistId, int position // position 记这首歌在歌单里排第几
+主键：trackId, playlistId
+外键指向：trackId -> tracks.id, playlistId -> playlists.id
