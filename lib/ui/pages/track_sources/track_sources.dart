@@ -123,7 +123,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
                 leading: const Icon(Icons.add),
                 title: const Text('添加文件夹'),
                 onTap: () async {
-                  var uri = await utils.pickDirectory();
+                  var uri = await utils.getDirectory();
                   if (uri == null) {
                     if (context.mounted) {
                       showSnackBar(context, Icons.warning, '未选择任何文件夹');

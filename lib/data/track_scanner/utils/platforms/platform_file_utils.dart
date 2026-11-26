@@ -14,7 +14,7 @@ abstract class PlatformFileUtils {
   // 读取标签；读不了就抛异常（由 TrackScanner 转成 TrackParsedError）。
   Future<SimpleTag> parse(FileDiscovered item);
   // 弹出系统的"选择文件夹"；返回目录的路径/URI，取消返回 null。
-  Future<String?> pickDirectory();
+  Future<String?> getDirectory();
   // 系统的"音乐目录"（用于来源页的默认勾选项）；没有则 path 为 null。
   Future<({String name, String? path})> getPlatformMusicPath();
   // 从 Uri 拿到显示/排序友好的 SourceKey。
