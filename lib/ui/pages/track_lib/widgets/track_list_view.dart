@@ -143,68 +143,81 @@ class _TrackListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     var removed = trackInfo.removed;
 
-    return Opacity(
-      opacity: removed ? 0.6 : 1,
-      child: ListTile(
-        leading: Container(
-          width: coverSize,
-          height: coverSize,
-          decoration: const BoxDecoration(shape: BoxShape.circle),
-          clipBehavior: Clip.antiAlias,
+    return ListTile(
+      leading: Container(
+        width: coverSize,
+        height: coverSize,
+        decoration: const BoxDecoration(shape: BoxShape.circle),
+        clipBehavior: Clip.antiAlias,
+        child: Opacity(
+          opacity: removed ? 0.4 : 1,
           child: CoverImage(track: trackInfo),
         ),
-        title: Text(
-          trackInfo.title,
-          maxLines: 1,
-          style: const TextStyle(overflow: TextOverflow.ellipsis),
+      ),
+      title: Text(
+        trackInfo.title,
+        maxLines: 1,
+        style: TextStyle(
+          overflow: TextOverflow.ellipsis,
+          color: Theme.of(context).colorScheme.onSurface
+              .withAlpha(removed ? 120 : 255),
+          decoration: removed ? TextDecoration.lineThrough : null,
+          decorationColor: Theme.of(context).colorScheme.onSurface
+              .withAlpha(160),
         ),
-        subtitle: trackInfo.artists == null
-            ? const Text('未知艺术家')
-            : RichText(
-                text: TextSpan(
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  children: [
-                    for (var i = 0; i < trackInfo.artists!.length; i++)
-                      TextSpan(
-                        children: [
-                          if (i != 0)
-                            TextSpan(
-                              text: ' / ',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurface
-                                    .withAlpha(120),
-                              ),
-                            ),
-                          TextSpan(text: trackInfo.artists![i]),
-                        ],
-                      ),
-                    if (trackInfo.album != null)
-                      TextSpan(
-                        children: [
+      ),
+      subtitle: trackInfo.artists == null
+          ? const Text('未知艺术家')
+          : RichText(
+              text: TextSpan(
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSecondaryContainer
+                      .withAlpha(removed ? 120 : 255),
+                  decoration: removed ? TextDecoration.lineThrough : null,
+                  decorationColor: Theme.of(context)
+                      .colorScheme
+                      .onSecondaryContainer
+                      .withAlpha(160),
+                ),
+                children: [
+                  for (var i = 0; i < trackInfo.artists!.length; i++)
+                    TextSpan(
+                      children: [
+                        if (i != 0)
                           TextSpan(
-                            text: ' - ',
+                            text: ' / ',
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.onSurface
-                                  .withAlpha(120),
+                                  .withAlpha(removed ? 60 : 120),
                             ),
                           ),
-                          TextSpan(text: trackInfo.album),
-                        ],
-                      ),
-                  ],
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                        TextSpan(text: trackInfo.artists![i]),
+                      ],
+                    ),
+                  if (trackInfo.album != null)
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: ' - ',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface
+                                .withAlpha(removed ? 60 : 120),
+                          ),
+                        ),
+                        TextSpan(text: trackInfo.album),
+                      ],
+                    ),
+                ],
               ),
-        // TODO: 目前点击弹出的是调试用的信息面板；接入播放器后点击应改为播放，
-        // 信息面板挪到长按/菜单里。
-        onTap: () {
-          showTrackInfoBottomSheet(context, trackInfo);
-        },
-      ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+      // TODO: 目前点击弹出的是调试用的信息面板；接入播放器后点击应改为播放，
+      // 信息面板挪到长按/菜单里。
+      onTap: () {
+        showTrackInfoBottomSheet(context, trackInfo);
+      },
     );
   }
 }
