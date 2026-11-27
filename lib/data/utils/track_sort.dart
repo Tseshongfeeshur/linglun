@@ -1,4 +1,4 @@
-import 'package:linglun/data/track_scanner/utils/group_key_of.dart';
+import 'package:linglun/data/track_scanner/utils/collation_of.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:linglun/data/models/track_info.dart';
 
@@ -26,9 +26,9 @@ enum TrackSort {
   /// 返回该曲目在当前排序依据下的分组键（TextKey.group），歌手只取第一位。
   /// 不分组的排序依据返回 null。
   String? groupSource(TrackInfo m) => switch (this) {
-    TrackSort.title => m.titleKey.group,
-    TrackSort.artists => m.artistsKey.group,
-    TrackSort.album => m.albumKey.group,
+    TrackSort.title => m.titleCollation.group,
+    TrackSort.artists => m.artistsCollation.group,
+    TrackSort.album => m.albumCollation.group,
     _ => null,
   };
 }
@@ -63,11 +63,17 @@ List<TrackInfo> sortTrackList(List<TrackInfo> list, SortConfig sortConfig) {
   final result = [...list];
   switch (sortConfig.method) {
     case TrackSort.title:
-      result.sort((a, b) => compareKeys(a.titleKey, b.titleKey));
+      result.sort(
+        (a, b) => compareCollations(a.titleCollation, b.titleCollation),
+      );
     case TrackSort.artists:
-      result.sort((a, b) => compareKeys(a.artistsKey, b.artistsKey));
+      result.sort(
+        (a, b) => compareCollations(a.artistsCollation, b.artistsCollation),
+      );
     case TrackSort.album:
-      result.sort((a, b) => compareKeys(a.albumKey, b.albumKey));
+      result.sort(
+        (a, b) => compareCollations(a.albumCollation, b.albumCollation),
+      );
 
     case TrackSort.sourceKey:
       result.sort((a, b) => a.sourceKey.compareTo(b.sourceKey));

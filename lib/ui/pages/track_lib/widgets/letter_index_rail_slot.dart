@@ -1,4 +1,4 @@
-import 'package:linglun/data/track_scanner/utils/group_key_of.dart';
+import 'package:linglun/data/track_scanner/utils/collation_of.dart';
 import 'package:linglun/data/utils/track_sort.dart';
 
 /// 索引栏上的一个条目：display 是栏上显示的字符，

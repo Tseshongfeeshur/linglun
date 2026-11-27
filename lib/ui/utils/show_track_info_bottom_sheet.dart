@@ -30,19 +30,19 @@ void showTrackInfoBottomSheet(
               TextSpan(text: '标题：', style: _headStyle()),
               TextSpan(text: track.title),
               TextSpan(
-                text: '（${track.titleKey.sort}）',
+                text: '（${track.titleCollation.sort}）',
                 style: _descStyle(context),
               ),
               TextSpan(text: '\n艺术家：', style: _headStyle()),
               TextSpan(text: track.artists.join(' / ')),
               TextSpan(
-                text: '（${track.artistsKey.sort}）',
+                text: '（${track.artistsCollation.sort}）',
                 style: _descStyle(context),
               ),
               TextSpan(text: '\n专辑：', style: _headStyle()),
               TextSpan(text: track.album),
               TextSpan(
-                text: '（${track.albumKey.sort}）',
+                text: '（${track.albumCollation.sort}）',
                 style: _descStyle(context),
               ),
               TextSpan(text: '\n路径：', style: _headStyle()),

@@ -1,13 +1,13 @@
 /// 一个名字（标题 / 歌手 / 专辑）的分组键与组内排序键。
 /// 扫描时一次算好，规则见 data/utils/group_key_of.dart。
-class TextKey {
+class Collation {
   final String group; // 分组键，如 'A'、'か'、'ㄱ'、'#'
   final String sort; // 组内排序键
 
   const new({required this.group, required this.sort});
 
-  TextKey copyWith({String? group, String? sort}) {
-    return TextKey(group: group ?? this.group, sort: sort ?? this.sort);
+  Collation copyWith({String? group, String? sort}) {
+    return Collation(group: group ?? this.group, sort: sort ?? this.sort);
   }
 }
 
@@ -19,15 +19,15 @@ class TrackInfo {
   final String sourceKey;
 
   final String title;
-  final TextKey titleKey;
+  final Collation titleCollation;
 
   // artists 不可空，无艺术家时为空列表。
   // artistsKey 依据为首位歌手，排序、分组、详情页都直接取 artistsKey。
   final List<String> artists;
-  final TextKey artistsKey;
+  final Collation artistsCollation;
 
   final String? album;
-  final TextKey albumKey;
+  final Collation albumCollation;
 
   /// 读取/播放用的地址：Linux 是文件路径，Android 是 content:// URI。
   final String uri;
@@ -50,11 +50,11 @@ class TrackInfo {
   const new({
     required this.sourceKey,
     required this.title,
-    required this.titleKey,
+    required this.titleCollation,
     required this.artists,
-    required this.artistsKey,
+    required this.artistsCollation,
     this.album,
-    required this.albumKey,
+    required this.albumCollation,
     required this.uri,
     required this.fileName,
     required this.sizeBytes,
@@ -72,11 +72,11 @@ class TrackInfo {
   TrackInfo copyWith({
     String? sourceKey,
     String? title,
-    TextKey? titleKey,
+    Collation? titleCollation,
     List<String>? artists,
-    TextKey? artistsKey,
+    Collation? artistsCollation,
     String? album,
-    TextKey? albumKey,
+    Collation? albumCollation,
     String? uri,
     String? fileName,
     int? sizeBytes,
@@ -90,11 +90,11 @@ class TrackInfo {
     return TrackInfo(
       sourceKey: sourceKey ?? this.sourceKey,
       title: title ?? this.title,
-      titleKey: titleKey ?? this.titleKey,
+      titleCollation: titleCollation ?? this.titleCollation,
       artists: artists ?? this.artists,
-      artistsKey: artistsKey ?? this.artistsKey,
+      artistsCollation: artistsCollation ?? this.artistsCollation,
       album: album ?? this.album,
-      albumKey: albumKey ?? this.albumKey,
+      albumCollation: albumCollation ?? this.albumCollation,
       uri: uri ?? this.uri,
       fileName: fileName ?? this.fileName,
       sizeBytes: sizeBytes ?? this.sizeBytes,

@@ -212,9 +212,9 @@ const _cyrillicOrder = 'АБВГҐДЂЕЄЖЗИІЇЈКЛЉМНЊОПРСТЋУ
 // ====== 对外接口 ======
 
 /// 计算一个名字的分组键与组内排序键，扫描时调用
-TextKey keyOf(String text) {
+Collation collationOf(String text) {
   final s = _stripLeading(_fold(text.trim()));
-  if (s.isEmpty) return const TextKey(group: '#', sort: '');
+  if (s.isEmpty) return const Collation(group: '#', sort: '');
 
   final first = s.runes.first;
   final tidy = s.replaceAll(_spaces, ' ');
@@ -231,38 +231,38 @@ TextKey keyOf(String text) {
           .replaceAll(_spaces, ' ')
           .trim();
       final head = sort.isEmpty ? '' : sort[0];
-      return TextKey(
+      return Collation(
         group: _asciiLetter.hasMatch(head) ? head.toUpperCase() : '#',
         sort: sort,
       );
 
     case Script.kana:
-      return TextKey(group: _kanaRowOf[first] ?? '#', sort: tidy);
+      return Collation(group: _kanaRowOf[first] ?? '#', sort: tidy);
 
     case Script.hangul:
-      return TextKey(group: _hangulGroup(first), sort: tidy);
+      return Collation(group: _hangulGroup(first), sort: tidy);
 
     case Script.cyrillic:
       var head = String.fromCharCode(first).toUpperCase();
       if (head == 'Ё') head = 'Е';
       if (head == 'Й') head = 'И';
       // sort 里同样把 ё→е、й→и，使组内顺序与分组规则一致（й 开头的和 и 开头的混排）
-      return TextKey(
+      return Collation(
         group: head,
         sort: tidy.toLowerCase().replaceAll('ё', 'е').replaceAll('й', 'и'),
       );
 
     case Script.other:
-      return TextKey(group: '#', sort: tidy.toLowerCase());
+      return Collation(group: '#', sort: tidy.toLowerCase());
   }
 }
 
 /// 名字缺失（如未知歌手、未知专辑）时使用：归 '#'，并排在 '#' 组末尾
-TextKey keyOfNullable(String? text) {
+Collation collationOfNullable(String? text) {
   if (text == null || text.isEmpty) {
-    return const TextKey(group: '#', sort: '\uffff');
+    return const Collation(group: '#', sort: '\uffff');
   }
-  return keyOf(text);
+  return collationOf(text);
 }
 
 /// 分组的先后顺序：A-Z、假名、韩文、西里尔、'#'；同类内：
@@ -292,7 +292,7 @@ int groupRank(String group) {
 }
 
 /// 先比分组，再比组内排序键
-int compareKeys(TextKey a, TextKey b) {
+int compareCollations(Collation a, Collation b) {
   final r = groupRank(a.group).compareTo(groupRank(b.group));
   // String.compareTo 按 UTF-16 码元逐个比较，与语言环境无关；
   // 大小写和音标已在 keyOf 里统一，所以这里不需要再处理。

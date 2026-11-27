@@ -7,7 +7,7 @@ import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.d
 import 'package:path/path.dart' as p;
 
 import 'package:linglun/data/models/track_info.dart';
-import 'package:linglun/data/track_scanner/utils/group_key_of.dart';
+import 'package:linglun/data/track_scanner/utils/collation_of.dart';
 
 // 只按扩展名过滤。
 const _extensions = {
@@ -110,11 +110,11 @@ class TrackScanner {
       final track = TrackInfo(
         sourceKey: item.sourceKey,
         title: title,
-        titleKey: keyOf(title),
+        titleCollation: collationOf(title),
         artists: tag.artists,
-        artistsKey: keyOfNullable(tag.artists.firstOrNull),
+        artistsCollation: collationOfNullable(tag.artists.firstOrNull),
         album: tag.album,
-        albumKey: keyOfNullable(tag.album),
+        albumCollation: collationOfNullable(tag.album),
         uri: item.uri,
         fileName: item.name,
         sizeBytes: item.sizeBytes,
