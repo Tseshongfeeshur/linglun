@@ -13,16 +13,6 @@ class TextKey {
 
 /// 曲库里的一首歌（不可变）。扫描器产出，Riverpod 里整体替换。
 class TrackInfo {
-  // TODO: 接入数据库、把 tracks / artists / albums 拆成三张表后再引入 id；
-  // 在那之前由 sourceKey 充当唯一标识（同时承担"标识"与"去重"两个职责，
-  // 日后若发现两者需要分开，再拆成两个字段）。
-  // final int id;
-
-  /// TrackInfo 最新版本号，若解析方式/数据结构发生变化需要修改。
-  static const int currentVersion = 1; // 或保留 static int get version => 1;
-  /// 版本号
-  final int version;
-
   /// 曲目的"身份"，用来在多次扫描之间认出同一个文件：
   /// Linux 为绝对路径；Android 为 SAF 的 document id（与通过哪个目录授权无关）。
   /// 注意它和 uri 不是一回事——uri 可能因授权方式不同而变化。
@@ -31,10 +21,10 @@ class TrackInfo {
   final String title;
   final TextKey titleKey;
 
-  // artists 为 null 时 artistsKeys 里仍有一个"未知艺术家"占位键。
-  // 排序、分组、详情页都直接取 artistsKeys.first，所以 artistsKeys 必须永远非空。
-  final List<String>? artists;
-  final List<TextKey> artistsKeys;
+  // artists 不可空，无艺术家时为空列表。
+  // artistsKey 依据为首位歌手，排序、分组、详情页都直接取 artistsKey。
+  final List<String> artists;
+  final TextKey artistsKey;
 
   final String? album;
   final TextKey albumKey;
@@ -58,12 +48,11 @@ class TrackInfo {
   final bool removed;
 
   const new({
-    this.version = currentVersion,
     required this.sourceKey,
     required this.title,
     required this.titleKey,
-    this.artists,
-    required this.artistsKeys,
+    required this.artists,
+    required this.artistsKey,
     this.album,
     required this.albumKey,
     required this.uri,
@@ -85,7 +74,7 @@ class TrackInfo {
     String? title,
     TextKey? titleKey,
     List<String>? artists,
-    List<TextKey>? artistsKeys,
+    TextKey? artistsKey,
     String? album,
     TextKey? albumKey,
     String? uri,
@@ -103,7 +92,7 @@ class TrackInfo {
       title: title ?? this.title,
       titleKey: titleKey ?? this.titleKey,
       artists: artists ?? this.artists,
-      artistsKeys: artistsKeys ?? this.artistsKeys,
+      artistsKey: artistsKey ?? this.artistsKey,
       album: album ?? this.album,
       albumKey: albumKey ?? this.albumKey,
       uri: uri ?? this.uri,

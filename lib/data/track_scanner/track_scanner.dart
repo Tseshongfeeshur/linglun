@@ -82,20 +82,18 @@ class TrackScanner {
       try {
         if (existingTrack != null) {
           // 若曲库数据版本过时，不管文件是否被修改都重新解析。
-          if (existingTrack.version == TrackInfo.currentVersion) {
-            existingMap.remove(item.sourceKey);
-            // 路径身份(sourceKey)、修改时间、大小都相同 → 认为文件没变，跳过解析。
-            // editTime 为 0 或 sizeBytes 为 -1 说明平台没给出可靠信息，不能据此判断
-            // "没变"，必须重新解析。
-            if ((existingTrack.editTime == item.editTime &&
-                    existingTrack.sizeBytes == item.sizeBytes) &&
-                (existingTrack.editTime.millisecondsSinceEpoch != 0 &&
-                    existingTrack.sizeBytes != -1)) {
-              yield TrackSkipped(
-                track: existingTrack.copyWith(uri: item.uri, removed: false),
-              );
-              continue;
-            }
+          existingMap.remove(item.sourceKey);
+          // 路径身份(sourceKey)、修改时间、大小都相同 → 认为文件没变，跳过解析。
+          // editTime 为 0 或 sizeBytes 为 -1 说明平台没给出可靠信息，不能据此判断
+          // "没变"，必须重新解析。
+          if ((existingTrack.editTime == item.editTime &&
+                  existingTrack.sizeBytes == item.sizeBytes) &&
+              (existingTrack.editTime.millisecondsSinceEpoch != 0 &&
+                  existingTrack.sizeBytes != -1)) {
+            yield TrackSkipped(
+              track: existingTrack.copyWith(uri: item.uri, removed: false),
+            );
+            continue;
           }
         }
         tag = await utils.parse(item);
@@ -109,16 +107,12 @@ class TrackScanner {
       }
 
       final title = tag.title ?? p.basenameWithoutExtension(item.name);
-      final artists = (tag.artists?.isEmpty ?? false) ? null : tag.artists;
-      final artistsKeys = tag.artists?.map((i) => keyOf(i)).toList();
       final track = TrackInfo(
         sourceKey: item.sourceKey,
         title: title,
         titleKey: keyOf(title),
-        artists: artists,
-        artistsKeys: (artistsKeys != null && artistsKeys.isNotEmpty)
-            ? artistsKeys
-            : [keyOfNullable(null)],
+        artists: tag.artists,
+        artistsKey: keyOfNullable(tag.artists.firstOrNull),
         album: tag.album,
         albumKey: keyOfNullable(tag.album),
         uri: item.uri,

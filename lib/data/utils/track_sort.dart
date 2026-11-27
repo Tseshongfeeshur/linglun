@@ -27,7 +27,7 @@ enum TrackSort {
   /// 不分组的排序依据返回 null。
   String? groupSource(TrackInfo m) => switch (this) {
     TrackSort.title => m.titleKey.group,
-    TrackSort.artists => m.artistsKeys.first.group,
+    TrackSort.artists => m.artistsKey.group,
     TrackSort.album => m.albumKey.group,
     _ => null,
   };
@@ -65,9 +65,7 @@ List<TrackInfo> sortTrackList(List<TrackInfo> list, SortConfig sortConfig) {
     case TrackSort.title:
       result.sort((a, b) => compareKeys(a.titleKey, b.titleKey));
     case TrackSort.artists:
-      result.sort(
-        (a, b) => compareKeys(a.artistsKeys.first, b.artistsKeys.first),
-      );
+      result.sort((a, b) => compareKeys(a.artistsKey, b.artistsKey));
     case TrackSort.album:
       result.sort((a, b) => compareKeys(a.albumKey, b.albumKey));
 

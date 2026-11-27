@@ -166,7 +166,7 @@ class _TrackListItem extends StatelessWidget {
               .withAlpha(160),
         ),
       ),
-      subtitle: trackInfo.artists == null
+      subtitle: trackInfo.artists.isEmpty
           ? const Text('未知艺术家')
           : RichText(
               text: TextSpan(
@@ -181,7 +181,7 @@ class _TrackListItem extends StatelessWidget {
                       .withAlpha(160),
                 ),
                 children: [
-                  for (var i = 0; i < trackInfo.artists!.length; i++)
+                  for (var i = 0; i < trackInfo.artists.length; i++)
                     TextSpan(
                       children: [
                         if (i != 0)
@@ -192,7 +192,7 @@ class _TrackListItem extends StatelessWidget {
                                   .withAlpha(removed ? 60 : 120),
                             ),
                           ),
-                        TextSpan(text: trackInfo.artists![i]),
+                        TextSpan(text: trackInfo.artists[i]),
                       ],
                     ),
                   if (trackInfo.album != null)
