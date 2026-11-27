@@ -60,7 +60,7 @@ class AndroidFileUtils extends PlatformFileUtils {
   }
 
   @override
-  Future<String?> pickDirectory() async {
+  Future<String?> getDirectory() async {
     final safUtil = SafUtil();
     final result = await safUtil.pickDirectory(
       writePermission: true,

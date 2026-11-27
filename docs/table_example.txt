@@ -1,0 +1,25 @@
+标题：吹灭小山河
+艺术家：国风堂、司南
+专辑：观风月·竹马篇
+专辑艺术家：国风堂
+
+标题：另一首
+艺术家：司南
+专辑：观风月·竹马篇
+专辑艺术家：国风堂
+
+Artists:
+复用：id: 1, name: '国风堂', nameGroup: 'G', nameSort: 'guo feng tang';
+复用：id: 2, name: '司南', nameGroup: 'S', nameSort: 'si nan';
+
+Albums:
+复用：id: 1, title: '观风月·竹马篇', titleGroup: 'G', titleSort: 'guan feng yue # zhu ma pian', albumKey: '观风月·竹马篇\u0000国风堂', albumArtistId: 1;
+
+Tracks:
+id: 1, sourceKey: '/home/ryan/Music/吹灭小山河 - 国风堂; 司南.opus', title: '吹灭小山河', titleGroup: 'C', titleSort: 'chui mie xiao shan he', albumId: 1, uri: '/home/ryan/Music/吹灭小山河 - 国风堂; 司南.opus', fileName: '吹灭小山河 - 国风堂; 司南.opus', sizeBytes: 600000, durationMs: 600000, editTime: DateTime(), trackGainUpdated: false, playCount: 0, addTime: DateTime(), removed: false;
+新增：id: 2, sourceKey: '/home/ryan/Music/另一首 - 司南.opus', title: '另一首', titleGroup: 'L', titleSort: 'ling yi shou', albumId: 1, uri: '/home/ryan/Music/另一首 - 司南.opus', fileName: '另一首 - 司南.opus', sizeBytes: 600000, durationMs: 600000, editTime: DateTime(), trackGainUpdated: false, playCount: 0, addTime: DateTime(), removed: false;
+
+TrackArtists:
+trackId: 1, artistId: 1, position: 0;
+trackId: 1, artistId: 2, position: 1;
+新增：trackId: 2, artistId: 2, position: 0;

@@ -70,8 +70,9 @@ class LinuxFileUtils extends PlatformFileUtils {
   }
 
   @override
-  Future<String?> pickDirectory() {
-    return FilePicker.getDirectoryPath();
+  Future<String?> getDirectory() async {
+    final uri = await FilePicker.pickDirectory();
+    return uri?.toFilePath();
   }
 
   @override
