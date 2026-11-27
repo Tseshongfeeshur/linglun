@@ -1,3 +1,4 @@
+import 'package:linglun/data/track_scanner/models/parse_event.dart';
 import 'package:linglun/states/track_scanner/scan_provider.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -8,12 +9,12 @@ import 'package:linglun/data/track_scanner/models/scan_state.dart';
 
 /// 弹出阻塞式扫描对话框，扫描完成并确认后返回新的完整曲库；取消返回 null。
 /// 返回值 = 跳过的旧记录 + 新增/已变化/被标 removed 的记录；
-Future<List<TrackInfo>?> showScanningDialog(
+Future<List<ParseEvent>?> showScanningDialog(
   BuildContext context,
   Set<String> uris,
   List<TrackInfo> existing,
 ) async {
-  return await showDialog<List<TrackInfo>>(
+  return await showDialog<List<ParseEvent>>(
     context: context,
     builder: (BuildContext context) => PopScope(
       // 禁止返回键/点击外部关闭，只能通过对话框里的按钮退出
@@ -163,7 +164,7 @@ class _ContentAtFinish extends StatelessWidget {
                     : const Icon(Icons.keyboard_arrow_right),
                 title: Text(
                   // 已更新 = 新增或已变化（不含被标记 removed 的）。
-                  '已更新 ${scanState.parseUpdates.where((item) => item.track.removed == false).length} 项',
+                  '已更新 ${scanState.parseUpdates.length} 项',
                   style: const TextStyle(overflow: TextOverflow.ellipsis),
                   maxLines: 1,
                 ),
@@ -177,16 +178,11 @@ class _ContentAtFinish extends StatelessWidget {
                     return;
                   }
 
-                  final updated = scanState.parseUpdates
-                      .where((item) => item.track.removed == false)
-                      .toList();
+                  final updated = scanState.parseUpdates.toList();
                   _showDetailDialog(
                     context,
                     '更新明细',
-                    updated
-                        .where((i) => i.track.removed == false)
-                        .map((i) => i.track.fileName)
-                        .toList(),
+                    updated.map((i) => i.fileName).toList(),
                   );
                 },
               ),
@@ -213,7 +209,8 @@ class _ContentAtFinish extends StatelessWidget {
                         context,
                         '跳过明细',
                         scanState.parseSkips
-                            .map((i) => i.track.fileName)
+                            .where((i) => i.removed == false)
+                            .map((i) => i.fileName)
                             .toList(),
                       ),
               ),
@@ -265,10 +262,9 @@ class _ContentAtFinish extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () {
-                  // 新的完整曲库 = 跳过的旧记录 + 新增/已变化/removed 的记录。
-                  Navigator.pop(context, <TrackInfo>[
-                    ...scanState.parseSkips.map((item) => item.track),
-                    ...scanState.parseUpdates.map((item) => item.track),
+                  Navigator.pop(context, <ParseEvent>[
+                    ...scanState.parseSkips,
+                    ...scanState.parseUpdates,
                   ]);
                 },
                 child: const Text('更新曲库'),

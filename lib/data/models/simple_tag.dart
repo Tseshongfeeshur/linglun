@@ -5,6 +5,7 @@ class SimpleTag {
   final String? title;
   final List<String> artists;
   final String? album;
+  final String? albumArtist;
   // 标签里的时长（毫秒）。无标签 mp3 / 部分 VBR mp3 可能为 0 或不准，
   // 按项目决定：播放时用播放器返回的时长覆盖它。
   final int durationMs;
@@ -13,6 +14,7 @@ class SimpleTag {
     this.title,
     required this.artists,
     this.album,
+    this.albumArtist,
     required this.durationMs,
   });
 }

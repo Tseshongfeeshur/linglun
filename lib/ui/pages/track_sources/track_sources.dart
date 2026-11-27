@@ -1,4 +1,5 @@
 import 'package:linglun/data/models/window_layout.dart';
+import 'package:linglun/states/repo_provider.dart';
 import 'package:linglun/ui/widgets/drawer_menu_button.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -172,13 +173,13 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           // 弹窗取消时返回 null，tracksProvider.update 会忽略它。
-          final tracks = await showScanningDialog(context, {
+          final events = await showScanningDialog(context, {
             if (platformPath.ticked && platformPath.path != null)
               platformPath.path!,
             ...userUris.keys.where((element) => userUris[element] ?? false),
           }, ref.read(tracksProvider));
-          if (tracks != null && mounted) {
-            ref.read(tracksProvider.notifier).replaceAll(tracks);
+          if (events != null) {
+            ref.read(repoProvider).update(events);
           }
         },
         isExtended: true,

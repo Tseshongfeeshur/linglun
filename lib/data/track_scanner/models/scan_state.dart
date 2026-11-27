@@ -56,7 +56,6 @@ class ScanState {
       parseErrors: parseErrors ?? this.parseErrors,
       parseFinished: parseFinished ?? this.parseFinished,
 
-      // TODO(已知): `??` 无法把 current 重置回 null（TrackInfo.copyWith 同理）。
       current: current ?? this.current,
     );
   }
@@ -87,12 +86,12 @@ class ScanState {
       case TrackParsed():
         return copyWith(
           parseUpdates: [...parseUpdates, event],
-          current: event.track.fileName,
+          current: event.fileName,
         );
       case TrackSkipped():
         return copyWith(
           parseSkips: [...parseSkips, event],
-          current: event.track.fileName,
+          current: event.fileName,
         );
       case TrackParsedError():
         return copyWith(

@@ -62,9 +62,6 @@ class AndroidFileUtils extends PlatformFileUtils {
   @override
   Future<String?> pickDirectory() async {
     final safUtil = SafUtil();
-    // writePermission：为日后"写回标签/增益"准备。
-    // TODO: persistablePermission 是否真的让授权在重启后保留尚未验证；
-    // 若重启后 list 报权限错误，需要提示用户重新选择目录。
     final result = await safUtil.pickDirectory(
       writePermission: true,
       persistablePermission: true,

@@ -1,21 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:linglun/data/models/track_info.dart';
 import 'package:linglun/data/utils/track_sort.dart';
+import 'package:linglun/states/repo_provider.dart';
 
 /// 全局曲库（含被标记 removed 的曲目）。扫描完成后整体替换。
-class _TracksNotifier extends Notifier<List<TrackInfo>> {
+// TODO: 改为同步，数据库监听
+class _TracksNotifier extends AsyncNotifier<List<TrackInfo>> {
   @override
-  List<TrackInfo> build() {
-    // TODO: 从数据库获取
-    return [];
-  }
-
-  void replaceAll(List<TrackInfo> tracks) {
-    state = tracks;
+  Future<List<TrackInfo>> build() async {
+    final repo = ref.read(repoProvider);
+    return repo.getTracks();
   }
 }
 
-final tracksProvider = NotifierProvider<_TracksNotifier, List<TrackInfo>>(
+final tracksProvider = AsyncNotifierProvider<_TracksNotifier, List<TrackInfo>>(
   _TracksNotifier.new,
 );
 

@@ -1,5 +1,5 @@
 /// 一个名字（标题 / 歌手 / 专辑）的分组键与组内排序键。
-/// 扫描时一次算好，规则见 data/utils/group_key_of.dart。
+/// 扫描时一次算好，规则见 data/utils/collation_of.dart。
 class Collation {
   final String group; // 分组键，如 'A'、'か'、'ㄱ'、'#'
   final String sort; // 组内排序键
@@ -22,12 +22,13 @@ class TrackInfo {
   final Collation titleCollation;
 
   // artists 不可空，无艺术家时为空列表。
-  // artistsKey 依据为首位歌手，排序、分组、详情页都直接取 artistsKey。
+  // artistsCollation 依据为首位歌手，仅供歌曲排序使用。
   final List<String> artists;
   final Collation artistsCollation;
 
   final String? album;
   final Collation albumCollation;
+  final String? albumArtist;
 
   /// 读取/播放用的地址：Linux 是文件路径，Android 是 content:// URI。
   final String uri;
@@ -55,6 +56,7 @@ class TrackInfo {
     required this.artistsCollation,
     this.album,
     required this.albumCollation,
+    this.albumArtist,
     required this.uri,
     required this.fileName,
     required this.sizeBytes,
@@ -66,7 +68,7 @@ class TrackInfo {
     required this.removed,
   });
 
-  // TODO: 可空字段（artists / album）用 `x ?? this.x` 实现，
+  // TODO: 可空字段（album）用 `x ?? this.x` 实现，
   // 无法通过 copyWith 把它们重置为 null（ScanState.copyWith 同理）。
   // 真需要时可改用哨兵值，或单独写 withoutAlbum() 之类的方法。
   TrackInfo copyWith({
@@ -77,6 +79,7 @@ class TrackInfo {
     Collation? artistsCollation,
     String? album,
     Collation? albumCollation,
+    String? albumArtist,
     String? uri,
     String? fileName,
     int? sizeBytes,
@@ -95,6 +98,7 @@ class TrackInfo {
       artistsCollation: artistsCollation ?? this.artistsCollation,
       album: album ?? this.album,
       albumCollation: albumCollation ?? this.albumCollation,
+      albumArtist: albumArtist ?? this.albumArtist,
       uri: uri ?? this.uri,
       fileName: fileName ?? this.fileName,
       sizeBytes: sizeBytes ?? this.sizeBytes,

@@ -91,7 +91,10 @@ class TrackScanner {
               (existingTrack.editTime.millisecondsSinceEpoch != 0 &&
                   existingTrack.sizeBytes != -1)) {
             yield TrackSkipped(
-              track: existingTrack.copyWith(uri: item.uri, removed: false),
+              sourceKey: item.sourceKey,
+              uri: item.uri,
+              fileName: item.name,
+              removed: false,
             );
             continue;
           }
@@ -100,38 +103,41 @@ class TrackScanner {
       } catch (e) {
         // 如果 item 是库里已有的曲目、重新解析失败（文件被改坏/截断），保留旧记录。
         if (existingTrack != null) {
-          yield TrackSkipped(track: existingTrack.copyWith(removed: true));
+          yield TrackSkipped(
+            sourceKey: item.sourceKey,
+            uri: item.uri,
+            fileName: item.name,
+            removed: true,
+          );
         }
         yield TrackParsedError(file: item, detail: e.toString());
         continue;
       }
 
       final title = tag.title ?? p.basenameWithoutExtension(item.name);
-      final track = TrackInfo(
+      yield TrackParsed(
         sourceKey: item.sourceKey,
         title: title,
         titleCollation: collationOf(title),
         artists: tag.artists,
-        artistsCollation: collationOfNullable(tag.artists.firstOrNull),
+        artistCollations: tag.artists.map((i) => collationOf(i)).toList(),
         album: tag.album,
         albumCollation: collationOfNullable(tag.album),
+        albumArtist: tag.albumArtist,
         uri: item.uri,
         fileName: item.name,
         sizeBytes: item.sizeBytes,
         durationMs: tag.durationMs,
-        // 文件变了，标签里的增益可能已失效
-        // TODO: 应用自己回写增益也会改变文件修改时间，
-        // 回写后必须同步更新库里的 editTime，否则下次扫描会被当成"文件变了"。
-        trackGainUpdated: false,
         editTime: item.editTime,
-        playCount: existingTrack?.playCount ?? 0,
-        addTime: existingTrack?.addTime ?? DateTime.now(),
-        removed: false,
       );
-      yield TrackParsed(track: track);
     }
     for (var item in existingMap.values) {
-      yield TrackParsed(track: item.copyWith(removed: true));
+      yield TrackSkipped(
+        sourceKey: item.sourceKey,
+        uri: item.uri,
+        fileName: item.fileName,
+        removed: true,
+      );
     }
     yield TrackParsedFinish();
   }

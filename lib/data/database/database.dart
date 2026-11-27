@@ -12,7 +12,7 @@ part 'database.g.dart';
 @DriftDatabase(
   tables: [Tracks, Albums, Artists, TrackArtists, Playlists, PlaylistTracks],
 )
-class AppDatabase extends _$AppDatabase {
+class LinglunDatabase extends _$LinglunDatabase {
   new([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
