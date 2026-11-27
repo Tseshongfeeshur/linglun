@@ -17,5 +17,6 @@ class Albums extends Table {
   /// 排序依据
   TextColumn get titleSort => text()();
 
-  TextColumn get albumArtistId => text().nullable().references(Artists, #id)();
+  IntColumn get albumArtistId =>
+      integer().nullable().references(Artists, #id)();
 }
