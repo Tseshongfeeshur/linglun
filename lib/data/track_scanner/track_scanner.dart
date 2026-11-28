@@ -65,6 +65,7 @@ class TrackScanner {
   /// 解析 files 里的文件，与 existing（现有曲库）对比：
   ///   - 没变化 → TrackSkipped（沿用旧记录，只更新 uri）；
   ///   - 新增/已变化 → TrackParsed（playCount、addTime 沿用旧值）；
+  ///   - 文件被移除 → TrackMissed；
   ///   - 失败 → TrackParsedError；
   ///   - 库里有、files 里没有 → 标记 removed 后以 TrackParsed 发出。
   /// 最后以 TrackParsedFinish 结束。
@@ -97,7 +98,6 @@ class TrackScanner {
               sourceKey: item.sourceKey,
               uri: item.uri,
               fileName: item.name,
-              removed: false,
             );
             continue;
           }
@@ -106,12 +106,7 @@ class TrackScanner {
       } catch (e) {
         // 如果 item 是库里已有的曲目、重新解析失败（文件被改坏/截断），保留旧记录。
         if (existingTrack != null) {
-          yield TrackSkipped(
-            sourceKey: item.sourceKey,
-            uri: item.uri,
-            fileName: item.name,
-            removed: true,
-          );
+          yield TrackMissed(sourceKey: item.sourceKey, fileName: item.name);
         }
         yield TrackParsedError(file: item, detail: e.toString());
         continue;
@@ -138,12 +133,7 @@ class TrackScanner {
       );
     }
     for (var item in existingMap.values) {
-      yield TrackSkipped(
-        sourceKey: item.sourceKey,
-        uri: item.uri,
-        fileName: item.fileName,
-        removed: true,
-      );
+      yield TrackMissed(sourceKey: item.sourceKey, fileName: item.fileName);
     }
     yield TrackParsedFinish();
   }

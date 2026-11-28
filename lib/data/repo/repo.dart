@@ -12,6 +12,7 @@ class Repo {
   Future<void> update(
     List<TrackParsed> parsed,
     List<TrackSkipped> skipped,
+    List<TrackMissed> missed,
   ) async {
     await db.transaction(() async {
       for (final e in parsed) {
@@ -177,8 +178,19 @@ class Repo {
           await (db.update(
             db.tracks,
           )..where((tbl) => tbl.id.equals(old.id))).write(
-            TracksCompanion(uri: Value(e.uri), removed: Value(e.removed)),
+            TracksCompanion(uri: Value(e.uri), removed: const Value(false)),
           );
+        }
+      }
+
+      for (final e in missed) {
+        final old = await (db.select(
+          db.tracks,
+        )..where((tbl) => tbl.sourceKey.equals(e.sourceKey))).getSingleOrNull();
+        // 如果曲库中有
+        if (old != null) {
+          await (db.update(db.tracks)..where((tbl) => tbl.id.equals(old.id)))
+              .write(const TracksCompanion(removed: Value(true)));
         }
       }
     });

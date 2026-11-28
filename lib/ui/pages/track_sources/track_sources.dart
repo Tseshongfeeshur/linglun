@@ -185,7 +185,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
               try {
                 await ref
                     .read(repoProvider)
-                    .update(events.parsed, events.skipped);
+                    .update(events.parsed, events.skipped, events.missed);
               } catch (e) {
                 if (context.mounted) {
                   showSnackBar(context, Icons.error, e.toString());

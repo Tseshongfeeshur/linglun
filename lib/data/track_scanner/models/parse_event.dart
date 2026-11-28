@@ -62,14 +62,18 @@ class TrackSkipped extends ParseEvent {
   final String uri;
   final String fileName;
 
-  final bool removed;
+  new({required this.sourceKey, required this.uri, required this.fileName});
+}
 
-  new({
-    required this.sourceKey,
-    required this.uri,
-    required this.fileName,
-    required this.removed,
-  });
+/// 被移除的曲目。
+class TrackMissed extends ParseEvent {
+  /// 曲目的"身份"，用来在多次扫描之间认出同一个文件：
+  /// Linux 为绝对路径；Android 为 SAF 的 document id（与通过哪个目录授权无关）。
+  /// 注意它和 uri 不是一回事——uri 可能因授权方式不同而变化。
+  final String sourceKey;
+  final String fileName;
+
+  new({required this.sourceKey, required this.fileName});
 }
 
 class TrackParsedError extends ParseEvent {

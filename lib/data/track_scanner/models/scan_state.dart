@@ -10,9 +10,9 @@ class ScanState {
   final bool discoverFinished;
 
   // 新增/已变化的曲目，以及被标记为 removed 的曲目
-  // （removed == true 的也在这里，界面统计"已更新"时要把它们排除）。
   final List<TrackParsed> parseUpdates;
   final List<TrackSkipped> parseSkips;
+  final List<TrackMissed> parseMissings;
   final List<TrackParsedError> parseErrors;
   int get parsedCount =>
       parseUpdates.length + parseSkips.length + parseErrors.length;
@@ -28,6 +28,7 @@ class ScanState {
 
     this.parseUpdates = const [],
     this.parseSkips = const [],
+    this.parseMissings = const [],
     this.parseErrors = const [],
     this.parseFinished = false,
 
@@ -41,6 +42,7 @@ class ScanState {
 
     List<TrackParsed>? parseUpdates,
     List<TrackSkipped>? parseSkips,
+    List<TrackMissed>? parseMissings,
     List<TrackParsedError>? parseErrors,
     bool? parseFinished,
 
@@ -53,6 +55,7 @@ class ScanState {
 
       parseUpdates: parseUpdates ?? this.parseUpdates,
       parseSkips: parseSkips ?? this.parseSkips,
+      parseMissings: parseMissings ?? this.parseMissings,
       parseErrors: parseErrors ?? this.parseErrors,
       parseFinished: parseFinished ?? this.parseFinished,
 
@@ -91,6 +94,11 @@ class ScanState {
       case TrackSkipped():
         return copyWith(
           parseSkips: [...parseSkips, event],
+          current: event.fileName,
+        );
+      case TrackMissed():
+        return copyWith(
+          parseMissings: [...parseMissings, event],
           current: event.fileName,
         );
       case TrackParsedError():

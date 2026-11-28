@@ -9,14 +9,24 @@ import 'package:linglun/data/track_scanner/models/scan_state.dart';
 
 /// 弹出阻塞式扫描对话框，扫描完成并确认后返回新的完整曲库；取消返回 null。
 /// 返回值 = 跳过的旧记录 + 新增/已变化/被标 removed 的记录；
-Future<({List<TrackParsed> parsed, List<TrackSkipped> skipped})?>
+Future<
+  ({
+    List<TrackParsed> parsed,
+    List<TrackSkipped> skipped,
+    List<TrackMissed> missed,
+  })?
+>
 showScanningDialog(
   BuildContext context,
   Set<String> uris,
   List<TrackInfo> existing,
 ) async {
   return await showDialog<
-    ({List<TrackParsed> parsed, List<TrackSkipped> skipped})
+    ({
+      List<TrackParsed> parsed,
+      List<TrackSkipped> skipped,
+      List<TrackMissed> missed,
+    })
   >(
     context: context,
     builder: (BuildContext context) => PopScope(
@@ -211,14 +221,36 @@ class _ContentAtFinish extends StatelessWidget {
                     : _showDetailDialog(
                         context,
                         '跳过明细',
-                        scanState.parseSkips
-                            .where((i) => i.removed == false)
-                            .map((i) => i.fileName)
-                            .toList(),
+                        scanState.parseSkips.map((i) => i.fileName).toList(),
                       ),
               ),
 
-              // 第三项：已失败
+              // 第三项：历史移除
+              ListTile(
+                leading: const Icon(Icons.remove_circle),
+                trailing: scanState.parseMissings.isEmpty
+                    ? null
+                    : const Icon(Icons.keyboard_arrow_right),
+                title: Text(
+                  '曾被移除 ${scanState.parseMissings.length} 项',
+                  style: const TextStyle(overflow: TextOverflow.ellipsis),
+                  maxLines: 1,
+                ),
+                subtitle: const Text(
+                  '曲库中存在条目，但源文件无法加载',
+                  style: TextStyle(overflow: TextOverflow.ellipsis),
+                  maxLines: 2,
+                ),
+                onTap: () => scanState.parseMissings.isEmpty
+                    ? null
+                    : _showDetailDialog(
+                        context,
+                        '移除明细',
+                        scanState.parseMissings.map((i) => i.fileName).toList(),
+                      ),
+              ),
+
+              // 第四项：已失败
               ListTile(
                 leading: const Icon(Icons.error),
                 trailing:
@@ -268,6 +300,7 @@ class _ContentAtFinish extends StatelessWidget {
                   Navigator.pop(context, (
                     parsed: scanState.parseUpdates,
                     skipped: scanState.parseSkips,
+                    missed: scanState.parseMissings,
                   ));
                 },
                 child: const Text('更新曲库'),
