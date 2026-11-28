@@ -5,7 +5,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:linglun/data/track_scanner/utils/platforms/platform_file_utils.dart';
-import 'package:linglun/states/tracks_provider.dart';
 import 'package:linglun/ui/utils/show_snack_bar.dart';
 import 'package:linglun/ui/pages/track_sources/utils/show_scanning_dialog.dart';
 import 'package:path/path.dart' as p;
@@ -177,7 +176,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
             if (platformPath.ticked && platformPath.path != null)
               platformPath.path!,
             ...userUris.keys.where((element) => userUris[element] ?? false),
-          }, ref.read(tracksProvider));
+          });
           if (events != null) {
             ref.read(repoProvider).update(events.parsed, events.skipped);
           }

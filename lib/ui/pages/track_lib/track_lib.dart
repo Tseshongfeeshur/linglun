@@ -25,7 +25,18 @@ class _TrackLibState extends ConsumerState<TrackLib> {
 
   @override
   Widget build(BuildContext context) {
-    final groupedTracks = ref.watch(groupedTracksProvider(sortConfig));
+    final loader = ref.watch(groupedTracksProvider(sortConfig));
+    var groupedTracks = <TrackListItemType>[];
+    var loading = true;
+    loader.when(
+      data: (data) {
+        groupedTracks = data;
+        loading = false;
+      },
+      // TODO
+      error: (_, _) {},
+      loading: () => loading = true,
+    );
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -42,29 +53,31 @@ class _TrackLibState extends ConsumerState<TrackLib> {
         ],
       ),
       // 列表限宽 960 并顶部居中（TrackSources 页里没有居中，两页不一致）。
-      body: groupedTracks.isEmpty
-          ? Center(
-              child: FilledButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: ((context) =>
-                        const TrackSources(hideDrawerButton: true)),
-                  ),
-                ),
-                child: const Text('扫描歌曲'),
-              ),
-            )
-          : Align(
-              alignment: AlignmentGeometry.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 960),
-                child: TrackListView(
-                  groupedTracks: groupedTracks,
-                  sortConfig: sortConfig,
-                ),
-              ),
-            ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : (groupedTracks.isEmpty
+                ? Center(
+                    child: FilledButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: ((context) =>
+                              const TrackSources(hideDrawerButton: true)),
+                        ),
+                      ),
+                      child: const Text('扫描歌曲'),
+                    ),
+                  )
+                : Align(
+                    alignment: AlignmentGeometry.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 960),
+                      child: TrackListView(
+                        groupedTracks: groupedTracks,
+                        sortConfig: sortConfig,
+                      ),
+                    ),
+                  )),
     );
   }
 }
