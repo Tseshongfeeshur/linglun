@@ -58,6 +58,10 @@ class TrackScanner {
     }
   }
 
+  /// 判断不同精度时间相等
+  bool _sameSecond(DateTime a, DateTime b) =>
+      a.millisecondsSinceEpoch ~/ 1000 == b.millisecondsSinceEpoch ~/ 1000;
+
   /// 解析 files 里的文件，与 existing（现有曲库）对比：
   ///   - 没变化 → TrackSkipped（沿用旧记录，只更新 uri）；
   ///   - 新增/已变化 → TrackParsed（playCount、addTime 沿用旧值）；
@@ -78,7 +82,6 @@ class TrackScanner {
     for (final item in files) {
       SimpleTag tag;
       final existingTrack = existingMap[item.sourceKey];
-
       try {
         if (existingTrack != null) {
           // 若曲库数据版本过时，不管文件是否被修改都重新解析。
@@ -86,7 +89,7 @@ class TrackScanner {
           // 路径身份(sourceKey)、修改时间、大小都相同 → 认为文件没变，跳过解析。
           // editTime 为 0 或 sizeBytes 为 -1 说明平台没给出可靠信息，不能据此判断
           // "没变"，必须重新解析。
-          if ((existingTrack.editTime == item.editTime &&
+          if ((_sameSecond(existingTrack.editTime, item.editTime) &&
                   existingTrack.sizeBytes == item.sizeBytes) &&
               (existingTrack.editTime.millisecondsSinceEpoch != 0 &&
                   existingTrack.sizeBytes != -1)) {

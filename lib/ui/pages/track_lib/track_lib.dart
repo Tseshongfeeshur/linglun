@@ -66,8 +66,8 @@ class _TrackLibState extends ConsumerState<TrackLib> {
                   ),
                 ),
               ),
-        error: (_, _) {
-          return null;
+        error: (err, _) {
+          return Text(err.toString());
         },
         loading: () => const Center(child: CircularProgressIndicator()),
       ),

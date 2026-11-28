@@ -1,6 +1,5 @@
 import 'package:linglun/data/track_scanner/models/parse_event.dart';
 import 'package:linglun/states/track_scanner/scan_provider.dart';
-import 'package:linglun/states/tracks_provider.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +10,11 @@ import 'package:linglun/data/track_scanner/models/scan_state.dart';
 /// 弹出阻塞式扫描对话框，扫描完成并确认后返回新的完整曲库；取消返回 null。
 /// 返回值 = 跳过的旧记录 + 新增/已变化/被标 removed 的记录；
 Future<({List<TrackParsed> parsed, List<TrackSkipped> skipped})?>
-showScanningDialog(BuildContext context, Set<String> uris) async {
+showScanningDialog(
+  BuildContext context,
+  Set<String> uris,
+  List<TrackInfo> existing,
+) async {
   return await showDialog<
     ({List<TrackParsed> parsed, List<TrackSkipped> skipped})
   >(
@@ -20,7 +23,9 @@ showScanningDialog(BuildContext context, Set<String> uris) async {
       // 禁止返回键/点击外部关闭，只能通过对话框里的按钮退出
       // （代码里调用的 Navigator.pop 不受 canPop 限制）。
       canPop: false,
-      child: Dialog(child: _ScanningDialogFrame(urisToDiscover: uris)),
+      child: Dialog(
+        child: _ScanningDialogFrame(urisToDiscover: uris, existing: existing),
+      ),
     ),
     barrierDismissible: false,
   );
@@ -28,7 +33,8 @@ showScanningDialog(BuildContext context, Set<String> uris) async {
 
 class _ScanningDialogFrame extends ConsumerStatefulWidget {
   final Set<String> urisToDiscover;
-  const new({required this.urisToDiscover});
+  final List<TrackInfo> existing;
+  const new({required this.urisToDiscover, required this.existing});
 
   @override
   ConsumerState<_ScanningDialogFrame> createState() =>
@@ -36,24 +42,14 @@ class _ScanningDialogFrame extends ConsumerStatefulWidget {
 }
 
 class _ScanningDialogFrameState extends ConsumerState<_ScanningDialogFrame> {
-  late List<TrackInfo> existing;
   @override
   void initState() {
     super.initState();
-    // 获取已有列表
-    final loader = ref.watch(tracksProvider);
-    var existing = <TrackInfo>[];
-    loader.when(
-      data: (data) {
-        existing = data;
-      },
-      // TODO
-      error: (_, _) {},
-      loading: () {},
-    );
     // 对话框一出现就开始扫描；对话框关闭 → scanProvider（autoDispose）销毁
     // → 扫描在下一个事件处停止，这就是"取消"。
-    ref.read(scanProvider.notifier).startScan(widget.urisToDiscover, existing);
+    ref
+        .read(scanProvider.notifier)
+        .startScan(widget.urisToDiscover, widget.existing);
   }
 
   @override
