@@ -22,9 +22,9 @@ class TrackInfo {
   final Collation titleCollation;
 
   // artists 不可空，无艺术家时为空列表。
-  // artistsCollation 依据为首位歌手，仅供歌曲排序使用。
+  // artistCollation 依据为首位歌手，仅供歌曲排序使用。
   final List<String> artists;
-  final Collation artistsCollation;
+  final Collation artistCollation;
 
   final String? album;
   final Collation albumCollation;
@@ -53,7 +53,7 @@ class TrackInfo {
     required this.title,
     required this.titleCollation,
     required this.artists,
-    required this.artistsCollation,
+    required this.artistCollation,
     this.album,
     required this.albumCollation,
     this.albumArtist,
@@ -76,7 +76,7 @@ class TrackInfo {
     String? title,
     Collation? titleCollation,
     List<String>? artists,
-    Collation? artistsCollation,
+    Collation? artistCollation,
     String? album,
     Collation? albumCollation,
     String? albumArtist,
@@ -95,7 +95,7 @@ class TrackInfo {
       title: title ?? this.title,
       titleCollation: titleCollation ?? this.titleCollation,
       artists: artists ?? this.artists,
-      artistsCollation: artistsCollation ?? this.artistsCollation,
+      artistCollation: artistCollation ?? this.artistCollation,
       album: album ?? this.album,
       albumCollation: albumCollation ?? this.albumCollation,
       albumArtist: albumArtist ?? this.albumArtist,

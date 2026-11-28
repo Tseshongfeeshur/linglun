@@ -125,4 +125,6 @@ final ArtistSplitter artistSplitter = ArtistSplitter(
   protectedNames: _protectedArtistNames,
 );
 
-List<String> splitArtists(String raw) => artistSplitter.split(raw);
+// 去重
+List<String> splitArtists(String raw) =>
+    artistSplitter.split(raw).toSet().toList();

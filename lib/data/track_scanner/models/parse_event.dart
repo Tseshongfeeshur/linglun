@@ -22,6 +22,7 @@ class TrackParsed extends ParseEvent {
   final String? album;
   final Collation albumCollation;
   final String? albumArtist;
+  final Collation? albumArtistCollation;
 
   /// 读取/播放用的地址：Linux 是文件路径，Android 是 content:// URI。
   final String uri;
@@ -41,12 +42,13 @@ class TrackParsed extends ParseEvent {
     this.album,
     required this.albumCollation,
     this.albumArtist,
+    this.albumArtistCollation,
     required this.uri,
     required this.fileName,
     required this.sizeBytes,
     required this.durationMs,
     required this.editTime,
-  });
+  }) : assert((albumArtist == null) == (albumArtistCollation == null));
 }
 
 /// 与库里记录一致、无需重新解析的曲目（沿用旧记录）。

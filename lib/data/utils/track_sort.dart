@@ -27,7 +27,7 @@ enum TrackSort {
   /// 不分组的排序依据返回 null。
   String? groupSource(TrackInfo m) => switch (this) {
     TrackSort.title => m.titleCollation.group,
-    TrackSort.artists => m.artistsCollation.group,
+    TrackSort.artists => m.artistCollation.group,
     TrackSort.album => m.albumCollation.group,
     _ => null,
   };
@@ -68,7 +68,7 @@ List<TrackInfo> sortTrackList(List<TrackInfo> list, SortConfig sortConfig) {
       );
     case TrackSort.artists:
       result.sort(
-        (a, b) => compareCollations(a.artistsCollation, b.artistsCollation),
+        (a, b) => compareCollations(a.artistCollation, b.artistCollation),
       );
     case TrackSort.album:
       result.sort(

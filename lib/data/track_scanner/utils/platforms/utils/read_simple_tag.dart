@@ -32,7 +32,9 @@ Future<SimpleTag> readSimpleTag(String uri) async {
       albumArtist: file.album.isEmpty
           ? null
           : _readAlbumArtist(file) ??
-                (file.album.isEmpty ? null : artists.first),
+                (file.album.isEmpty
+                    ? null
+                    : (artists.isEmpty ? null : artists.first)),
       durationMs: file.duration.inMilliseconds,
     );
   } finally {

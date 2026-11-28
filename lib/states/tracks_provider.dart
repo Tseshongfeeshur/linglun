@@ -5,15 +5,15 @@ import 'package:linglun/states/repo_provider.dart';
 
 /// 全局曲库（含被标记 removed 的曲目）。扫描完成后整体替换。
 // TODO: 改为同步，数据库监听
-class _TracksNotifier extends AsyncNotifier<List<TrackInfo>> {
+class _TracksNotifier extends Notifier<List<TrackInfo>> {
   @override
-  Future<List<TrackInfo>> build() async {
+  List<TrackInfo> build() {
     final repo = ref.read(repoProvider);
     return repo.getTracks();
   }
 }
 
-final tracksProvider = AsyncNotifierProvider<_TracksNotifier, List<TrackInfo>>(
+final tracksProvider = NotifierProvider<_TracksNotifier, List<TrackInfo>>(
   _TracksNotifier.new,
 );
 

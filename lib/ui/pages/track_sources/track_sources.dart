@@ -179,7 +179,7 @@ class _TrackSourcesState extends ConsumerState<TrackSources> {
             ...userUris.keys.where((element) => userUris[element] ?? false),
           }, ref.read(tracksProvider));
           if (events != null) {
-            ref.read(repoProvider).update(events);
+            ref.read(repoProvider).update(events.parsed, events.skipped);
           }
         },
         isExtended: true,

@@ -36,7 +36,7 @@ void showTrackInfoBottomSheet(
               TextSpan(text: '\n艺术家：', style: _headStyle()),
               TextSpan(text: track.artists.join(' / ')),
               TextSpan(
-                text: '（${track.artistsCollation.sort}）',
+                text: '（${track.artistCollation.sort}）',
                 style: _descStyle(context),
               ),
               TextSpan(text: '\n专辑：', style: _headStyle()),

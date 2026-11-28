@@ -124,6 +124,9 @@ class TrackScanner {
         album: tag.album,
         albumCollation: collationOfNullable(tag.album),
         albumArtist: tag.albumArtist,
+        albumArtistCollation: tag.albumArtist == null
+            ? null
+            : collationOf(tag.albumArtist!),
         uri: item.uri,
         fileName: item.name,
         sizeBytes: item.sizeBytes,

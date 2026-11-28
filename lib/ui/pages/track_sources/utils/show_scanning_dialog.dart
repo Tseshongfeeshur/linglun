@@ -9,12 +9,15 @@ import 'package:linglun/data/track_scanner/models/scan_state.dart';
 
 /// 弹出阻塞式扫描对话框，扫描完成并确认后返回新的完整曲库；取消返回 null。
 /// 返回值 = 跳过的旧记录 + 新增/已变化/被标 removed 的记录；
-Future<List<ParseEvent>?> showScanningDialog(
+Future<({List<TrackParsed> parsed, List<TrackSkipped> skipped})?>
+showScanningDialog(
   BuildContext context,
   Set<String> uris,
   List<TrackInfo> existing,
 ) async {
-  return await showDialog<List<ParseEvent>>(
+  return await showDialog<
+    ({List<TrackParsed> parsed, List<TrackSkipped> skipped})
+  >(
     context: context,
     builder: (BuildContext context) => PopScope(
       // 禁止返回键/点击外部关闭，只能通过对话框里的按钮退出
@@ -262,10 +265,10 @@ class _ContentAtFinish extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () {
-                  Navigator.pop(context, <ParseEvent>[
-                    ...scanState.parseSkips,
-                    ...scanState.parseUpdates,
-                  ]);
+                  Navigator.pop(context, (
+                    parsed: scanState.parseUpdates,
+                    skipped: scanState.parseSkips,
+                  ));
                 },
                 child: const Text('更新曲库'),
               ),
