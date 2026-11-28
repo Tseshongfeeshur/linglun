@@ -184,145 +184,69 @@ class Repo {
     });
   }
 
-  Future<List<TrackInfo>> getTracks() async {
-    var result = <TrackInfo>[];
-
-    // 先拿出所有曲目
+  Future<List<TrackInfo>> _loadTracks() async {
     final trackRows = await db.select(db.tracks).get();
 
-    for (final row in trackRows) {
-      final trackId = row.id;
+    final artistRows = await db.select(db.artists).get();
+    final artistMap = Map.fromEntries(artistRows.map((i) => MapEntry(i.id, i)));
 
-      // 先读出艺术家
-      final artistIds =
-          (await ((db.select(db.trackArtists)
-                      ..where((tbl) => tbl.trackId.equals(trackId)))
-                    ..orderBy([(tbl) => OrderingTerm.asc(tbl.position)]))
-                  .get())
-              .map((i) => i.artistId);
-      final artistRows = await (db.select(
-        db.artists,
-      )..where((tbl) => tbl.id.isIn(artistIds))).get();
+    final albumRows = await db.select(db.albums).get();
+    final albumMap = Map.fromEntries(albumRows.map((i) => MapEntry(i.id, i)));
 
-      // 再读出专辑
-      Album? albumRow;
-      Artist? albumArtistRow;
-      if (row.albumId != null) {
-        albumRow = await (db.select(
-          db.albums,
-        )..where((tbl) => tbl.id.equals(row.albumId!))).getSingleOrNull();
-        // 专辑艺术家
-        albumArtistRow = await (db.select(
-          db.artists,
-        )..where((tbl) => tbl.id.equals(albumRow!.id))).getSingleOrNull();
-      }
-
-      // 构建对象
-      result.add(
-        TrackInfo(
-          sourceKey: row.sourceKey,
-          title: row.title,
-          titleCollation: Collation(group: row.titleGroup, sort: row.titleSort),
-          artists: artistRows.map((i) => i.name).toList(),
-          artistCollation: artistRows.isEmpty
-              ? collationOfNullable(null)
-              : Collation(
-                  group: artistRows.first.nameGroup,
-                  sort: artistRows.first.nameSort,
-                ),
-          album: albumRow?.title,
-          albumCollation: albumRow == null
-              ? collationOfNullable(null)
-              : Collation(group: albumRow.titleGroup, sort: albumRow.titleSort),
-          albumArtist: albumArtistRow?.name,
-          uri: row.uri,
-          fileName: row.fileName,
-          sizeBytes: row.sizeBytes,
-          durationMs: row.durationMs,
-          editTime: row.editTime,
-          trackGainUpdated: row.trackGainUpdated,
-          playCount: row.playCount,
-          addTime: row.addTime,
-          removed: row.removed,
-        ),
-      );
+    final trackArtistRows = await (db.select(
+      db.trackArtists,
+    )..orderBy([(tbl) => OrderingTerm.asc(tbl.position)])).get();
+    var trackArtistMap = <int, List<int>>{};
+    for (final i in trackArtistRows) {
+      trackArtistMap.putIfAbsent(i.trackId, () => []).add(i.artistId);
     }
+
+    final result = trackRows.map((row) {
+      final artistIds = trackArtistMap[row.id];
+      final album = albumMap[row.albumId];
+
+      return TrackInfo(
+        sourceKey: row.sourceKey,
+        title: row.title,
+        titleCollation: Collation(group: row.titleGroup, sort: row.titleSort),
+        artists: artistIds?.map((i) => artistMap[i]!.name).toList() ?? [],
+
+        artistCollation: artistIds == null
+            ? collationOfNullable(null)
+            : Collation(
+                group: artistMap[artistIds[0]]!.nameGroup,
+                sort: artistMap[artistIds[0]]!.nameSort,
+              ),
+        album: album?.title,
+        albumCollation: album == null
+            ? collationOfNullable(null)
+            : Collation(group: album.titleGroup, sort: album.titleSort),
+        albumArtist: album == null
+            ? null
+            : artistMap[album.albumArtistId]?.name,
+        uri: row.uri,
+        fileName: row.fileName,
+        sizeBytes: row.sizeBytes,
+        durationMs: row.durationMs,
+        editTime: row.editTime,
+        trackGainUpdated: row.trackGainUpdated,
+        playCount: row.playCount,
+        addTime: row.addTime,
+        removed: row.removed,
+      );
+    }).toList();
+
     return result;
   }
 
-  Stream<List<TrackInfo>> watchTracks() async* {
-    final trackRowsStream = db.select(db.tracks).watch();
-
-    await for (final trackRow in trackRowsStream) {
-      final artistRows = await db.select(db.artists).get();
-      final albumRows = await db.select(db.albums).get();
-      final trackArtistRows = await (db.select(
-        db.trackArtists,
-      )..orderBy([(tbl) => OrderingTerm.asc(tbl.position)])).get();
-
-      yield trackRow
-          .map(
-            (row) => TrackInfo(
-              sourceKey: row.sourceKey,
-              title: row.title,
-              titleCollation: Collation(
-                group: row.titleGroup,
-                sort: row.titleSort,
-              ),
-              artists: trackArtistRows
-                  .where((i) => i.trackId == row.id)
-                  .map((i) => i.artistId)
-                  .map(
-                    (i) =>
-                        artistRows.firstWhere((artistRow) => artistRow.id == i),
-                  )
-                  .map((i) => i.name)
-                  .toList(),
-              artistCollation: artistRows.isEmpty
-                  ? collationOfNullable(null)
-                  : Collation(
-                      group: trackArtistRows
-                          .where((i) => i.trackId == row.id)
-                          .map((i) => i.artistId)
-                          .map(
-                            (i) => artistRows.firstWhere(
-                              (artistRow) => artistRow.id == i,
-                            ),
-                          )
-                          .first
-                          .nameGroup,
-                      sort: trackArtistRows
-                          .where((i) => i.trackId == row.id)
-                          .map((i) => i.artistId)
-                          .map(
-                            (i) => artistRows.firstWhere(
-                              (artistRow) => artistRow.id == i,
-                            ),
-                          )
-                          .first
-                          .nameGroup,
-                    ),
-              album: albumRows.firstWhere((i) => i.id == row.albumId).title,
-              albumCollation: Collation(
-                group: albumRows
-                    .firstWhere((i) => i.id == row.albumId)
-                    .titleGroup,
-                sort: albumRows
-                    .firstWhere((i) => i.id == row.albumId)
-                    .titleSort,
-              ),
-              uri: row.uri,
-              fileName: row.fileName,
-              sizeBytes: row.sizeBytes,
-              durationMs: row.durationMs,
-              editTime: row.editTime,
-              trackGainUpdated: row.trackGainUpdated,
-              playCount: row.playCount,
-              addTime: row.addTime,
-              removed: row.removed,
-            ),
-          )
-          .toList();
-    }
+  Stream<List<TrackInfo>> watchTracks() {
+    final dataStream = db
+        .customSelect(
+          'SELECT 1',
+          readsFrom: {db.tracks, db.artists, db.albums, db.trackArtists},
+        )
+        .watch()
+        .asyncMap((_) => _loadTracks());
+    return dataStream;
   }
 }
